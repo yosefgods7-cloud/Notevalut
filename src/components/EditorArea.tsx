@@ -88,7 +88,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
   useEffect(() => {
     if (note && editor) {
       if (editor.getHTML() !== note.content) {
-        editor.commands.setContent(note.content, false);
+        editor.commands.setContent(note.content, false, { preserveWhitespace: 'full' } as any);
       }
       setTitle(note.title);
       setSource(note.headerMeta?.source || '');

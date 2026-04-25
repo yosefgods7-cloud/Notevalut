@@ -74,7 +74,7 @@ export const NoteList: React.FC<NoteListProps> = ({
 
   const handleBulkDelete = () => {
     if (confirm(`Delete ${selectedNotes.length} notes?`)) {
-      deleteNotes(selectedNotes);
+      selectedNotes.forEach(id => deleteNote(id));
       setSelectedNotes([]);
       setIsBulkMode(false);
       if (activeNoteId && selectedNotes.includes(activeNoteId)) {

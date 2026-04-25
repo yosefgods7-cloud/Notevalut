@@ -12,7 +12,7 @@ interface ImportModalProps {
 }
 
 export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, activeWorkspaceId, activeCollectionId }) => {
-  const { data, importData, addNote } = useStorage();
+  const { data, importData, addNote, updateNote } = useStorage();
   const [isImporting, setIsImporting] = useState(false);
   
   if (!isOpen) return null;
@@ -40,8 +40,12 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, activ
         
         // Use addNote context method to ensure UUIDs are generated properly
         const newNote = addNote(activeWorkspaceId, activeCollectionId, noteData.title, noteData.content);
-        // Then apply any additional metadata from frontmatter
-        const { updateNote } = useStorage.getState?.() || {}; // Quick hack to get updateNote if not directly from context, wait we are in component
+        if (updateNote) {
+          updateNote(newNote.id, {
+            tags: noteData.tags || [],
+            headerMeta: noteData.headerMeta,
+          });
+        }
       } else {
         alert("Unsupported file format. Please use .json or .md");
       }
