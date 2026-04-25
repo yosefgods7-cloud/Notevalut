@@ -1,0 +1,6 @@
+{
+  "name": "NoteVault",
+  "description": "A private, offline-first personal knowledge system with smart AI pasting capabilities.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
