@@ -15,7 +15,7 @@ export const NoteList: React.FC<NoteListProps> = ({
   activeWorkspaceId, activeCollectionId,
   activeNoteId, setActiveNoteId
 }) => {
-  const { data, addNote, updateNote, deleteNote } = useStorage();
+  const { data, addNote, updateNote, deleteNote, deleteNotes } = useStorage();
   const [searchQuery, setSearchQuery] = useState('');
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
@@ -74,7 +74,7 @@ export const NoteList: React.FC<NoteListProps> = ({
 
   const handleBulkDelete = () => {
     if (confirm(`Delete ${selectedNotes.length} notes?`)) {
-      selectedNotes.forEach(id => deleteNote(id));
+      deleteNotes(selectedNotes);
       setSelectedNotes([]);
       setIsBulkMode(false);
       if (activeNoteId && selectedNotes.includes(activeNoteId)) {

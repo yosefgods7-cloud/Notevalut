@@ -51,7 +51,22 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        return JSON.parse(stored) as NoteVaultData;
+        let parsed = JSON.parse(stored) as Partial<NoteVaultData>;
+        
+        const now = new Date().toISOString();
+        const defaultWsId = generateId();
+
+        // Ensure that all properties exist to prevent undefined property errors
+        const migratedData: NoteVaultData = {
+          version: parsed.version || 1,
+          workspaces: parsed.workspaces?.length ? parsed.workspaces : [{ id: defaultWsId, name: 'My Notes', icon: '🧠', createdAt: now, order: 0 }],
+          collections: parsed.collections || [],
+          notes: parsed.notes || [],
+          tags: parsed.tags || [],
+          settings: { ...DEFAULT_SETTINGS, ...(parsed.settings || {}) },
+        };
+        
+        return migratedData;
       }
     } catch (e) {
       console.error('Failed to parse NoteVault data from localStorage', e);

@@ -40,11 +40,9 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, activ
         
         // Use addNote context method to ensure UUIDs are generated properly
         const newNote = addNote(activeWorkspaceId, activeCollectionId, noteData.title, noteData.content);
-        if (updateNote) {
-          updateNote(newNote.id, {
-            tags: noteData.tags || [],
-            headerMeta: noteData.headerMeta,
-          });
+        // Then apply any additional metadata from frontmatter
+        if (noteData.headerMeta || noteData.tags) {
+           updateNote(newNote.id, { headerMeta: noteData.headerMeta, tags: noteData.tags || [] });
         }
       } else {
         alert("Unsupported file format. Please use .json or .md");

@@ -3,13 +3,10 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "homepage": ".",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
-    "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist",
-    "preview": "vite preview",
+    "preview": "vite preview --port=3000 --host=0.0.0.0",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit"
   },
@@ -33,7 +30,6 @@
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "file-saver": "^2.0.5",
-    "gh-pages": "^6.3.0",
     "jszip": "^3.10.1",
     "lucide-react": "^0.546.0",
     "marked": "^18.0.2",

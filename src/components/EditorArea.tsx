@@ -88,7 +88,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
   useEffect(() => {
     if (note && editor) {
       if (editor.getHTML() !== note.content) {
-        editor.commands.setContent(note.content, false, { preserveWhitespace: 'full' } as any);
+        editor.commands.setContent(note.content, { emitUpdate: false });
       }
       setTitle(note.title);
       setSource(note.headerMeta?.source || '');
@@ -337,7 +337,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
         onClose={() => setHistoryOpen(false)}
         noteId={noteId}
         onRestore={(content) => {
-          editor.commands.setContent(content, false);
+          editor.commands.setContent(content, { emitUpdate: false });
           updateNote(noteId, { content });
           showToast('✓ Resorted from history');
         }}
