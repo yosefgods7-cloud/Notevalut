@@ -54,7 +54,8 @@ service cloud.firestore {
              data.createdAt is string &&
              data.updatedAt is string &&
              data.wordCount is number &&
-             (data.keys().hasAll(['headerMeta']) == false || data.headerMeta is map);
+             (data.keys().hasAll(['headerMeta']) == false || data.headerMeta is map) &&
+             (data.keys().hasAll(['images']) == false || data.images is list);
     }
 
     match /users/{userId} {
@@ -81,8 +82,8 @@ service cloud.firestore {
 
       match /notes/{noteId} {
         allow get, list: if isOwner(userId) && resource.data.userId == request.auth.uid;
-        allow create: if isOwner(userId) && isValidId(noteId) && isValidNote(incoming()) && incoming().userId == userId && incoming().keys().size() <= 13;
-        allow update: if isOwner(userId) && isValidId(noteId) && isValidNote(incoming()) && incoming().userId == existing().userId && incoming().id == existing().id && incoming().diff(existing()).affectedKeys().hasOnly(['workspaceId', 'collectionId', 'title', 'content', 'tags', 'pinned', 'starred', 'updatedAt', 'wordCount', 'headerMeta']);
+        allow create: if isOwner(userId) && isValidId(noteId) && isValidNote(incoming()) && incoming().userId == userId && incoming().keys().size() <= 15;
+        allow update: if isOwner(userId) && isValidId(noteId) && isValidNote(incoming()) && incoming().userId == existing().userId && incoming().id == existing().id && incoming().diff(existing()).affectedKeys().hasOnly(['workspaceId', 'collectionId', 'title', 'content', 'tags', 'pinned', 'starred', 'updatedAt', 'wordCount', 'headerMeta', 'images']);
         allow delete: if isOwner(userId) && resource.data.userId == request.auth.uid;
       }
     }

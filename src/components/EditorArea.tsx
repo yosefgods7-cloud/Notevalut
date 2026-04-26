@@ -18,10 +18,19 @@ import {
   Heading1, Heading2, Heading3, 
   List, ListOrdered, CheckSquare, 
   Code, FileCode2, Table as TableIcon, 
-  Minus, Sparkles, Tag as TagIcon, X, Check, Clock
+  Minus, Sparkles, Tag as TagIcon, X, Check, Clock,
+  Image as ImageIcon, Download, Trash2, Bot
 } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, generateId } from '../lib/utils';
 import { format } from 'date-fns';
+import imageCompression from 'browser-image-compression';
+import { GoogleGenAI } from '@google/genai';
+
+// html2pdf is a robust library for turning DOM elements into PDFs
+// @ts-ignore
+import html2pdf from 'html2pdf.js';
+
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
 
 interface EditorAreaProps {
   noteId: string;
@@ -41,8 +50,100 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
   const [tagInput, setTagInput] = useState('');
   const [savedStatus, setSavedStatus] = useState<'saved' | 'saving'>('saved');
   const [isHistoryOpen, setHistoryOpen] = useState(false);
+  const [isProcessingImage, setIsProcessingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const pdfContainerRef = useRef<HTMLDivElement>(null);
 
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const exportToPdf = useCallback(() => {
+    if (!pdfContainerRef.current || !note) return;
+    
+    showToast('Preparing PDF...');
+    const element = pdfContainerRef.current;
+    
+    const opt = {
+      margin:       10,
+      filename:     `${note.title || 'Untitled_Note'}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+    
+    html2pdf().set(opt).from(element).save().then(() => {
+      showToast('PDF Exported Successfully');
+    });
+  }, [note, showToast]);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !note) return;
+    
+    setIsProcessingImage(true);
+    showToast('Compressing image...');
+    try {
+      const options = {
+        maxSizeMB: 0.1,
+        maxWidthOrHeight: 1200,
+        useWebWorker: true
+      };
+      
+      const compressedFile = await imageCompression(file, options);
+      const base64 = await imageCompression.getDataUrlFromFile(compressedFile);
+      
+      const newImage = {
+        id: generateId(),
+        name: file.name,
+        base64
+      };
+      
+      const updatedImages = [...(note.images || []), newImage];
+      updateNote(noteId, { images: updatedImages });
+      showToast('Image attached');
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to process image');
+    } finally {
+      setIsProcessingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const explainImage = async (base64: string) => {
+    showToast('Analyzing image with AI...');
+    try {
+      // Need to strip the data prefix from base64 string
+      const base64Data = base64.split(',')[1];
+      const mimeType = base64.split(';')[0].split(':')[1];
+      
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { text: 'Please analyze this image, describe what you see, and extract any notable text or key information.' },
+              { inlineData: { data: base64Data, mimeType } }
+            ]
+          }
+        ]
+      });
+      
+      if (response.text) {
+        editor?.commands.insertContent(`<p><strong>AI Image Analysis:</strong> ${response.text}</p>`);
+        showToast('Image analysis added to note');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('AI analysis failed');
+    }
+  };
+
+  const deleteImage = (imageId: string) => {
+    if (!note) return;
+    const newImages = (note.images || []).filter(img => img.id !== imageId);
+    updateNote(noteId, { images: newImages });
+  };
 
   const smartPasteRef = useRef(settings.smartPaste);
   useEffect(() => {
@@ -238,6 +339,14 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
             <Sparkles size={14} />
             <span>Smart Paste</span>
           </button>
+
+          <button 
+            onClick={exportToPdf}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-sm bg-surface-active text-text-primary hover:bg-border rounded-md font-medium transition-colors"
+          >
+            <Download size={14} />
+            <span>Export PDF</span>
+          </button>
         </div>
         </div>
 
@@ -247,7 +356,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
       </div>
 
       <div className="flex-1 overflow-y-auto no-scrollbar relative flex justify-center pb-32 pt-8 print:pt-0">
-        <div className="w-full max-w-[720px] px-8 print:px-0">
+        <div className="w-full max-w-[720px] px-8 print:px-0" ref={pdfContainerRef}>
           
           {/* Note Metadata Header */}
           <div className="mb-8 p-6 bg-surface border border-border rounded-xl">
@@ -321,6 +430,54 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
           </div>
 
           <EditorContent editor={editor} className="min-h-[400px]" />
+          
+          {/* Images Section */}
+          <div className="mt-12 pt-8 border-t border-border">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-text-muted uppercase tracking-wider flex items-center gap-2">
+                <ImageIcon size={16} /> Attachments & Images
+              </h3>
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isProcessingImage}
+                className="text-xs bg-surface-active hover:bg-border text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {isProcessingImage ? 'Loading...' : '+ Add Photo'}
+              </button>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                accept="image/*" 
+                onChange={handleImageUpload} 
+              />
+            </div>
+
+            {note.images && note.images.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {note.images.map(img => (
+                  <div key={img.id} className="group relative bg-surface border border-border rounded-lg overflow-hidden">
+                    <img src={img.base64} alt={img.name} className="w-full h-48 object-cover" />
+                    
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-3 no-print">
+                      <button 
+                        onClick={() => explainImage(img.base64)}
+                        className="bg-accent text-white px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2 hover:bg-accent/80 transition-colors"
+                      >
+                        <Bot size={16} /> Ask AI
+                      </button>
+                      <button 
+                        onClick={() => deleteImage(img.id)}
+                        className="bg-red-500/90 text-white px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2 hover:bg-red-600 transition-colors"
+                      >
+                        <Trash2 size={16} /> Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
         </div>
       </div>

@@ -11,7 +11,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@google/genai": "^1.29.0",
+    "@google/genai": "^1.50.1",
     "@tailwindcss/vite": "^4.1.14",
     "@tiptap/extension-character-count": "^3.22.4",
     "@tiptap/extension-placeholder": "^3.22.4",
@@ -25,12 +25,14 @@
     "@tiptap/react": "^3.22.4",
     "@tiptap/starter-kit": "^3.22.4",
     "@vitejs/plugin-react": "^5.0.4",
+    "browser-image-compression": "^2.0.2",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "file-saver": "^2.0.5",
     "firebase": "^12.12.1",
+    "html2pdf.js": "^0.14.0",
     "jszip": "^3.10.1",
     "lucide-react": "^0.546.0",
     "marked": "^18.0.2",

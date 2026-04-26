@@ -105,15 +105,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             <div className="space-y-4">
               <label className="flex items-center justify-between cursor-pointer">
                 <div>
-                  <div className="text-sm">Smart Paste</div>
+                  <div className="text-sm font-medium">Smart Paste</div>
                   <div className="text-xs text-text-muted mt-0.5">Automatically clean AI text on Ctrl+V</div>
                 </div>
-                <input 
-                  type="checkbox" 
-                  checked={localSettings.smartPaste}
-                  onChange={e => setLocalSettings(s => ({ ...s, smartPaste: e.target.checked }))}
-                  className="accent-accent w-4 h-4 cursor-pointer"
-                />
+                <div className="relative inline-flex items-center cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={localSettings.smartPaste}
+                    onChange={e => setLocalSettings(s => ({ ...s, smartPaste: e.target.checked }))}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-surface-active border border-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2.5px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
+                </div>
               </label>
             </div>
           </div>

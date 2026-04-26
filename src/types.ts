@@ -21,6 +21,12 @@ export interface NoteHeaderMeta {
   date: string;
 }
 
+export interface NoteImage {
+  id: string;
+  name: string;
+  base64: string;
+}
+
 export interface Note {
   id: string;
   workspaceId: string;
@@ -34,6 +40,7 @@ export interface Note {
   updatedAt: string;
   wordCount: number;
   headerMeta?: NoteHeaderMeta;
+  images?: NoteImage[];
 }
 
 export interface Settings {
