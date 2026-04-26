@@ -164,6 +164,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                 <div className="flex flex-col items-center justify-center text-center py-2 space-y-3">
                   <p className="text-sm text-text-muted">Sign in to securely backup and sync your notes across devices.</p>
                   <button 
+                    type="button"
                     onClick={signIn}
                     className="bg-white text-black font-medium hover:bg-gray-200 transition-colors px-4 py-2 rounded-md shadow-sm flex items-center gap-2 text-sm"
                   >
