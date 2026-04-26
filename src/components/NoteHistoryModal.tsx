@@ -14,10 +14,14 @@ export const NoteHistoryModal: React.FC<NoteHistoryModalProps> = ({ isOpen, onCl
 
   useEffect(() => {
     if (isOpen) {
-      const stored = localStorage.getItem(`notevault_history_${noteId}`);
-      if (stored) {
-        setHistory(JSON.parse(stored));
-      } else {
+      try {
+        const stored = localStorage.getItem(`notevault_history_${noteId}`);
+        if (stored) {
+          setHistory(JSON.parse(stored));
+        } else {
+          setHistory([]);
+        }
+      } catch (e) {
         setHistory([]);
       }
     }

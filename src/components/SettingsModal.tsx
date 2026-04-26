@@ -35,7 +35,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           setStorageUsage(kb.toFixed(2) + ' KB');
         }
       } catch (e) {
-        setStorageUsage('Unknown');
+        setStorageUsage('Unknown (Storage Access Denied)');
       }
     }
   }, [isOpen, data.settings]);

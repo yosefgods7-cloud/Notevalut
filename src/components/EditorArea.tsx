@@ -103,15 +103,19 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
     
     updateTimeoutRef.current = setTimeout(() => {
       // Version history logic
-      const currentHistoryStr = localStorage.getItem(`notevault_history_${noteId}`);
-      const history = currentHistoryStr ? JSON.parse(currentHistoryStr) : [];
-      const lastVersion = history[0];
-      
-      // Save version if heavily changed (e.g. > 50 chars diff)
-      if (!lastVersion || Math.abs(lastVersion.content.length - content.length) > 50) {
-        const newVersion = { timestamp: new Date().toISOString(), content, wordCount };
-        const newHistory = [newVersion, ...history].slice(0, 10);
-        localStorage.setItem(`notevault_history_${noteId}`, JSON.stringify(newHistory));
+      try {
+        const currentHistoryStr = localStorage.getItem(`notevault_history_${noteId}`);
+        const history = currentHistoryStr ? JSON.parse(currentHistoryStr) : [];
+        const lastVersion = history[0];
+        
+        // Save version if heavily changed (e.g. > 50 chars diff)
+        if (!lastVersion || Math.abs(lastVersion.content.length - content.length) > 50) {
+          const newVersion = { timestamp: new Date().toISOString(), content, wordCount };
+          const newHistory = [newVersion, ...history].slice(0, 10);
+          localStorage.setItem(`notevault_history_${noteId}`, JSON.stringify(newHistory));
+        }
+      } catch (e) {
+        console.warn('History save failed', e);
       }
 
       updateNote(noteId, { content, wordCount });

@@ -13,6 +13,19 @@ const DEFAULT_DATA: NoteVaultData = {
   settings: DEFAULT_SETTINGS,
 };
 
+// Safe wrapper to prevent DOMExceptions in strict iframes (e.g., Safari/Incognito)
+const safeStorage = {
+  getItem: (key: string): string | null => {
+    try { return localStorage.getItem(key); } catch (e) { return null; }
+  },
+  setItem: (key: string, value: string): void => {
+    try { localStorage.setItem(key, value); } catch (e) { console.warn('localStorage write failed, using memory'); }
+  },
+  removeItem: (key: string): void => {
+    try { localStorage.removeItem(key); } catch (e) {}
+  }
+};
+
 interface StorageContextType {
   data: NoteVaultData;
   saveData: (newData: NoteVaultData) => void;
@@ -49,7 +62,7 @@ export const useStorage = () => {
 export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [data, setData] = useState<NoteVaultData>(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
+      const stored = safeStorage.getItem(STORAGE_KEY);
       if (stored) {
         let parsed = JSON.parse(stored) as Partial<NoteVaultData>;
         
@@ -97,13 +110,13 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }]
     };
     
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(initialData));
+    safeStorage.setItem(STORAGE_KEY, JSON.stringify(initialData));
     return initialData;
   });
 
   const saveData = useCallback((newData: NoteVaultData) => {
     setData(newData);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
+    safeStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
   }, []);
 
   const updateSettings = useCallback((updates: Partial<Settings>) => {
@@ -202,7 +215,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [data, saveData]);
 
   const clearAllData = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY);
+    safeStorage.removeItem(STORAGE_KEY);
     window.location.reload();
   }, []);
 
