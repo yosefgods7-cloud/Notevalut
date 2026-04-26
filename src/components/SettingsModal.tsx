@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStorage } from '../context/StorageContext';
-import { X, Save, Trash2, HardDrive } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { X, Save, Trash2, HardDrive, Cloud, LogIn, LogOut, RefreshCw } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Settings as SettingsType } from '../types';
 
@@ -10,7 +11,8 @@ interface SettingsModalProps {
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
-  const { data, updateSettings, clearAllData } = useStorage();
+  const { data, updateSettings, clearAllData, syncFromCloud, syncToCloud, isSyncing } = useStorage();
+  const { user, signIn, signOut } = useAuth();
   const [localSettings, setLocalSettings] = useState<SettingsType>(data.settings);
   const [deleteInput, setDeleteInput] = useState('');
   const [storageUsage, setStorageUsage] = useState<string>('0 KB');
@@ -113,6 +115,59 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                   className="accent-accent w-4 h-4 cursor-pointer"
                 />
               </label>
+            </div>
+          </div>
+
+          <hr className="border-border" />
+
+          {/* Cloud Sync */}
+          <div>
+            <h3 className="text-sm font-semibold text-text-muted uppercase mb-3 flex items-center gap-2">
+              <Cloud size={16} /> Cloud Sync
+            </h3>
+            <div className="bg-surface border border-border rounded-lg p-4">
+              {user ? (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between text-sm">
+                     <div className="flex flex-col">
+                        <span className="font-medium text-text-primary">Signed in as</span>
+                        <span className="text-text-muted text-xs">{user.email}</span>
+                     </div>
+                     <button
+                       onClick={signOut}
+                       className="text-text-muted hover:text-white transition-colors flex items-center gap-1 text-xs"
+                     >
+                       <LogOut size={14} /> Sign out
+                     </button>
+                  </div>
+                  <div className="flex items-center gap-3 pt-2">
+                     <button
+                       onClick={() => syncToCloud()}
+                       disabled={isSyncing}
+                       className="flex-1 bg-surface-active hover:bg-surface-active/80 border border-border disabled:opacity-50 text-sm py-2 rounded-md transition-colors flex items-center justify-center gap-2"
+                     >
+                       <Cloud size={16} /> Backup to Cloud
+                     </button>
+                     <button
+                       onClick={() => syncFromCloud()}
+                       disabled={isSyncing}
+                       className="flex-1 bg-surface-active hover:bg-surface-active/80 border border-border disabled:opacity-50 text-sm py-2 rounded-md transition-colors flex items-center justify-center gap-2"
+                     >
+                       <RefreshCw size={16} className={isSyncing ? "animate-spin" : ""} /> Download Data
+                     </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center text-center py-2 space-y-3">
+                  <p className="text-sm text-text-muted">Sign in to securely backup and sync your notes across devices.</p>
+                  <button 
+                    onClick={signIn}
+                    className="bg-white text-black font-medium hover:bg-gray-200 transition-colors px-4 py-2 rounded-md shadow-sm flex items-center gap-2 text-sm"
+                  >
+                    <LogIn size={16} /> Sign in with Google
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 

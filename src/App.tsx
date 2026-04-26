@@ -1,5 +1,6 @@
 import React, { Component, ErrorInfo } from 'react';
 import { StorageProvider } from './context/StorageContext';
+import { AuthProvider } from './context/AuthContext';
 import { MainLayout } from './components/MainLayout';
 
 class ErrorBoundary extends Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null}> {
@@ -33,9 +34,11 @@ class ErrorBoundary extends Component<{children: React.ReactNode}, {hasError: bo
 export default function App() {
   return (
     <ErrorBoundary>
-      <StorageProvider>
-        <MainLayout />
-      </StorageProvider>
+      <AuthProvider>
+        <StorageProvider>
+          <MainLayout />
+        </StorageProvider>
+      </AuthProvider>
     </ErrorBoundary>
   );
 }

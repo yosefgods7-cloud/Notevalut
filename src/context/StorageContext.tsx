@@ -1,6 +1,9 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { NoteVaultData, Workspace, Collection, Note, Settings, DEFAULT_SETTINGS } from '../types';
 import { generateId } from '../lib/utils';
+import { useAuth } from './AuthContext';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { doc, setDoc, deleteDoc, writeBatch, collection, onSnapshot, query } from 'firebase/firestore';
 
 const STORAGE_KEY = 'notevault_data';
 
@@ -46,6 +49,9 @@ interface StorageContextType {
   // Global actions
   clearAllData: () => void;
   importData: (importedData: NoteVaultData, merge: boolean) => void;
+  syncToCloud: () => Promise<void>;
+  syncFromCloud: () => Promise<void>;
+  isSyncing: boolean;
   // UI
   toast: string | null;
   showToast: (msg: string) => void;
@@ -60,6 +66,9 @@ export const useStorage = () => {
 };
 
 export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [isSyncing, setIsSyncing] = useState(false);
+  const { user } = useAuth();
+
   const [data, setData] = useState<NoteVaultData>(() => {
     try {
       const stored = safeStorage.getItem(STORAGE_KEY);
@@ -69,7 +78,6 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const now = new Date().toISOString();
         const defaultWsId = generateId();
 
-        // Ensure that all properties exist to prevent undefined property errors
         const migratedData: NoteVaultData = {
           version: parsed.version || 1,
           workspaces: parsed.workspaces?.length ? parsed.workspaces : [{ id: defaultWsId, name: 'My Notes', icon: '🧠', createdAt: now, order: 0 }],
@@ -85,7 +93,6 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       console.error('Failed to parse NoteVault data from localStorage', e);
     }
     
-    // First launch initialization
     const workspaceId = generateId();
     const collectionId = generateId();
     const now = new Date().toISOString();
@@ -118,6 +125,98 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setData(newData);
     safeStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
   }, []);
+
+  const syncToCloud = useCallback(async () => {
+    if (!user) return;
+    setIsSyncing(true);
+    try {
+      const batch = writeBatch(db);
+      
+      batch.set(doc(db, `users/${user.uid}/settings/default`), {
+        userId: user.uid,
+        settings: data.settings,
+        tags: data.tags,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+
+      data.workspaces.forEach(w => {
+        batch.set(doc(db, `users/${user.uid}/workspaces/${w.id}`), { ...w, userId: user.uid }, { merge: true });
+      });
+      data.collections.forEach(c => {
+        batch.set(doc(db, `users/${user.uid}/collections/${c.id}`), { ...c, userId: user.uid }, { merge: true });
+      });
+      data.notes.forEach(n => {
+        batch.set(doc(db, `users/${user.uid}/notes/${n.id}`), { ...n, userId: user.uid }, { merge: true });
+      });
+
+      await batch.commit();
+      showToast('Successfully backed up to cloud');
+    } catch (e) {
+      console.error(e);
+      showToast('Failed to sync to cloud');
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [user, data]);
+
+  const syncFromCloud = useCallback(async () => {
+    if (!user) return;
+    setIsSyncing(true);
+    try {
+      // Need getDocs
+      const { getDocs } = await import('firebase/firestore');
+      
+      const settingsSnap = await getDocs(collection(db, `users/${user.uid}/settings`));
+      const workspacesSnap = await getDocs(collection(db, `users/${user.uid}/workspaces`));
+      const collectionsSnap = await getDocs(collection(db, `users/${user.uid}/collections`));
+      const notesSnap = await getDocs(collection(db, `users/${user.uid}/notes`));
+
+      const cloudSettings = settingsSnap.docs[0]?.data();
+      const workspaces = workspacesSnap.docs.map(d => d.data() as Workspace);
+      const collections = collectionsSnap.docs.map(d => d.data() as Collection);
+      const notes = notesSnap.docs.map(d => d.data() as Note);
+
+      if (workspaces.length === 0 && notes.length === 0) {
+        showToast('No cloud data found. Uploading local data...');
+        await syncToCloud();
+        return;
+      }
+
+      // Merge avoiding duplicates by ID, cloud takes precedence
+      const mergeArrays = <T extends {id: string}>(local: T[], remote: T[]) => {
+        const map = new Map<string, T>();
+        local.forEach(i => map.set(i.id, i));
+        remote.forEach(i => map.set(i.id, i)); // remote overrides
+        return Array.from(map.values());
+      };
+
+      const mergedData: NoteVaultData = {
+        ...data,
+        settings: cloudSettings?.settings || data.settings,
+        tags: cloudSettings?.tags || data.tags,
+        workspaces: mergeArrays(data.workspaces, workspaces),
+        collections: mergeArrays(data.collections, collections),
+        notes: mergeArrays(data.notes, notes),
+      };
+
+      saveData(mergedData);
+      showToast('Data downloaded from cloud');
+    } catch (e) {
+      console.error(e);
+      showToast('Failed to download from cloud');
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [user, data, saveData, syncToCloud]);
+
+  // Rest of the methods...
+
+  // Auto-sync when user signs in
+  useEffect(() => {
+    if (user) {
+      syncFromCloud();
+    }
+  }, [user]);
 
   const updateSettings = useCallback((updates: Partial<Settings>) => {
     saveData({ ...data, settings: { ...data.settings, ...updates } });
@@ -246,6 +345,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       addCollection, updateCollection, deleteCollection,
       addNote, updateNote, deleteNote, deleteNotes,
       clearAllData, importData,
+      syncToCloud, syncFromCloud, isSyncing,
       toast, showToast
     }}>
       {children}

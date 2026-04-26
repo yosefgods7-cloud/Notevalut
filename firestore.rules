@@ -1,0 +1,90 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+
+    function isValidUserSetting(data) {
+      return data.keys().hasAll(['userId', 'settings', 'tags', 'updatedAt']) &&
+             data.userId is string &&
+             data.settings is map &&
+             data.tags is list && data.tags.size() <= 100 &&
+             data.updatedAt is string;
+    }
+
+    function isValidWorkspace(data) {
+      return data.keys().hasAll(['userId', 'id', 'name', 'createdAt', 'order']) &&
+             data.userId is string &&
+             data.id is string &&
+             data.name is string && data.name.size() <= 100 &&
+             data.createdAt is string &&
+             data.order is number &&
+             (data.keys().hasAll(['icon']) == false || data.icon is string);
+    }
+
+    function isValidCollection(data) {
+      return data.keys().hasAll(['userId', 'id', 'workspaceId', 'name', 'createdAt', 'order']) &&
+             data.userId is string &&
+             data.id is string &&
+             data.workspaceId is string &&
+             data.name is string && data.name.size() <= 100 &&
+             data.createdAt is string &&
+             data.order is number &&
+             (data.keys().hasAll(['icon']) == false || data.icon is string);
+    }
+
+    function isValidNote(data) {
+      return data.keys().hasAll(['userId', 'id', 'workspaceId', 'collectionId', 'title', 'content', 'tags', 'pinned', 'starred', 'createdAt', 'updatedAt', 'wordCount']) &&
+             data.userId is string &&
+             data.id is string &&
+             data.workspaceId is string &&
+             data.collectionId is string &&
+             data.title is string && data.title.size() <= 500 &&
+             data.content is string && data.content.size() <= 1048000 &&
+             data.tags is list && data.tags.size() <= 100 &&
+             data.pinned is bool &&
+             data.starred is bool &&
+             data.createdAt is string &&
+             data.updatedAt is string &&
+             data.wordCount is number &&
+             (data.keys().hasAll(['headerMeta']) == false || data.headerMeta is map);
+    }
+
+    match /users/{userId} {
+      match /settings/{settingId} {
+        allow get, list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isOwner(userId) && isValidId(settingId) && isValidUserSetting(incoming()) && incoming().userId == userId && incoming().keys().size() <= 5;
+        allow update: if isOwner(userId) && isValidId(settingId) && isValidUserSetting(incoming()) && incoming().userId == existing().userId && incoming().diff(existing()).affectedKeys().hasOnly(['settings', 'tags', 'updatedAt']);
+        allow delete: if isOwner(userId) && resource.data.userId == request.auth.uid;
+      }
+      
+      match /workspaces/{workspaceId} {
+        allow get, list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isOwner(userId) && isValidId(workspaceId) && isValidWorkspace(incoming()) && incoming().userId == userId && incoming().keys().size() <= 6;
+        allow update: if isOwner(userId) && isValidId(workspaceId) && isValidWorkspace(incoming()) && incoming().userId == existing().userId && incoming().id == existing().id && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'icon', 'order']);
+        allow delete: if isOwner(userId) && resource.data.userId == request.auth.uid;
+      }
+
+      match /collections/{collectionId} {
+        allow get, list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isOwner(userId) && isValidId(collectionId) && isValidCollection(incoming()) && incoming().userId == userId && incoming().keys().size() <= 7;
+        allow update: if isOwner(userId) && isValidId(collectionId) && isValidCollection(incoming()) && incoming().userId == existing().userId && incoming().id == existing().id && incoming().workspaceId == existing().workspaceId && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'icon', 'order']);
+        allow delete: if isOwner(userId) && resource.data.userId == request.auth.uid;
+      }
+
+      match /notes/{noteId} {
+        allow get, list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isOwner(userId) && isValidId(noteId) && isValidNote(incoming()) && incoming().userId == userId && incoming().keys().size() <= 13;
+        allow update: if isOwner(userId) && isValidId(noteId) && isValidNote(incoming()) && incoming().userId == existing().userId && incoming().id == existing().id && incoming().diff(existing()).affectedKeys().hasOnly(['workspaceId', 'collectionId', 'title', 'content', 'tags', 'pinned', 'starred', 'updatedAt', 'wordCount', 'headerMeta']);
+        allow delete: if isOwner(userId) && resource.data.userId == request.auth.uid;
+      }
+    }
+  }
+}
