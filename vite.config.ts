@@ -14,7 +14,7 @@ export default defineConfig(({mode}) => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['icon.svg', 'robots.txt', 'apple-touch-icon.png'],
+        includeAssets: ['icon.svg'],
         manifest: {
           name: 'NoteVault',
           short_name: 'NoteVault',

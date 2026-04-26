@@ -30,7 +30,13 @@ import { GoogleGenAI } from '@google/genai';
 // @ts-ignore
 import html2pdf from 'html2pdf.js';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
+let aiClient: GoogleGenAI | null = null;
+const getAiClient = () => {
+  if (!aiClient && process.env.GEMINI_API_KEY) {
+    aiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  }
+  return aiClient;
+};
 
 interface EditorAreaProps {
   noteId: string;
@@ -116,6 +122,11 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
       const base64Data = base64.split(',')[1];
       const mimeType = base64.split(';')[0].split(':')[1];
       
+      const ai = getAiClient();
+      if (!ai) {
+        showToast('AI features require an API key to be set');
+        return;
+      }
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: [

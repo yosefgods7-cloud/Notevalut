@@ -334,7 +334,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       try {
         await deleteDoc(doc(db, `users/${user.uid}/notes/${id}`));
       } catch (e) {
-        console.error("Failed to delete note from cloud", e);
+        handleFirestoreError(e, OperationType.DELETE, `users/${user.uid}/notes/${id}`);
       }
     }
   }, [data, saveData, user]);
@@ -351,7 +351,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
         ids.forEach(id => batch.delete(doc(db, `users/${user.uid}/notes/${id}`)));
         await batch.commit();
       } catch (e) {
-        console.error("Failed to delete notes from cloud", e);
+        handleFirestoreError(e, OperationType.DELETE, `users/${user.uid}/notes`);
       }
     }
   }, [data, saveData, user]);
