@@ -3,7 +3,7 @@ import { NoteVaultData, Workspace, Collection, Note, Settings, DEFAULT_SETTINGS 
 import { generateId } from '../lib/utils';
 import { useAuth } from './AuthContext';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { doc, setDoc, deleteDoc, writeBatch, collection, onSnapshot, query } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, writeBatch, collection, onSnapshot, query, getDocs } from 'firebase/firestore';
 
 const STORAGE_KEY = 'notevault_data';
 
@@ -163,9 +163,6 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (!user) return;
     setIsSyncing(true);
     try {
-      // Need getDocs
-      const { getDocs } = await import('firebase/firestore');
-      
       const settingsSnap = await getDocs(collection(db, `users/${user.uid}/settings`));
       const workspacesSnap = await getDocs(collection(db, `users/${user.uid}/workspaces`));
       const collectionsSnap = await getDocs(collection(db, `users/${user.uid}/collections`));
@@ -236,14 +233,30 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   }, [data, saveData]);
 
-  const deleteWorkspace = useCallback((id: string) => {
+  const deleteWorkspace = useCallback(async (id: string) => {
+    // Determine collections and notes to delete
+    const collectionsToDelete = data.collections.filter(c => c.workspaceId === id);
+    const notesToDelete = data.notes.filter(n => n.workspaceId === id);
+    
     saveData({
       ...data,
       workspaces: data.workspaces.filter(w => w.id !== id),
       collections: data.collections.filter(c => c.workspaceId !== id),
       notes: data.notes.filter(n => n.workspaceId !== id)
     });
-  }, [data, saveData]);
+
+    if (user) {
+      try {
+        const batch = writeBatch(db);
+        batch.delete(doc(db, `users/${user.uid}/workspaces/${id}`));
+        collectionsToDelete.forEach(c => batch.delete(doc(db, `users/${user.uid}/collections/${c.id}`)));
+        notesToDelete.forEach(n => batch.delete(doc(db, `users/${user.uid}/notes/${n.id}`)));
+        await batch.commit();
+      } catch (e) {
+        console.error("Failed to delete workspace from cloud", e);
+      }
+    }
+  }, [data, saveData, user]);
 
   // --- Collections ---
   const addCollection = useCallback((workspaceId: string, name: string, icon: string) => {
@@ -259,13 +272,25 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   }, [data, saveData]);
 
-  const deleteCollection = useCallback((id: string) => {
+  const deleteCollection = useCallback(async (id: string) => {
+    const notesToDelete = data.notes.filter(n => n.collectionId === id);
     saveData({
       ...data,
       collections: data.collections.filter(c => c.id !== id),
       notes: data.notes.filter(n => n.collectionId !== id)
     });
-  }, [data, saveData]);
+
+    if (user) {
+      try {
+        const batch = writeBatch(db);
+        batch.delete(doc(db, `users/${user.uid}/collections/${id}`));
+        notesToDelete.forEach(n => batch.delete(doc(db, `users/${user.uid}/notes/${n.id}`)));
+        await batch.commit();
+      } catch (e) {
+        console.error("Failed to delete collection from cloud", e);
+      }
+    }
+  }, [data, saveData, user]);
 
   // --- Notes ---
   const addNote = useCallback((workspaceId: string, collectionId: string, title = 'Untitled Note', content = '<p></p>') => {
@@ -299,19 +324,37 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   }, [data, saveData]);
 
-  const deleteNote = useCallback((id: string) => {
+  const deleteNote = useCallback(async (id: string) => {
     saveData({
       ...data,
       notes: data.notes.filter(n => n.id !== id)
     });
-  }, [data, saveData]);
 
-  const deleteNotes = useCallback((ids: string[]) => {
+    if (user) {
+      try {
+        await deleteDoc(doc(db, `users/${user.uid}/notes/${id}`));
+      } catch (e) {
+        console.error("Failed to delete note from cloud", e);
+      }
+    }
+  }, [data, saveData, user]);
+
+  const deleteNotes = useCallback(async (ids: string[]) => {
     saveData({
       ...data,
       notes: data.notes.filter(n => !ids.includes(n.id))
     });
-  }, [data, saveData]);
+
+    if (user) {
+      try {
+        const batch = writeBatch(db);
+        ids.forEach(id => batch.delete(doc(db, `users/${user.uid}/notes/${id}`)));
+        await batch.commit();
+      } catch (e) {
+        console.error("Failed to delete notes from cloud", e);
+      }
+    }
+  }, [data, saveData, user]);
 
   const clearAllData = useCallback(() => {
     safeStorage.removeItem(STORAGE_KEY);

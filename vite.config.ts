@@ -22,10 +22,18 @@ export default defineConfig(({mode}) => {
           theme_color: '#0f0f0f',
           background_color: '#0f0f0f',
           display: 'standalone',
+          start_url: '/Notevalut/',
+          scope: '/Notevalut/',
           icons: [
             {
               src: 'icon.svg',
-              sizes: 'any',
+              sizes: '192x192',
+              type: 'image/svg+xml',
+              purpose: 'any maskable'
+            },
+            {
+              src: 'icon.svg',
+              sizes: '512x512',
               type: 'image/svg+xml',
               purpose: 'any maskable'
             }
