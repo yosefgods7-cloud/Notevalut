@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStorage } from '../context/StorageContext';
 import { useAuth } from '../context/AuthContext';
-import { X, Save, Trash2, HardDrive, Cloud, LogIn, LogOut, RefreshCw } from 'lucide-react';
+import { X, Save, Trash2, HardDrive, Cloud, LogIn, LogOut, RefreshCw, FileJson, Download } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Settings as SettingsType } from '../types';
 
@@ -11,11 +11,53 @@ interface SettingsModalProps {
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
-  const { data, updateSettings, clearAllData, syncFromCloud, syncToCloud, isSyncing } = useStorage();
+  const { data, updateSettings, clearAllData, syncFromCloud, syncToCloud, isSyncing, importData, showToast } = useStorage();
   const { user, signIn, signOut } = useAuth();
   const [localSettings, setLocalSettings] = useState<SettingsType>(data.settings);
   const [deleteInput, setDeleteInput] = useState('');
   const [storageUsage, setStorageUsage] = useState<string>('0 KB');
+  const [isImporting, setIsImporting] = useState(false);
+
+  const handleExportJson = () => {
+    const backup = {
+      ...data,
+      exportDate: new Date().toISOString()
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `NoteVault_Backup_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Backup JSON exported successfully');
+  };
+
+  const handleImportJson = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const imported = JSON.parse(event.target?.result as string);
+        // Basic validation
+        if (!imported.workspaces || !imported.notes) {
+          throw new Error('Invalid backup file structure');
+        }
+        
+        const confirmMerge = window.confirm('Merge with existing data? (Cancel to replace everything)');
+        importData(imported, confirmMerge);
+        showToast('Data imported successfully');
+        onClose();
+      } catch (err) {
+        console.error(err);
+        showToast('Failed to import JSON: Invalid file');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = ''; // Reset input
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -180,13 +222,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           {/* Data Management */}
           <div>
             <h3 className="text-sm font-semibold text-text-muted uppercase mb-3 flex items-center justify-between">
-              <span>Data & Storage</span>
+              <span>Data & Backup</span>
               <span className="flex items-center gap-1 normal-case font-normal text-xs bg-surface-active px-2 py-1 rounded-md border border-border">
                 <HardDrive size={12} />
                 Using {storageUsage}
               </span>
             </h3>
             
+            <div className="grid grid-cols-2 gap-3 mb-6">
+              <button 
+                onClick={handleExportJson}
+                className="flex flex-col items-center justify-center p-4 bg-surface border border-border rounded-xl hover:bg-surface-active transition-all group"
+              >
+                <div className="p-2 bg-blue-500/10 rounded-lg group-hover:scale-110 transition-transform mb-2">
+                  <FileJson className="text-blue-400" size={24} />
+                </div>
+                <span className="text-xs font-semibold">Export JSON</span>
+                <span className="text-[10px] text-text-muted mt-1">Full Backup</span>
+              </button>
+
+              <label className="flex flex-col items-center justify-center p-4 bg-surface border border-border rounded-xl hover:bg-surface-active transition-all group cursor-pointer">
+                <div className="p-2 bg-purple-500/10 rounded-lg group-hover:scale-110 transition-transform mb-2">
+                   <Download className="text-purple-400" size={24} />
+                </div>
+                <span className="text-xs font-semibold">Import JSON</span>
+                <span className="text-[10px] text-text-muted mt-1">Restore / Merge</span>
+                <input type="file" accept=".json" onChange={handleImportJson} className="hidden" />
+              </label>
+            </div>
+
             <div className="bg-red-950/20 border border-red-900/30 rounded-lg p-4 mt-2">
               <h4 className="text-red-400 font-medium text-sm mb-2 flex items-center gap-2">
                 <Trash2 size={16} /> Danger Zone

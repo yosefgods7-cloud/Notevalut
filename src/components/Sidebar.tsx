@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useStorage } from '../context/StorageContext';
 import { cn } from '../lib/utils';
-import { Plus, Tag, Settings as SettingsIcon, Download, Upload, Star } from 'lucide-react';
+import { Plus, Tag, Settings as SettingsIcon, Download, Upload, Star, Undo2 } from 'lucide-react';
 
 interface SidebarProps {
   activeWorkspaceId: string;
@@ -18,7 +18,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeCollectionId, setActiveCollectionId,
   onOpenExport, onOpenImport, onOpenSettings
 }) => {
-  const { data, addCollection } = useStorage();
+  const { data, addCollection, undo, canUndo } = useStorage();
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
 
   const activeWorkspace = data.workspaces.find(w => w.id === activeWorkspaceId);
@@ -125,6 +125,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
       
       <div className="p-3 border-t border-border mt-auto space-y-1">
+        <button 
+          onClick={undo} 
+          disabled={!canUndo}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary transition-colors disabled:opacity-30 disabled:pointer-events-none"
+        >
+          <Undo2 size={16} />
+          <span>Undo Action</span>
+        </button>
         <button onClick={onOpenSettings} className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary transition-colors">
           <SettingsIcon size={16} />
           <span>Settings</span>

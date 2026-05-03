@@ -52,6 +52,8 @@ interface StorageContextType {
   syncToCloud: () => Promise<void>;
   syncFromCloud: () => Promise<void>;
   isSyncing: boolean;
+  undo: () => void;
+  canUndo: boolean;
   // UI
   toast: string | null;
   showToast: (msg: string) => void;
@@ -68,6 +70,7 @@ export const useStorage = () => {
 export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const { user } = useAuth();
+  const [history, setHistory] = useState<NoteVaultData[]>([]);
 
   const [data, setData] = useState<NoteVaultData>(() => {
     try {
@@ -121,10 +124,28 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return initialData;
   });
 
-  const saveData = useCallback((newData: NoteVaultData) => {
+  const [toast, setToast] = useState<string | null>(null);
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2500);
+  }, []);
+
+  const saveData = useCallback((newData: NoteVaultData, skipHistory = false) => {
+    if (!skipHistory) {
+      setHistory(prev => [data, ...prev].slice(0, 20));
+    }
     setData(newData);
     safeStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
-  }, []);
+  }, [data]);
+
+  const undo = useCallback(() => {
+    if (history.length === 0) return;
+    const previous = history[0];
+    setHistory(prev => prev.slice(1));
+    setData(previous);
+    safeStorage.setItem(STORAGE_KEY, JSON.stringify(previous));
+    showToast('Action Undone');
+  }, [history, showToast]);
 
   const syncToCloud = useCallback(async () => {
     if (!user) return;
@@ -375,12 +396,6 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [data, saveData]);
 
-  const [toast, setToast] = useState<string | null>(null);
-  const showToast = useCallback((msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 2500);
-  }, []);
-
   return (
     <StorageContext.Provider value={{
       data, saveData, updateSettings,
@@ -389,6 +404,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       addNote, updateNote, deleteNote, deleteNotes,
       clearAllData, importData,
       syncToCloud, syncFromCloud, isSyncing,
+      undo, canUndo: history.length > 0,
       toast, showToast
     }}>
       {children}

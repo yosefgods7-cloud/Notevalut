@@ -19,16 +19,25 @@ import {
   List, ListOrdered, CheckSquare, 
   Code, FileCode2, Table as TableIcon, 
   Minus, Sparkles, Tag as TagIcon, X, Check, Clock,
-  Image as ImageIcon, Download, Trash2, Bot
+  Image as ImageIcon, Download, Trash2, Bot, Undo2, Redo2, FileText, FileJson
 } from 'lucide-react';
 import { cn, generateId } from '../lib/utils';
 import { format } from 'date-fns';
 import imageCompression from 'browser-image-compression';
 import { GoogleGenAI } from '@google/genai';
 
+import TurndownService from 'turndown';
+
 // html2pdf is a robust library for turning DOM elements into PDFs
 // @ts-ignore
 import html2pdf from 'html2pdf.js';
+
+const turndownService = new TurndownService();
+// Preserve some basic HTML if needed
+turndownService.addRule('strikethrough', {
+  filter: ['del', 's', 'strike'],
+  replacement: (content) => `~~${content}~~`
+});
 
 let aiClient: GoogleGenAI | null = null;
 const getAiClient = () => {
@@ -59,27 +68,9 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
   const [isProcessingImage, setIsProcessingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pdfContainerRef = useRef<HTMLDivElement>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const exportToPdf = useCallback(() => {
-    if (!pdfContainerRef.current || !note) return;
-    
-    showToast('Preparing PDF...');
-    const element = pdfContainerRef.current;
-    
-    const opt = {
-      margin:       10,
-      filename:     `${note.title || 'Untitled_Note'}.pdf`,
-      image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true },
-      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
-    
-    html2pdf().set(opt).from(element).save().then(() => {
-      showToast('PDF Exported Successfully');
-    });
-  }, [note, showToast]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -209,6 +200,72 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
     }
   }, [noteId, editor]); // intentionally don't include note.content here to avoid cursor jumping
 
+  const exportToPdf = useCallback(() => {
+    if (!pdfContainerRef.current || !note) return;
+    
+    setIsExporting(true);
+    showToast('Preparing PDF...');
+    
+    const element = pdfContainerRef.current;
+    const originalStyle = element.getAttribute('style') || '';
+    
+    // Force some styles for export
+    element.style.backgroundColor = '#ffffff';
+    element.style.color = '#000000';
+    element.classList.add('pdf-export-mode');
+    
+    const opt = {
+      margin:       [10, 10] as [number, number],
+      filename:     `${note.title || 'Untitled_Note'}.pdf`,
+      image:        { type: 'jpeg' as const, quality: 0.98 },
+      html2canvas:  { 
+        scale: 2, 
+        useCORS: true, 
+        backgroundColor: '#ffffff',
+        logging: false
+      },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
+    };
+    
+    html2pdf().set(opt).from(element).save().then(() => {
+      showToast('PDF Exported Successfully');
+    }).catch(err => {
+      console.error(err);
+      showToast('PDF Export Failed');
+    }).finally(() => {
+      element.setAttribute('style', originalStyle);
+      element.classList.remove('pdf-export-mode');
+      setIsExporting(false);
+    });
+  }, [note, showToast]);
+
+  const exportAsMarkdown = useCallback(() => {
+    if (!editor || !note) return;
+    const html = editor.getHTML();
+    const markdown = turndownService.turndown(html);
+    const blob = new Blob([markdown], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${note.title || 'Untitled_Note'}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Markdown exported');
+  }, [editor, note, showToast]);
+
+  const exportAsText = useCallback(() => {
+    if (!editor || !note) return;
+    const text = editor.getText();
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${note.title || 'Untitled_Note'}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Text exported');
+  }, [editor, note, showToast]);
+
   const handleSaveContent = useCallback((content: string, wordCount: number) => {
     setSavedStatus('saving');
     if (updateTimeoutRef.current) clearTimeout(updateTimeoutRef.current);
@@ -315,6 +372,11 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
           </button>
           {/* Toolbar */}
           <div className="flex items-center space-x-1 shrink-0">
+          <ToolbarButton onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} icon={<Undo2 size={16} />} title="Undo (Ctrl+Z)" />
+          <ToolbarButton onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} icon={<Redo2 size={16} />} title="Redo (Ctrl+Shift+Z)" />
+          
+          <div className="w-px h-4 bg-border mx-1"></div>
+
           <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive('heading', { level: 1 })} icon={<Heading1 size={16} />} />
           <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive('heading', { level: 2 })} icon={<Heading2 size={16} />} />
           <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive('heading', { level: 3 })} icon={<Heading3 size={16} />} />
@@ -344,20 +406,44 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
           <div className="w-px h-4 bg-border mx-1"></div>
           
           <button 
+            id="btn-smart-paste"
             onClick={handleSmartPasteClick}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-sm bg-accent/10 text-accent hover:bg-accent/20 rounded-md font-medium transition-colors"
+            className="flex items-center gap-1.5 px-2.5 py-1 text-sm bg-accent/10 text-accent hover:bg-accent/20 rounded-md font-medium transition-colors h-8"
           >
             <Sparkles size={14} />
             <span>Smart Paste</span>
           </button>
 
-          <button 
-            onClick={exportToPdf}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-sm bg-surface-active text-text-primary hover:bg-border rounded-md font-medium transition-colors"
-          >
-            <Download size={14} />
-            <span>Export PDF</span>
-          </button>
+          <div className="relative group">
+            <button 
+              id="btn-export-main"
+              className="flex items-center gap-1.5 px-2.5 py-1 text-sm bg-surface-active text-text-primary hover:bg-border rounded-md font-medium transition-colors h-8"
+            >
+              <Download size={14} />
+              <span>Export</span>
+            </button>
+            <div className="absolute top-full right-0 mt-1 w-40 bg-surface border border-border rounded-md shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 py-1">
+              <button 
+                onClick={exportToPdf}
+                disabled={isExporting}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-surface-active flex items-center gap-2"
+              >
+                <FileText size={14} /> PDF Document
+              </button>
+              <button 
+                onClick={exportAsMarkdown}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-surface-active flex items-center gap-2"
+              >
+                <Bot size={14} /> Markdown (.md)
+              </button>
+              <button 
+                onClick={exportAsText}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-surface-active flex items-center gap-2"
+              >
+                <FileText size={14} /> Plain Text (.txt)
+              </button>
+            </div>
+          </div>
         </div>
         </div>
 
@@ -518,11 +604,13 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
   );
 };
 
-const ToolbarButton: React.FC<{ onClick: () => void; active?: boolean; icon: React.ReactNode }> = ({ onClick, active, icon }) => (
+const ToolbarButton: React.FC<{ onClick: () => void; active?: boolean; disabled?: boolean; icon: React.ReactNode; title?: string }> = ({ onClick, active, disabled, icon, title }) => (
   <button
     onClick={onClick}
+    disabled={disabled}
+    title={title}
     className={cn(
-      "p-1.5 rounded-md transition-colors",
+      "p-1.5 rounded-md transition-colors disabled:opacity-30 disabled:pointer-events-none",
       active 
         ? "bg-accent/20 text-accent" 
         : "text-text-secondary hover:bg-surface-active hover:text-text-primary"

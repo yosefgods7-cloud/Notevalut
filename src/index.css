@@ -184,6 +184,28 @@
       display: block !important;
     }
   }
+
+  /* PDF Export Logic */
+  .pdf-export-mode {
+    background-color: white !important;
+    color: black !important;
+    padding: 20px !important;
+    min-height: 100vh;
+  }
+  .pdf-export-mode, .pdf-export-mode * {
+    color: black !important;
+  }
+  .pdf-export-mode h1, .pdf-export-mode h2, .pdf-export-mode h3 {
+    color: black !important;
+  }
+  .pdf-export-mode .ProseMirror {
+    font-family: serif;
+    font-size: 11pt;
+  }
+  .pdf-export-mode .bg-surface, .pdf-export-mode .bg-surface-active {
+    background-color: #f8f8f8 !important;
+    border-color: #e0e0e0 !important;
+  }
 }
 
 .print-only {
