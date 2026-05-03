@@ -87,10 +87,10 @@ export const MainLayout: React.FC = () => {
       data.settings.fontSize === 'large' ? 'text-base md:text-lg' : 'text-sm'
     )}>
       
-      {/* Mobile Overlay */}
+      {/* Backdrop Overlay */}
       {isSidebarOpen && (
         <div 
-          className="md:hidden fixed inset-0 bg-black/50 z-20 transition-opacity"
+          className="fixed inset-0 bg-black/20 z-20 transition-opacity"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
@@ -98,8 +98,8 @@ export const MainLayout: React.FC = () => {
       {/* Sidebars wrapping div */}
       <div 
         className={cn(
-          "fixed md:relative inset-y-0 left-0 z-30 flex h-full transition-[transform,width,opacity] duration-300 ease-in-out shrink-0 border-r border-border overflow-x-auto overflow-y-hidden bg-background",
-          isSidebarOpen ? "translate-x-0 w-full max-w-[540px] opacity-100" : "-translate-x-full md:translate-x-0 md:w-0 border-r-0 opacity-0 md:opacity-100 p-0"
+          "fixed inset-y-0 left-0 z-30 flex h-full transition-[transform,opacity] duration-300 ease-in-out border-r border-border overflow-x-auto overflow-y-hidden bg-background shadow-2xl",
+          isSidebarOpen ? "translate-x-0 w-full max-w-[540px] opacity-100" : "-translate-x-full w-full max-w-[540px] opacity-0 pointer-events-none"
         )}
       >
         <Sidebar 

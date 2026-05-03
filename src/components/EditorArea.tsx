@@ -69,6 +69,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
   const [savedStatus, setSavedStatus] = useState<'saved' | 'saving'>('saved');
   const [isHistoryOpen, setHistoryOpen] = useState(false);
   const [isProcessingImage, setIsProcessingImage] = useState(false);
+  const [imageToDelete, setImageToDelete] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pdfContainerRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -186,7 +187,9 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
           event.preventDefault();
           const coordinates = view.posAtCoords({ left: event.clientX, top: event.clientY });
           if (coordinates) {
-            const node = view.state.schema.nodes.image.create({
+            const imageNode = view.state.schema.nodes.imageResize || view.state.schema.nodes.image;
+            if (!imageNode) return false;
+            const node = imageNode.create({
               src: draggedImageData.src,
               alt: draggedImageData.alt
             });
@@ -597,8 +600,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
                       draggedImageData = { id: img.id, src: img.base64, alt: img.name };
                       // Set both plain URL and HTML to be super compatible with Tiptap
                       e.dataTransfer.setData('text/plain', `[Image: ${img.name}]`);
-                      e.dataTransfer.setData('text/html', `<img src="${img.base64}" alt="${img.name}" />`);
-                      e.dataTransfer.effectAllowed = 'copy';
+                      e.dataTransfer.effectAllowed = 'copyMove';
                     }}
                     onDragEnd={() => {
                       draggedImageData = null;
@@ -609,9 +611,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
                     <button 
                         onClick={(e) => { 
                           e.stopPropagation(); 
-                          if (window.confirm("Are you sure you want to delete this image?")) {
-                            deleteImage(img.id); 
-                          }
+                          setImageToDelete(img.id);
                         }}
                         className="absolute top-2 right-2 bg-red-500/90 hover:bg-red-600 text-white p-2 rounded-full shadow-lg md:opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-auto"
                         title="Delete Image"
@@ -657,6 +657,37 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
           showToast('✓ Resorted from history');
         }}
       />
+
+      {/* Image Delete Confirmation Modal */}
+      {imageToDelete && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-surface border border-border rounded-xl shadow-2xl p-6 max-w-sm w-full animate-in fade-in zoom-in duration-200">
+            <h3 className="text-lg font-semibold text-text-primary mb-2 flex items-center gap-2">
+              <Trash2 className="text-red-400" size={20} /> Delete Image?
+            </h3>
+            <p className="text-sm text-text-muted mb-6">
+              Are you sure you want to permanently delete this uploaded image?
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button 
+                onClick={() => setImageToDelete(null)}
+                className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => {
+                  deleteImage(imageToDelete);
+                  setImageToDelete(null);
+                }}
+                className="px-4 py-2 text-sm font-medium bg-red-500/90 hover:bg-red-600 text-white rounded-md transition-colors shadow-sm"
+              >
+                Delete Permanently
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

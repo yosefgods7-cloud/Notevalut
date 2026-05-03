@@ -339,11 +339,20 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [data, saveData]);
 
   const updateNote = useCallback((id: string, updates: Partial<Note>) => {
-    saveData({
-      ...data,
-      notes: data.notes.map(n => n.id === id ? { ...n, ...updates, updatedAt: new Date().toISOString() } : n)
+    setData(prevData => {
+      const newNotes = prevData.notes.map(n => 
+        n.id === id 
+          ? { ...n, ...updates, updatedAt: new Date().toISOString() } 
+          : n
+      );
+      const newData = { ...prevData, notes: newNotes };
+      
+      // We manually handle saveData's duties here to get the correct prevData
+      setHistory(prevHist => [prevData, ...prevHist].slice(0, 20));
+      safeStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
+      return newData;
     });
-  }, [data, saveData]);
+  }, []);
 
   const deleteNote = useCallback(async (id: string) => {
     saveData({
