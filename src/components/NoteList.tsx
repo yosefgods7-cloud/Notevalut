@@ -21,6 +21,8 @@ export const NoteList: React.FC<NoteListProps> = ({
   const [renameValue, setRenameValue] = useState('');
   const [selectedNotes, setSelectedNotes] = useState<string[]>([]);
   const [isBulkMode, setIsBulkMode] = useState(false);
+  const [noteToDelete, setNoteToDelete] = useState<string | null>(null);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
 
   const notes = activeCollectionId === 'starred' 
     ? data.notes.filter(n => n.workspaceId === activeWorkspaceId && n.starred)
@@ -72,15 +74,14 @@ export const NoteList: React.FC<NoteListProps> = ({
     }
   };
 
-  const handleBulkDelete = () => {
-    if (confirm(`Delete ${selectedNotes.length} notes?`)) {
-      deleteNotes(selectedNotes);
-      setSelectedNotes([]);
-      setIsBulkMode(false);
-      if (activeNoteId && selectedNotes.includes(activeNoteId)) {
-        setActiveNoteId(null);
-      }
+  const handleBulkDeleteContent = () => {
+    deleteNotes(selectedNotes);
+    setSelectedNotes([]);
+    setIsBulkMode(false);
+    if (activeNoteId && selectedNotes.includes(activeNoteId)) {
+      setActiveNoteId(null);
     }
+    setShowBulkDeleteConfirm(false);
   };
 
   return (
@@ -110,7 +111,7 @@ export const NoteList: React.FC<NoteListProps> = ({
           <span className="text-xs font-medium">{selectedNotes.length} selected</span>
           <div className="flex items-center gap-1">
             <button 
-              onClick={handleBulkDelete}
+              onClick={() => setShowBulkDeleteConfirm(true)}
               className="p-1.5 text-text-muted hover:text-red-400 hover:bg-surface rounded transition-colors"
               title="Delete Selected"
             >
@@ -223,10 +224,7 @@ export const NoteList: React.FC<NoteListProps> = ({
                 <button
                   onClick={(e) => { 
                     e.stopPropagation(); 
-                    if (confirm('Delete this note?')) {
-                      deleteNote(note.id);
-                      if (activeNoteId === note.id) setActiveNoteId(null);
-                    }
+                    setNoteToDelete(note.id);
                   }}
                   className="p-1.5 text-text-secondary hover:text-red-400 rounded hover:bg-surface-active"
                   title="Delete"
@@ -238,6 +236,65 @@ export const NoteList: React.FC<NoteListProps> = ({
           ))
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {noteToDelete && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-surface border border-border rounded-xl shadow-2xl p-6 max-w-sm w-full animate-in fade-in zoom-in duration-200">
+            <h3 className="text-lg font-semibold text-text-primary mb-2 flex items-center gap-2">
+              <Trash2 className="text-red-400" size={20} /> Delete Note?
+            </h3>
+            <p className="text-sm text-text-muted mb-6">
+              Are you sure you want to permanently delete this note? This action will also delete the note from cloud sync. This cannot be undone.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button 
+                onClick={() => setNoteToDelete(null)}
+                className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => {
+                  deleteNote(noteToDelete);
+                  if (activeNoteId === noteToDelete) setActiveNoteId(null);
+                  setNoteToDelete(null);
+                }}
+                className="px-4 py-2 text-sm font-medium bg-red-500/90 hover:bg-red-600 text-white rounded-md transition-colors shadow-sm"
+              >
+                Delete Permanently
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Bulk Delete Confirmation Modal */}
+      {showBulkDeleteConfirm && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-surface border border-border rounded-xl shadow-2xl p-6 max-w-sm w-full animate-in fade-in zoom-in duration-200">
+            <h3 className="text-lg font-semibold text-text-primary mb-2 flex items-center gap-2">
+              <Trash2 className="text-red-400" size={20} /> Delete {selectedNotes.length} Notes?
+            </h3>
+            <p className="text-sm text-text-muted mb-6">
+              Are you sure you want to permanently delete these notes? They will also be removed from cloud sync. This cannot be undone.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button 
+                onClick={() => setShowBulkDeleteConfirm(false)}
+                className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleBulkDeleteContent}
+                className="px-4 py-2 text-sm font-medium bg-red-500/90 hover:bg-red-600 text-white rounded-md transition-colors shadow-sm"
+              >
+                Delete Permanently
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
