@@ -1,3 +1,5 @@
+import { marked } from 'marked';
+
 export function cleanAIPaste(rawText: string): string {
   let text = rawText;
 
@@ -28,74 +30,22 @@ export function cleanAIPaste(rawText: string): string {
   // Collapse 3+ consecutive blank lines into 2
   text = text.replace(/\n{3,}/g, '\n\n');
 
-  // Convert markdown dividers
-  text = text.replace(/^---$/gm, '<hr>');
-  text = text.replace(/^===$/gm, '<hr>');
-
-  // Basic markdown conversion
-  // Bold
-  text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-  // Italic (be careful with list items starting with *, we need a space check or similar)
-  // Only match *word* not * list
-  text = text.replace(/(?<!\*)\*(?!\s)(.*?)(?<!\s)\*(?!\*)/g, '<em>$1</em>');
-
-  // Headings
-  text = text.replace(/^### (.*$)/gm, '<h3>$1</h3>');
-  text = text.replace(/^## (.*$)/gm, '<h2>$1</h2>');
-  text = text.replace(/^# (.*$)/gm, '<h1>$1</h1>');
-
-  // Code blocks (simplified)
-  text = text.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
-  text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
-
-  // Simple lists processing
-  // This is a naive conversion for requirement compliance.
-  // Actually, sending clean markdown to Tiptap or Marked is safer. We will structure it as HTML.
-  const lines = text.split('\n');
-  let inUl = false;
-  let inOl = false;
+  // Parse markdown into HTML using marked synchronously
   let htmlResult = '';
-
-  for (let i = 0; i < lines.length; i++) {
-    let line = lines[i];
-
-    // Is it a hr, h1, h2, pre etc?
-    if (line.match(/^<h[1-3]>|^<hr>|^<pre>/)) {
-      if (inUl) { htmlResult += '</ul>\n'; inUl = false; }
-      if (inOl) { htmlResult += '</ol>\n'; inOl = false; }
-      htmlResult += line + '\n';
-      continue;
+  try {
+    const rawHtml = marked.parse(text);
+    if (typeof rawHtml === 'string') {
+      htmlResult = rawHtml;
     }
-
-    const ulMatch = line.match(/^[-*]\s+(.*)/);
-    const olMatch = line.match(/^\d+\.\s+(.*)/);
-
-    if (ulMatch) {
-      if (inOl) { htmlResult += '</ol>\n'; inOl = false; }
-      if (!inUl) { htmlResult += '<ul>\n'; inUl = true; }
-      htmlResult += `<li>${ulMatch[1]}</li>\n`;
-    } else if (olMatch) {
-      if (inUl) { htmlResult += '</ul>\n'; inUl = false; }
-      if (!inOl) { htmlResult += '<ol>\n'; inOl = true; }
-      htmlResult += `<li>${olMatch[1]}</li>\n`;
-    } else {
-      if (inUl) { htmlResult += '</ul>\n'; inUl = false; }
-      if (inOl) { htmlResult += '</ol>\n'; inOl = false; }
-      
-      // If none of the above and not empty, wrap in P
-      if (line.trim() !== '') {
-        // If it's not already wrapped
-        if (!line.startsWith('<')) {
-          htmlResult += `<p>${line}</p>\n`;
-        } else {
-          htmlResult += line + '\n';
-        }
-      }
-    }
+  } catch (e) {
+    // Fallback to naive replacement if marked somehow fails
+    htmlResult = `<p>${text.replace(/\n/g, '<br>')}</p>`;
   }
-
-  if (inUl) htmlResult += '</ul>\n';
-  if (inOl) htmlResult += '</ol>\n';
+  
+  if (!htmlResult) {
+    // Minimal fallback
+    htmlResult = text;
+  }
 
   return htmlResult;
 }
