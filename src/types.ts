@@ -27,6 +27,14 @@ export interface NoteImage {
   base64: string;
 }
 
+export interface NoteAttachment {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  base64: string;
+}
+
 export interface Note {
   id: string;
   workspaceId: string;
@@ -41,7 +49,9 @@ export interface Note {
   wordCount: number;
   headerMeta?: NoteHeaderMeta;
   images?: NoteImage[];
+  attachments?: NoteAttachment[];
 }
+
 
 export interface Settings {
   theme: 'dark' | 'light' | 'system';

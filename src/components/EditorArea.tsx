@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useStorage } from '../context/StorageContext';
 import { useEditor, EditorContent } from '@tiptap/react';
+import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import TaskList from '@tiptap/extension-task-list';
@@ -14,13 +15,14 @@ import Placeholder from '@tiptap/extension-placeholder';
 import ImageResize from 'tiptap-extension-resize-image';
 import { cleanAIPaste } from '../lib/paste-cleaner';
 import { NoteHistoryModal } from './NoteHistoryModal';
+import { ImageCropModal } from './ImageCropModal';
 import { 
   Bold, Italic, Underline as UnderlineIcon, 
   Heading1, Heading2, Heading3, 
   List, ListOrdered, CheckSquare, 
   Code, FileCode2, Table as TableIcon, 
   Minus, Sparkles, Tag as TagIcon, X, Check, Clock,
-  Image as ImageIcon, Download, Trash2, Bot, Undo2, Redo2, FileText, FileJson
+  Image as ImageIcon, Download, Trash2, Bot, Undo2, Redo2, FileText, FileJson, Crop, Paperclip
 } from 'lucide-react';
 import { cn, generateId } from '../lib/utils';
 import { format } from 'date-fns';
@@ -70,7 +72,9 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
   const [isHistoryOpen, setHistoryOpen] = useState(false);
   const [isProcessingImage, setIsProcessingImage] = useState(false);
   const [imageToDelete, setImageToDelete] = useState<string | null>(null);
+  const [imageToCrop, setImageToCrop] = useState<{ id: string, base64: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
   const pdfContainerRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -110,6 +114,47 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
     }
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !note) return;
+    
+    // Size limit 2MB for overall stability in local storage
+    if (file.size > 2 * 1024 * 1024) {
+      showToast('File too large (limit: 2MB)');
+      return;
+    }
+
+    try {
+      showToast('Uploading file...');
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = reader.result as string;
+        const newAttachment = {
+          id: generateId(),
+          name: file.name,
+          type: file.type || 'application/octet-stream',
+          size: file.size,
+          base64
+        };
+        const updatedAttachments = [...(note.attachments || []), newAttachment];
+        updateNote(noteId, { attachments: updatedAttachments });
+        showToast('File attached');
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to attach file');
+    } finally {
+      if (attachmentInputRef.current) attachmentInputRef.current.value = '';
+    }
+  };
+
+  const removeAttachment = (attachmentId: string) => {
+    if (!note) return;
+    const newAttachments = (note.attachments || []).filter(a => a.id !== attachmentId);
+    updateNote(noteId, { attachments: newAttachments });
+  };
+
   const explainImage = async (base64: string) => {
     showToast('Analyzing image with AI...');
     try {
@@ -143,6 +188,16 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
       console.error(err);
       showToast('AI analysis failed');
     }
+  };
+
+  const handleSaveCrop = (croppedBase64: string) => {
+    if (!note || !imageToCrop) return;
+    const newImages = (note.images || []).map(img => 
+      img.id === imageToCrop.id ? { ...img, base64: croppedBase64 } : img
+    );
+    updateNote(noteId, { images: newImages });
+    setImageToCrop(null);
+    showToast('Image cropped successfully');
   };
 
   const deleteImage = (imageId: string) => {
@@ -564,13 +619,83 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
             </div>
           </div>
 
+          {editor && (
+            <BubbleMenu 
+              editor={editor} 
+              tippyOptions={{ duration: 100 }}
+              shouldShow={({ editor }) => editor.isActive('image') || editor.isActive('imageResize')}
+            >
+              <div className="bg-surface-header border border-border shadow-xl rounded-lg overflow-hidden flex flex-col p-1 gap-1">
+                <button
+                  onClick={() => editor.chain().focus().deleteSelection().run()}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm text-red-400 hover:bg-surface hover:text-red-500 rounded-md transition-colors"
+                >
+                  <Trash2 size={14} /> Remove Image
+                </button>
+              </div>
+            </BubbleMenu>
+          )}
+
           <EditorContent editor={editor} className="min-h-[400px]" />
           
-          {/* Images Section */}
+          {/* Attachments Section */}
           <div className="mt-12 pt-8 border-t border-border">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
               <h3 className="text-sm font-semibold text-text-muted uppercase tracking-wider flex items-center gap-2">
-                <ImageIcon size={16} /> Attachments & Images
+                <Paperclip size={16} /> Files & Attachments
+              </h3>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => attachmentInputRef.current?.click()}
+                  className="text-xs bg-surface-active hover:bg-border text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5"
+                >
+                  + Add File 
+                </button>
+                <input 
+                  type="file" 
+                  ref={attachmentInputRef} 
+                  className="hidden" 
+                  onChange={handleFileUpload} 
+                />
+              </div>
+            </div>
+            
+            {note.attachments && note.attachments.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
+                {note.attachments.map(att => (
+                  <div key={att.id} className="flex items-center gap-3 p-3 bg-surface border border-border rounded-lg group">
+                    <div className="p-2 bg-surface-active rounded-md text-accent">
+                      <FileText size={20} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-text-primary truncate" title={att.name}>{att.name}</p>
+                      <p className="text-xs text-text-muted">{(att.size / 1024).toFixed(1)} KB</p>
+                    </div>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <a 
+                        href={att.base64} 
+                        download={att.name}
+                        className="p-1.5 text-text-muted hover:text-accent rounded-md hover:bg-surface-active transition-colors"
+                        title="Download"
+                      >
+                        <Download size={14} />
+                      </a>
+                      <button 
+                        onClick={() => removeAttachment(att.id)}
+                        className="p-1.5 text-text-muted hover:text-red-400 rounded-md hover:bg-surface-active transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between mb-4 mt-8">
+              <h3 className="text-sm font-semibold text-text-muted uppercase tracking-wider flex items-center gap-2">
+                <ImageIcon size={16} /> Images
                 <span className="text-[10px] bg-accent/20 text-accent px-2 py-0.5 rounded-full normal-case font-medium ml-2">Drag into text ↑</span>
               </h3>
               <button 
@@ -625,6 +750,12 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
                         className="pointer-events-auto bg-accent text-white px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2 hover:bg-accent/80 transition-colors"
                       >
                         <Bot size={16} /> Ask AI
+                      </button>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setImageToCrop({ id: img.id, base64: img.base64 }); }}
+                        className="pointer-events-auto bg-surface text-text-primary px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2 hover:bg-surface-active transition-colors border border-border"
+                      >
+                        <Crop size={16} /> Crop Image
                       </button>
                     </div>
                   </div>
@@ -687,6 +818,14 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
             </div>
           </div>
         </div>
+      )}
+
+      {imageToCrop && (
+        <ImageCropModal 
+          imageUrl={imageToCrop.base64}
+          onClose={() => setImageToCrop(null)}
+          onSave={handleSaveCrop}
+        />
       )}
     </div>
   );
