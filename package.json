@@ -42,6 +42,7 @@
     "react-dom": "^19.0.0",
     "react-firebase-hooks": "^5.1.1",
     "react-image-crop": "^11.0.10",
+    "recharts": "^3.8.1",
     "tailwind-merge": "^3.5.0",
     "tiptap-extension-resize-image": "^1.4.0",
     "turndown": "^7.2.4",

@@ -16,18 +16,24 @@ import ImageResize from 'tiptap-extension-resize-image';
 import { cleanAIPaste } from '../lib/paste-cleaner';
 import { NoteHistoryModal } from './NoteHistoryModal';
 import { ImageCropModal } from './ImageCropModal';
+import { ChartBuilderModal } from './ChartBuilderModal';
 import { 
   Bold, Italic, Underline as UnderlineIcon, 
   Heading1, Heading2, Heading3, 
   List, ListOrdered, CheckSquare, 
   Code, FileCode2, Table as TableIcon, 
   Minus, Sparkles, Tag as TagIcon, X, Check, Clock,
-  Image as ImageIcon, Download, Trash2, Bot, Undo2, Redo2, FileText, FileJson, Crop, Paperclip, BookOpen, Pen
+  Image as ImageIcon, Download, Trash2, Bot, Undo2, Redo2, FileText, FileJson, Crop, Paperclip, BookOpen, Pen, BarChart3, LineChart, PieChart
 } from 'lucide-react';
 import { cn, generateId } from '../lib/utils';
 import { format } from 'date-fns';
 import imageCompression from 'browser-image-compression';
 import { GoogleGenAI } from '@google/genai';
+import { NoteChart } from '../types';
+import {
+  BarChart as RechartsBarChart, Bar, LineChart as RechartsLineChart, Line, PieChart as RechartsPieChart, Pie,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell
+} from 'recharts';
 
 import TurndownService from 'turndown';
 
@@ -74,6 +80,8 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
   const [imageToDelete, setImageToDelete] = useState<string | null>(null);
   const [imageToCrop, setImageToCrop] = useState<{ id: string, base64: string } | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isChartBuilderOpen, setIsChartBuilderOpen] = useState(false);
+  const [editingChart, setEditingChart] = useState<NoteChart | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const pdfContainerRef = useRef<HTMLDivElement>(null);
@@ -205,6 +213,92 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
     if (!note) return;
     const newImages = (note.images || []).filter(img => img.id !== imageId);
     updateNote(noteId, { images: newImages });
+  };
+
+  const handleSaveChart = (chart: NoteChart) => {
+    if (!note) return;
+    const existingCharts = note.charts || [];
+    const editIndex = existingCharts.findIndex(c => c.id === chart.id);
+    
+    let newCharts;
+    if (editIndex >= 0) {
+      newCharts = [...existingCharts];
+      newCharts[editIndex] = chart;
+    } else {
+      newCharts = [...existingCharts, chart];
+    }
+    
+    updateNote(noteId, { charts: newCharts });
+    setIsChartBuilderOpen(false);
+    setEditingChart(undefined);
+  };
+
+  const deleteChart = (chartId: string) => {
+    if (!note) return;
+    const newCharts = (note.charts || []).filter(c => c.id !== chartId);
+    updateNote(noteId, { charts: newCharts });
+  };
+
+  const renderChartPreview = (chart: NoteChart) => {
+    const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#00c49f', '#ffbb28', '#ff8042'];
+    
+    switch (chart.type) {
+      case 'bar':
+        return (
+          <ResponsiveContainer width="100%" height={300}>
+            <RechartsBarChart data={chart.data}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+              <XAxis dataKey={chart.config.xAxisKey} stroke="#888" fontSize={12} />
+              <YAxis stroke="#888" fontSize={12} />
+              <Tooltip contentStyle={{ backgroundColor: '#1e1e1e', borderColor: '#333' }} />
+              <Legend />
+              {chart.config.dataKeys.map((key, i) => (
+                <Bar key={key} dataKey={key} fill={COLORS[i % COLORS.length]} />
+              ))}
+            </RechartsBarChart>
+          </ResponsiveContainer>
+        );
+      case 'line':
+        return (
+          <ResponsiveContainer width="100%" height={300}>
+            <RechartsLineChart data={chart.data}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+              <XAxis dataKey={chart.config.xAxisKey} stroke="#888" fontSize={12} />
+              <YAxis stroke="#888" fontSize={12} />
+              <Tooltip contentStyle={{ backgroundColor: '#1e1e1e', borderColor: '#333' }} />
+              <Legend />
+              {chart.config.dataKeys.map((key, i) => (
+                <Line key={key} type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} />
+              ))}
+            </RechartsLineChart>
+          </ResponsiveContainer>
+        );
+      case 'pie':
+        return (
+          <ResponsiveContainer width="100%" height={300}>
+            <RechartsPieChart>
+              <Tooltip contentStyle={{ backgroundColor: '#1e1e1e', borderColor: '#333' }} />
+              <Legend />
+              {chart.config.dataKeys.map((key, i) => (
+                <Pie 
+                  key={key} 
+                  data={chart.data} 
+                  dataKey={key} 
+                  nameKey={chart.config.xAxisKey} 
+                  cx="50%" 
+                  cy="50%" 
+                  outerRadius={100 - (i * 20)} 
+                  fill={COLORS[i % COLORS.length]}
+                >
+                  {chart.data.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[(index + i) % COLORS.length]} />
+                  ))}
+                </Pie>
+              ))}
+            </RechartsPieChart>
+          </ResponsiveContainer>
+        );
+    }
   };
 
   useEffect(() => {
@@ -737,6 +831,56 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
 
             <div className="flex items-center justify-between mb-4 mt-8">
               <h3 className="text-sm font-semibold text-text-muted uppercase tracking-wider flex items-center gap-2">
+                <BarChart3 size={16} /> Charts & Data
+              </h3>
+              {isEditing && (
+                <button 
+                  onClick={() => { setEditingChart(undefined); setIsChartBuilderOpen(true); }}
+                  className="text-xs bg-surface-active hover:bg-border text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5"
+                >
+                  + Build Chart
+                </button>
+              )}
+            </div>
+
+            {note.charts && note.charts.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                {note.charts.map(chart => (
+                  <div key={chart.id} className="bg-surface border border-border rounded-xl shadow-sm overflow-hidden flex flex-col pt-4">
+                    <div className="px-4 pb-2 flex items-center justify-between">
+                      <h4 className="font-semibold text-text-primary flex items-center gap-2">
+                        {chart.type === 'bar' ? <BarChart3 size={18}/> : chart.type === 'line' ? <LineChart size={18}/> : <PieChart size={18}/>}
+                        {chart.title}
+                      </h4>
+                      {isEditing && (
+                        <div className="flex items-center gap-1">
+                          <button 
+                            onClick={() => { setEditingChart(chart); setIsChartBuilderOpen(true); }}
+                            className="p-1.5 text-text-muted hover:text-accent rounded-md hover:bg-surface-active transition-colors"
+                            title="Edit Chart"
+                          >
+                            <Pen size={14} />
+                          </button>
+                          <button 
+                            onClick={() => deleteChart(chart.id)}
+                            className="p-1.5 text-text-muted hover:text-red-400 rounded-md hover:bg-surface-active transition-colors"
+                            title="Delete Chart"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 w-full p-2 relative bg-background/50">
+                      {renderChartPreview(chart)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between mb-4 mt-8">
+              <h3 className="text-sm font-semibold text-text-muted uppercase tracking-wider flex items-center gap-2">
                 <ImageIcon size={16} /> Images
                 {isEditing && <span className="text-[10px] bg-accent/20 text-accent px-2 py-0.5 rounded-full normal-case font-medium ml-2">Drag into text ↑</span>}
               </h3>
@@ -875,6 +1019,14 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
           imageUrl={imageToCrop.base64}
           onClose={() => setImageToCrop(null)}
           onSave={handleSaveCrop}
+        />
+      )}
+
+      {isChartBuilderOpen && (
+        <ChartBuilderModal
+          initialChart={editingChart}
+          onClose={() => setIsChartBuilderOpen(false)}
+          onSave={handleSaveChart}
         />
       )}
     </div>

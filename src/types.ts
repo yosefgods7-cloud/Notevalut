@@ -35,6 +35,17 @@ export interface NoteAttachment {
   base64: string;
 }
 
+export interface NoteChart {
+  id: string;
+  type: 'bar' | 'line' | 'pie';
+  title: string;
+  data: any[];
+  config: {
+    xAxisKey: string;
+    dataKeys: string[];
+  };
+}
+
 export interface Note {
   id: string;
   workspaceId: string;
@@ -50,6 +61,7 @@ export interface Note {
   headerMeta?: NoteHeaderMeta;
   images?: NoteImage[];
   attachments?: NoteAttachment[];
+  charts?: NoteChart[];
 }
 
 
