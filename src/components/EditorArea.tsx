@@ -22,7 +22,7 @@ import {
   List, ListOrdered, CheckSquare, 
   Code, FileCode2, Table as TableIcon, 
   Minus, Sparkles, Tag as TagIcon, X, Check, Clock,
-  Image as ImageIcon, Download, Trash2, Bot, Undo2, Redo2, FileText, FileJson, Crop, Paperclip
+  Image as ImageIcon, Download, Trash2, Bot, Undo2, Redo2, FileText, FileJson, Crop, Paperclip, BookOpen, Pen
 } from 'lucide-react';
 import { cn, generateId } from '../lib/utils';
 import { format } from 'date-fns';
@@ -73,6 +73,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
   const [isProcessingImage, setIsProcessingImage] = useState(false);
   const [imageToDelete, setImageToDelete] = useState<string | null>(null);
   const [imageToCrop, setImageToCrop] = useState<{ id: string, base64: string } | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const pdfContainerRef = useRef<HTMLDivElement>(null);
@@ -236,6 +237,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
       Placeholder.configure({ placeholder: 'Start writing or paste AI text...' })
     ],
     content: '',
+    editable: isEditing,
     editorProps: {
       handleDrop: (view, event, slice, moved) => {
         if (draggedImageData) {
@@ -280,6 +282,12 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
       handleSaveContent(editor.getHTML(), editor.storage.characterCount.words());
     }
   });
+
+  useEffect(() => {
+    if (editor) {
+      editor.setEditable(isEditing);
+    }
+  }, [isEditing, editor]);
 
   useEffect(() => {
     if (note && editor) {
@@ -465,47 +473,51 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
           </button>
           {/* Toolbar */}
           <div className="flex items-center space-x-1 shrink-0">
-          <ToolbarButton onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} icon={<Undo2 size={16} />} title="Undo (Ctrl+Z)" />
-          <ToolbarButton onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} icon={<Redo2 size={16} />} title="Redo (Ctrl+Shift+Z)" />
-          
-          <div className="w-px h-4 bg-border mx-1"></div>
+          {isEditing && (
+            <>
+              <ToolbarButton onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} icon={<Undo2 size={16} />} title="Undo (Ctrl+Z)" />
+              <ToolbarButton onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} icon={<Redo2 size={16} />} title="Redo (Ctrl+Shift+Z)" />
+              
+              <div className="w-px h-4 bg-border mx-1"></div>
 
-          <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive('heading', { level: 1 })} icon={<Heading1 size={16} />} />
-          <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive('heading', { level: 2 })} icon={<Heading2 size={16} />} />
-          <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive('heading', { level: 3 })} icon={<Heading3 size={16} />} />
-          
-          <div className="w-px h-4 bg-border mx-1"></div>
-          
-          <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} icon={<Bold size={16} />} />
-          <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} icon={<Italic size={16} />} />
-          <ToolbarButton onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive('underline')} icon={<UnderlineIcon size={16} />} />
-          
-          <div className="w-px h-4 bg-border mx-1"></div>
-          
-          <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} icon={<List size={16} />} />
-          <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} icon={<ListOrdered size={16} />} />
-          <ToolbarButton onClick={() => editor.chain().focus().toggleTaskList().run()} active={editor.isActive('taskList')} icon={<CheckSquare size={16} />} />
-          
-          <div className="w-px h-4 bg-border mx-1"></div>
-          
-          <ToolbarButton onClick={() => editor.chain().focus().toggleCode().run()} active={editor.isActive('code')} icon={<Code size={16} />} />
-          <ToolbarButton onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')} icon={<FileCode2 size={16} />} />
-          
-          <div className="w-px h-4 bg-border mx-1"></div>
-          
-          <ToolbarButton onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} icon={<TableIcon size={16} />} />
-          <ToolbarButton onClick={() => editor.chain().focus().setHorizontalRule().run()} icon={<Minus size={16} />} />
-          
-          <div className="w-px h-4 bg-border mx-1"></div>
-          
-          <button 
-            id="btn-smart-paste"
-            onClick={handleSmartPasteClick}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-sm bg-accent/10 text-accent hover:bg-accent/20 rounded-md font-medium transition-colors h-8"
-          >
-            <Sparkles size={14} />
-            <span>Smart Paste</span>
-          </button>
+              <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive('heading', { level: 1 })} icon={<Heading1 size={16} />} />
+              <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive('heading', { level: 2 })} icon={<Heading2 size={16} />} />
+              <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive('heading', { level: 3 })} icon={<Heading3 size={16} />} />
+              
+              <div className="w-px h-4 bg-border mx-1"></div>
+              
+              <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} icon={<Bold size={16} />} />
+              <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} icon={<Italic size={16} />} />
+              <ToolbarButton onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive('underline')} icon={<UnderlineIcon size={16} />} />
+              
+              <div className="w-px h-4 bg-border mx-1"></div>
+              
+              <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} icon={<List size={16} />} />
+              <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} icon={<ListOrdered size={16} />} />
+              <ToolbarButton onClick={() => editor.chain().focus().toggleTaskList().run()} active={editor.isActive('taskList')} icon={<CheckSquare size={16} />} />
+              
+              <div className="w-px h-4 bg-border mx-1"></div>
+              
+              <ToolbarButton onClick={() => editor.chain().focus().toggleCode().run()} active={editor.isActive('code')} icon={<Code size={16} />} />
+              <ToolbarButton onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')} icon={<FileCode2 size={16} />} />
+              
+              <div className="w-px h-4 bg-border mx-1"></div>
+              
+              <ToolbarButton onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} icon={<TableIcon size={16} />} />
+              <ToolbarButton onClick={() => editor.chain().focus().setHorizontalRule().run()} icon={<Minus size={16} />} />
+              
+              <div className="w-px h-4 bg-border mx-1"></div>
+              
+              <button 
+                id="btn-smart-paste"
+                onClick={handleSmartPasteClick}
+                className="flex items-center gap-1.5 px-2.5 py-1 text-sm bg-accent/10 text-accent hover:bg-accent/20 rounded-md font-medium transition-colors h-8"
+              >
+                <Sparkles size={14} />
+                <span>Smart Paste</span>
+              </button>
+            </>
+          )}
 
           <div className="relative group">
             <button 
@@ -540,8 +552,26 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
         </div>
         </div>
 
-        <div className="flex items-center gap-4 text-xs text-text-muted select-none">
-          {savedStatus === 'saving' ? 'Saving...' : '✓ Saved'}
+        <div className="flex items-center gap-4 shrink-0 no-print">
+          <button 
+            onClick={() => setIsEditing(!isEditing)}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-sm bg-surface-active hover:bg-border text-text-primary rounded-md font-medium transition-colors h-8"
+            title={isEditing ? "Switch to Reading Mode" : "Switch to Editing Mode"}
+          >
+            {isEditing ? (
+              <><BookOpen size={14} /> <span className="hidden sm:inline">Read</span></>
+            ) : (
+              <><Pen size={14} /> <span className="hidden sm:inline">Edit</span></>
+            )}
+          </button>
+          <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 bg-surface-active rounded border border-border text-xs text-text-muted h-8">
+            <span className="flex items-center gap-1"><span className="text-text-primary text-[10px] w-3 h-3 flex items-center justify-center bg-border rounded">A</span> {editor.storage.characterCount.characters()}</span>
+            <span className="text-border mx-1">|</span>
+            <span>{editor.storage.characterCount.words()} <span className="hidden lg:inline">words</span></span>
+          </div>
+          <div className="text-xs text-text-muted select-none w-16 text-right">
+            {savedStatus === 'saving' ? 'Saving...' : '✓ Saved'}
+          </div>
         </div>
       </div>
 
@@ -553,6 +583,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
             <input
               type="text"
               value={title}
+              readOnly={!isEditing}
               onChange={(e) => {
                 setTitle(e.target.value);
                 handleSaveMetadata({ title: e.target.value });
@@ -579,24 +610,26 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
               <input
                 type="text"
                 value={source}
+                readOnly={!isEditing}
                 onChange={(e) => {
                   setSource(e.target.value);
                   handleSaveMetadata({ headerMeta: { ...(note.headerMeta || {date:'', summary:''}), source: e.target.value } });
                 }}
                 placeholder="ChatGPT, Meeting, URL..."
-                className="bg-transparent border-none outline-none text-text-primary placeholder:text-surface-active"
+                className="bg-transparent border-none outline-none text-text-primary placeholder:text-surface-active w-full"
               />
 
               <span className="text-text-muted font-medium flex items-center gap-2"><span className="text-[1.1em]">📌</span> Summary</span>
               <input
                 type="text"
                 value={summary}
+                readOnly={!isEditing}
                 onChange={(e) => {
                   setSummary(e.target.value);
                   handleSaveMetadata({ headerMeta: { ...(note.headerMeta || {date:'', source:''}), summary: e.target.value } });
                 }}
                 placeholder="One-line summary..."
-                className="bg-transparent border-none outline-none text-text-primary placeholder:text-surface-active"
+                className="bg-transparent border-none outline-none text-text-primary placeholder:text-surface-active w-full"
               />
 
               <span className="text-text-muted font-medium flex items-center gap-2 pt-1"><span className="text-[1.1em]">🏷️</span> Tags</span>
@@ -604,25 +637,28 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
                 {tags.map(tag => (
                   <span key={tag} className="flex items-center gap-1 bg-surface-active px-2 py-0.5 rounded-md text-xs text-text-primary border border-border">
                     {tag}
-                    <button onClick={() => removeTag(tag)} className="text-text-muted hover:text-white"><X size={10} /></button>
+                    {isEditing && (
+                      <button onClick={() => removeTag(tag)} className="text-text-muted hover:text-white"><X size={10} /></button>
+                    )}
                   </span>
                 ))}
-                <input
-                  type="text"
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyDown={handleAddTag}
-                  placeholder="+ Add tag..."
-                  className="bg-transparent border-none outline-none text-text-muted placeholder:text-surface-active text-xs w-24"
-                />
+                {isEditing && (
+                  <input
+                    type="text"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={handleAddTag}
+                    placeholder="+ Add tag..."
+                    className="bg-transparent border-none outline-none text-text-muted placeholder:text-surface-active text-xs w-24"
+                  />
+                )}
               </div>
             </div>
           </div>
 
-          {editor && (
+          {isEditing && editor && (
             <BubbleMenu 
               editor={editor} 
-              tippyOptions={{ duration: 100 }}
               shouldShow={({ editor }) => editor.isActive('image') || editor.isActive('imageResize')}
             >
               <div className="bg-surface-header border border-border shadow-xl rounded-lg overflow-hidden flex flex-col p-1 gap-1">
@@ -645,18 +681,22 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
                 <Paperclip size={16} /> Files & Attachments
               </h3>
               <div className="flex items-center gap-2">
-                <button 
-                  onClick={() => attachmentInputRef.current?.click()}
-                  className="text-xs bg-surface-active hover:bg-border text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5"
-                >
-                  + Add File 
-                </button>
-                <input 
-                  type="file" 
-                  ref={attachmentInputRef} 
-                  className="hidden" 
-                  onChange={handleFileUpload} 
-                />
+                {isEditing && (
+                  <>
+                    <button 
+                      onClick={() => attachmentInputRef.current?.click()}
+                      className="text-xs bg-surface-active hover:bg-border text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5"
+                    >
+                      + Add File 
+                    </button>
+                    <input 
+                      type="file" 
+                      ref={attachmentInputRef} 
+                      className="hidden" 
+                      onChange={handleFileUpload} 
+                    />
+                  </>
+                )}
               </div>
             </div>
             
@@ -680,13 +720,15 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
                       >
                         <Download size={14} />
                       </a>
-                      <button 
-                        onClick={() => removeAttachment(att.id)}
-                        className="p-1.5 text-text-muted hover:text-red-400 rounded-md hover:bg-surface-active transition-colors"
-                        title="Delete"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      {isEditing && (
+                        <button 
+                          onClick={() => removeAttachment(att.id)}
+                          className="p-1.5 text-text-muted hover:text-red-400 rounded-md hover:bg-surface-active transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -696,22 +738,26 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
             <div className="flex items-center justify-between mb-4 mt-8">
               <h3 className="text-sm font-semibold text-text-muted uppercase tracking-wider flex items-center gap-2">
                 <ImageIcon size={16} /> Images
-                <span className="text-[10px] bg-accent/20 text-accent px-2 py-0.5 rounded-full normal-case font-medium ml-2">Drag into text ↑</span>
+                {isEditing && <span className="text-[10px] bg-accent/20 text-accent px-2 py-0.5 rounded-full normal-case font-medium ml-2">Drag into text ↑</span>}
               </h3>
-              <button 
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isProcessingImage}
-                className="text-xs bg-surface-active hover:bg-border text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5 disabled:opacity-50"
-              >
-                {isProcessingImage ? 'Loading...' : '+ Add Photo'}
-              </button>
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                className="hidden" 
-                accept="image/*" 
-                onChange={handleImageUpload} 
-              />
+              {isEditing && (
+                <>
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isProcessingImage}
+                    className="text-xs bg-surface-active hover:bg-border text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {isProcessingImage ? 'Loading...' : '+ Add Photo'}
+                  </button>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    className="hidden" 
+                    accept="image/*" 
+                    onChange={handleImageUpload} 
+                  />
+                </>
+              )}
             </div>
 
             {note.images && note.images.length > 0 && (
@@ -733,16 +779,18 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
                   >
                     <img src={img.base64} alt={img.name} className="w-full h-48 object-cover" />
                     
-                    <button 
-                        onClick={(e) => { 
-                          e.stopPropagation(); 
-                          setImageToDelete(img.id);
-                        }}
-                        className="absolute top-2 right-2 bg-red-500/90 hover:bg-red-600 text-white p-2 rounded-full shadow-lg md:opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-auto"
-                        title="Delete Image"
-                    >
-                        <Trash2 size={14} />
-                    </button>
+                    {isEditing && (
+                      <button 
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            setImageToDelete(img.id);
+                          }}
+                          className="absolute top-2 right-2 bg-red-500/90 hover:bg-red-600 text-white p-2 rounded-full shadow-lg md:opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-auto"
+                          title="Delete Image"
+                      >
+                          <Trash2 size={14} />
+                      </button>
+                    )}
 
                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-3 no-print pointer-events-none">
                       <button 
@@ -751,12 +799,14 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
                       >
                         <Bot size={16} /> Ask AI
                       </button>
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); setImageToCrop({ id: img.id, base64: img.base64 }); }}
-                        className="pointer-events-auto bg-surface text-text-primary px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2 hover:bg-surface-active transition-colors border border-border"
-                      >
-                        <Crop size={16} /> Crop Image
-                      </button>
+                      {isEditing && (
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); setImageToCrop({ id: img.id, base64: img.base64 }); }}
+                          className="pointer-events-auto bg-surface text-text-primary px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2 hover:bg-surface-active transition-colors border border-border"
+                        >
+                          <Crop size={16} /> Crop Image
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
