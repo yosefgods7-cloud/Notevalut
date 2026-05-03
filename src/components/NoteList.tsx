@@ -205,7 +205,7 @@ export const NoteList: React.FC<NoteListProps> = ({
               </div>
 
               {/* Hover Actions */}
-              <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity flex gap-1 bg-surface-hover rounded-md shadow-lg border border-border p-0.5 backdrop-blur-md">
+              <div className="absolute right-2 top-2 lg:opacity-0 opacity-100 group-hover:opacity-100 focus-within:opacity-100 transition-opacity flex gap-1 bg-surface-hover rounded-md shadow-lg border border-border p-0.5 backdrop-blur-md">
                 <button
                   onClick={(e) => { e.stopPropagation(); updateNote(note.id, { starred: !note.starred }); }}
                   className="p-1.5 text-text-secondary hover:text-yellow-500 rounded hover:bg-surface-active"

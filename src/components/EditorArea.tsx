@@ -11,7 +11,7 @@ import TableHeader from '@tiptap/extension-table-header';
 import TableCell from '@tiptap/extension-table-cell';
 import CharacterCount from '@tiptap/extension-character-count';
 import Placeholder from '@tiptap/extension-placeholder';
-import Image from '@tiptap/extension-image';
+import ImageResize from 'tiptap-extension-resize-image';
 import { cleanAIPaste } from '../lib/paste-cleaner';
 import { NoteHistoryModal } from './NoteHistoryModal';
 import { 
@@ -41,6 +41,8 @@ turndownService.addRule('strikethrough', {
 });
 
 let aiClient: GoogleGenAI | null = null;
+let draggedImageData: { id: string; src: string; alt: string } | null = null;
+
 const getAiClient = () => {
   if (!aiClient && process.env.GEMINI_API_KEY) {
     aiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -148,6 +150,16 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
     updateNote(noteId, { images: newImages });
   };
 
+  useEffect(() => {
+    const handleImageDropped = (e: any) => {
+      if (e.detail?.id) {
+        deleteImage(e.detail.id);
+      }
+    };
+    window.addEventListener('image-dropped', handleImageDropped);
+    return () => window.removeEventListener('image-dropped', handleImageDropped);
+  }, [note, deleteImage]);
+
   const smartPasteRef = useRef(settings.smartPaste);
   useEffect(() => {
     smartPasteRef.current = settings.smartPaste;
@@ -164,11 +176,32 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
       TableHeader,
       TableCell,
       CharacterCount,
-      Image.configure({ inline: true }),
+      ImageResize,
       Placeholder.configure({ placeholder: 'Start writing or paste AI text...' })
     ],
     content: '',
     editorProps: {
+      handleDrop: (view, event, slice, moved) => {
+        if (draggedImageData) {
+          event.preventDefault();
+          const coordinates = view.posAtCoords({ left: event.clientX, top: event.clientY });
+          if (coordinates) {
+            const node = view.state.schema.nodes.image.create({
+              src: draggedImageData.src,
+              alt: draggedImageData.alt
+            });
+            const tr = view.state.tr.insert(coordinates.pos, node);
+            view.dispatch(tr);
+            view.focus();
+            if (draggedImageData.id) {
+               window.dispatchEvent(new CustomEvent('image-dropped', { detail: { id: draggedImageData.id } }));
+            }
+            draggedImageData = null;
+            return true;
+          }
+        }
+        return false;
+      },
       handlePaste: (view, event, slice) => {
         if (!smartPasteRef.current) return false;
         
@@ -561,26 +594,37 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
                     className="group relative bg-surface border border-border rounded-lg overflow-hidden cursor-grab active:cursor-grabbing"
                     draggable={true}
                     onDragStart={(e) => {
+                      draggedImageData = { id: img.id, src: img.base64, alt: img.name };
                       // Set both plain URL and HTML to be super compatible with Tiptap
-                      e.dataTransfer.setData('text/plain', img.base64);
+                      e.dataTransfer.setData('text/plain', `[Image: ${img.name}]`);
                       e.dataTransfer.setData('text/html', `<img src="${img.base64}" alt="${img.name}" />`);
                       e.dataTransfer.effectAllowed = 'copy';
+                    }}
+                    onDragEnd={() => {
+                      draggedImageData = null;
                     }}
                   >
                     <img src={img.base64} alt={img.name} className="w-full h-48 object-cover" />
                     
+                    <button 
+                        onClick={(e) => { 
+                          e.stopPropagation(); 
+                          if (window.confirm("Are you sure you want to delete this image?")) {
+                            deleteImage(img.id); 
+                          }
+                        }}
+                        className="absolute top-2 right-2 bg-red-500/90 hover:bg-red-600 text-white p-2 rounded-full shadow-lg md:opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-auto"
+                        title="Delete Image"
+                    >
+                        <Trash2 size={14} />
+                    </button>
+
                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-3 no-print pointer-events-none">
                       <button 
                         onClick={(e) => { e.stopPropagation(); explainImage(img.base64); }}
                         className="pointer-events-auto bg-accent text-white px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2 hover:bg-accent/80 transition-colors"
                       >
                         <Bot size={16} /> Ask AI
-                      </button>
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); deleteImage(img.id); }}
-                        className="pointer-events-auto bg-red-500/90 text-white px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2 hover:bg-red-600 transition-colors"
-                      >
-                        <Trash2 size={16} /> Delete
                       </button>
                     </div>
                   </div>

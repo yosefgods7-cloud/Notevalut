@@ -42,6 +42,7 @@
     "react-dom": "^19.0.0",
     "react-firebase-hooks": "^5.1.1",
     "tailwind-merge": "^3.5.0",
+    "tiptap-extension-resize-image": "^1.4.0",
     "turndown": "^7.2.4",
     "uuid": "^14.0.0",
     "vite": "^6.2.0"
