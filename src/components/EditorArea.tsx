@@ -11,6 +11,7 @@ import TableHeader from '@tiptap/extension-table-header';
 import TableCell from '@tiptap/extension-table-cell';
 import CharacterCount from '@tiptap/extension-character-count';
 import Placeholder from '@tiptap/extension-placeholder';
+import Image from '@tiptap/extension-image';
 import { cleanAIPaste } from '../lib/paste-cleaner';
 import { NoteHistoryModal } from './NoteHistoryModal';
 import { 
@@ -163,6 +164,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
       TableHeader,
       TableCell,
       CharacterCount,
+      Image.configure({ inline: true }),
       Placeholder.configure({ placeholder: 'Start writing or paste AI text...' })
     ],
     content: '',
@@ -533,6 +535,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-text-muted uppercase tracking-wider flex items-center gap-2">
                 <ImageIcon size={16} /> Attachments & Images
+                <span className="text-[10px] bg-accent/20 text-accent px-2 py-0.5 rounded-full normal-case font-medium ml-2">Drag into text ↑</span>
               </h3>
               <button 
                 onClick={() => fileInputRef.current?.click()}
@@ -553,19 +556,29 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
             {note.images && note.images.length > 0 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {note.images.map(img => (
-                  <div key={img.id} className="group relative bg-surface border border-border rounded-lg overflow-hidden">
+                  <div 
+                    key={img.id} 
+                    className="group relative bg-surface border border-border rounded-lg overflow-hidden cursor-grab active:cursor-grabbing"
+                    draggable={true}
+                    onDragStart={(e) => {
+                      // Set both plain URL and HTML to be super compatible with Tiptap
+                      e.dataTransfer.setData('text/plain', img.base64);
+                      e.dataTransfer.setData('text/html', `<img src="${img.base64}" alt="${img.name}" />`);
+                      e.dataTransfer.effectAllowed = 'copy';
+                    }}
+                  >
                     <img src={img.base64} alt={img.name} className="w-full h-48 object-cover" />
                     
-                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-3 no-print">
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-3 no-print pointer-events-none">
                       <button 
-                        onClick={() => explainImage(img.base64)}
-                        className="bg-accent text-white px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2 hover:bg-accent/80 transition-colors"
+                        onClick={(e) => { e.stopPropagation(); explainImage(img.base64); }}
+                        className="pointer-events-auto bg-accent text-white px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2 hover:bg-accent/80 transition-colors"
                       >
                         <Bot size={16} /> Ask AI
                       </button>
                       <button 
-                        onClick={() => deleteImage(img.id)}
-                        className="bg-red-500/90 text-white px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2 hover:bg-red-600 transition-colors"
+                        onClick={(e) => { e.stopPropagation(); deleteImage(img.id); }}
+                        className="pointer-events-auto bg-red-500/90 text-white px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2 hover:bg-red-600 transition-colors"
                       >
                         <Trash2 size={16} /> Delete
                       </button>
