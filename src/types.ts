@@ -37,7 +37,7 @@ export interface NoteAttachment {
 
 export interface NoteChart {
   id: string;
-  type: 'bar' | 'line' | 'pie';
+  type: 'bar' | 'line' | 'pie' | 'area' | 'radar';
   title: string;
   data: any[];
   config: {

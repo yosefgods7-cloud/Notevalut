@@ -26,7 +26,7 @@ import {
   List, ListOrdered, CheckSquare, 
   Code, FileCode2, Table as TableIcon, 
   Minus, Sparkles, Tag as TagIcon, X, Check, Clock,
-  Image as ImageIcon, Download, Trash2, Bot, Undo2, Redo2, FileText, FileJson, Crop, Paperclip, BookOpen, Pen, BarChart3, LineChart, PieChart, Quote, Type, Palette, Plus, ChevronDown
+  Image as ImageIcon, Download, Trash2, Bot, Undo2, Redo2, FileText, FileJson, Crop, Paperclip, BookOpen, Pen, BarChart3, LineChart, PieChart, Quote, Type, Palette, Plus, ChevronDown, AreaChart as AreaChartIcon, Hexagon
 } from 'lucide-react';
 import { cn, generateId } from '../lib/utils';
 import { format } from 'date-fns';
@@ -35,6 +35,7 @@ import { GoogleGenAI } from '@google/genai';
 import { NoteChart } from '../types';
 import {
   BarChart as RechartsBarChart, Bar, LineChart as RechartsLineChart, Line, PieChart as RechartsPieChart, Pie,
+  AreaChart as RechartsAreaChart, Area, RadarChart as RechartsRadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell
 } from 'recharts';
 
@@ -299,6 +300,36 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
                 </Pie>
               ))}
             </RechartsPieChart>
+          </ResponsiveContainer>
+        );
+      case 'area':
+        return (
+          <ResponsiveContainer width="100%" height={300}>
+            <RechartsAreaChart data={chart.data}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+              <XAxis dataKey={chart.config.xAxisKey} stroke="#888" fontSize={12} />
+              <YAxis stroke="#888" fontSize={12} />
+              <Tooltip contentStyle={{ backgroundColor: '#1e1e1e', borderColor: '#333' }} />
+              <Legend />
+              {chart.config.dataKeys.map((key, i) => (
+                <Area key={key} type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} fill={COLORS[i % COLORS.length]} fillOpacity={0.3} />
+              ))}
+            </RechartsAreaChart>
+          </ResponsiveContainer>
+        );
+      case 'radar':
+        return (
+          <ResponsiveContainer width="100%" height={300}>
+            <RechartsRadarChart data={chart.data}>
+              <PolarGrid stroke="#555" />
+              <PolarAngleAxis dataKey={chart.config.xAxisKey} stroke="#888" fontSize={12} />
+              <PolarRadiusAxis stroke="#888" fontSize={12} />
+              <Tooltip contentStyle={{ backgroundColor: '#1e1e1e', borderColor: '#333' }} />
+              <Legend />
+              {chart.config.dataKeys.map((key, i) => (
+                <Radar key={key} name={key} dataKey={key} stroke={COLORS[i % COLORS.length]} fill={COLORS[i % COLORS.length]} fillOpacity={0.6} />
+              ))}
+            </RechartsRadarChart>
           </ResponsiveContainer>
         );
     }
@@ -932,7 +963,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
                   <div key={chart.id} className="bg-surface border border-border rounded-xl shadow-sm overflow-hidden flex flex-col pt-4">
                     <div className="px-4 pb-2 flex items-center justify-between">
                       <h4 className="font-semibold text-text-primary flex items-center gap-2">
-                        {chart.type === 'bar' ? <BarChart3 size={18}/> : chart.type === 'line' ? <LineChart size={18}/> : <PieChart size={18}/>}
+                        {chart.type === 'bar' ? <BarChart3 size={18}/> : chart.type === 'line' ? <LineChart size={18}/> : chart.type === 'pie' ? <PieChart size={18}/> : chart.type === 'area' ? <AreaChartIcon size={18} /> : <Hexagon size={18}/>}
                         {chart.title}
                       </h4>
                       {isEditing && (

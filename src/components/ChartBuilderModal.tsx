@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { X, Check, BarChart3, LineChart, PieChart } from 'lucide-react';
+import { X, Check, BarChart3, LineChart, PieChart, AreaChart as AreaChartIcon, Hexagon } from 'lucide-react';
 import { NoteChart } from '../types';
 import { generateId } from '../lib/utils';
 import {
   BarChart, Bar, LineChart as RechartsLineChart, Line, PieChart as RechartsPieChart, Pie,
+  AreaChart as RechartsAreaChart, Area, RadarChart as RechartsRadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell
 } from 'recharts';
 
@@ -114,6 +115,36 @@ export function ChartBuilderModal({ onClose, onSave, initialChart }: ChartBuilde
             </RechartsPieChart>
           </ResponsiveContainer>
         );
+      case 'area':
+        return (
+          <ResponsiveContainer width="100%" height="100%">
+            <RechartsAreaChart data={parsedData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+              <XAxis dataKey={xAxisKey} stroke="#888" />
+              <YAxis stroke="#888" />
+              <Tooltip contentStyle={{ backgroundColor: '#1e1e1e', borderColor: '#333' }} />
+              <Legend />
+              {dataKeys.map((key, i) => (
+                <Area key={key} type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} fill={COLORS[i % COLORS.length]} fillOpacity={0.3} />
+              ))}
+            </RechartsAreaChart>
+          </ResponsiveContainer>
+        );
+      case 'radar':
+        return (
+          <ResponsiveContainer width="100%" height="100%">
+            <RechartsRadarChart data={parsedData}>
+              <PolarGrid stroke="#555" />
+              <PolarAngleAxis dataKey={xAxisKey} stroke="#888" />
+              <PolarRadiusAxis stroke="#888" />
+              <Tooltip contentStyle={{ backgroundColor: '#1e1e1e', borderColor: '#333' }} />
+              <Legend />
+              {dataKeys.map((key, i) => (
+                <Radar key={key} name={key} dataKey={key} stroke={COLORS[i % COLORS.length]} fill={COLORS[i % COLORS.length]} fillOpacity={0.6} />
+              ))}
+            </RechartsRadarChart>
+          </ResponsiveContainer>
+        );
     }
   };
 
@@ -144,7 +175,7 @@ export function ChartBuilderModal({ onClose, onSave, initialChart }: ChartBuilde
 
             <div>
               <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Chart Type</label>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button 
                   onClick={() => setType('bar')}
                   className={`flex-1 py-2 px-3 flex items-center justify-center gap-2 rounded-md border text-sm font-medium transition-colors ${type === 'bar' ? 'bg-accent/10 border-accent text-accent' : 'border-border text-text-secondary hover:bg-surface-active'}`}
@@ -156,7 +187,15 @@ export function ChartBuilderModal({ onClose, onSave, initialChart }: ChartBuilde
                 <button 
                   onClick={() => setType('pie')}
                   className={`flex-1 py-2 px-3 flex items-center justify-center gap-2 rounded-md border text-sm font-medium transition-colors ${type === 'pie' ? 'bg-accent/10 border-accent text-accent' : 'border-border text-text-secondary hover:bg-surface-active'}`}
-                ><PieChart size={16}/> Pie</button>
+                ><PieChart size={16}/> Circle</button>
+                <button 
+                  onClick={() => setType('area')}
+                  className={`flex-1 py-2 px-3 flex items-center justify-center gap-2 rounded-md border text-sm font-medium transition-colors ${type === 'area' ? 'bg-accent/10 border-accent text-accent' : 'border-border text-text-secondary hover:bg-surface-active'}`}
+                ><AreaChartIcon size={16}/> Area</button>
+                <button 
+                  onClick={() => setType('radar')}
+                  className={`flex-1 py-2 px-3 flex items-center justify-center gap-2 rounded-md border text-sm font-medium transition-colors ${type === 'radar' ? 'bg-accent/10 border-accent text-accent' : 'border-border text-text-secondary hover:bg-surface-active'}`}
+                ><Hexagon size={16}/> Geo</button>
               </div>
             </div>
 
