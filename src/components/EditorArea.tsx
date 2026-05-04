@@ -13,6 +13,9 @@ import TableCell from '@tiptap/extension-table-cell';
 import CharacterCount from '@tiptap/extension-character-count';
 import Placeholder from '@tiptap/extension-placeholder';
 import ImageResize from 'tiptap-extension-resize-image';
+import { Color } from '@tiptap/extension-color';
+import { TextStyle } from '@tiptap/extension-text-style';
+import { FontSize } from '../lib/FontSize';
 import { cleanAIPaste } from '../lib/paste-cleaner';
 import { NoteHistoryModal } from './NoteHistoryModal';
 import { ImageCropModal } from './ImageCropModal';
@@ -23,7 +26,7 @@ import {
   List, ListOrdered, CheckSquare, 
   Code, FileCode2, Table as TableIcon, 
   Minus, Sparkles, Tag as TagIcon, X, Check, Clock,
-  Image as ImageIcon, Download, Trash2, Bot, Undo2, Redo2, FileText, FileJson, Crop, Paperclip, BookOpen, Pen, BarChart3, LineChart, PieChart
+  Image as ImageIcon, Download, Trash2, Bot, Undo2, Redo2, FileText, FileJson, Crop, Paperclip, BookOpen, Pen, BarChart3, LineChart, PieChart, Quote, Type, Palette, Plus, ChevronDown
 } from 'lucide-react';
 import { cn, generateId } from '../lib/utils';
 import { format } from 'date-fns';
@@ -328,6 +331,9 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
       TableCell,
       CharacterCount,
       ImageResize,
+      TextStyle,
+      Color,
+      FontSize,
       Placeholder.configure({ placeholder: 'Start writing or paste AI text...' })
     ],
     content: '',
@@ -583,6 +589,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
               <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} icon={<Bold size={16} />} />
               <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} icon={<Italic size={16} />} />
               <ToolbarButton onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive('underline')} icon={<UnderlineIcon size={16} />} />
+              <ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')} icon={<Quote size={16} />} title="Quote" />
               
               <div className="w-px h-4 bg-border mx-1"></div>
               
@@ -753,15 +760,91 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
           {isEditing && editor && (
             <BubbleMenu 
               editor={editor} 
+              pluginKey="imageMenu"
               shouldShow={({ editor }) => editor.isActive('image') || editor.isActive('imageResize')}
             >
-              <div className="bg-surface-header border border-border shadow-xl rounded-lg overflow-hidden flex flex-col p-1 gap-1">
+              <div className="bg-surface-header border border-border shadow-xl rounded-lg overflow-hidden flex flex-col p-1 gap-1 relative z-10">
                 <button
                   onClick={() => editor.chain().focus().deleteSelection().run()}
                   className="flex items-center gap-2 px-3 py-1.5 text-sm text-red-400 hover:bg-surface hover:text-red-500 rounded-md transition-colors"
                 >
                   <Trash2 size={14} /> Remove Image
                 </button>
+              </div>
+            </BubbleMenu>
+          )}
+
+          {isEditing && editor && (
+            <BubbleMenu 
+              editor={editor} 
+              pluginKey="textBubbleMenu"
+              shouldShow={({ editor, from, to }) => {
+                return from !== to && !editor.isActive('image') && !editor.isActive('imageResize');
+              }}
+            >
+              <div className="bg-surface-header border border-border shadow-xl rounded-lg overflow-visible flex items-center p-1 gap-1 relative z-50">
+                <button
+                  onClick={() => {
+                    const currentSize = parseInt(editor.getAttributes('textStyle').fontSize || '16', 10);
+                    editor.chain().focus().setFontSize(`${Math.max(8, currentSize - 2)}px`).run();
+                  }}
+                  className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-active rounded-md transition-colors"
+                  title="Decrease Font Size"
+                >
+                  <Minus size={14} />
+                </button>
+                <span className="text-xs font-medium px-2 text-text-primary min-w-[32px] text-center">
+                  {parseInt(editor.getAttributes('textStyle').fontSize || '16', 10)}
+                </span>
+                <button
+                  onClick={() => {
+                    const currentSize = parseInt(editor.getAttributes('textStyle').fontSize || '16', 10);
+                    editor.chain().focus().setFontSize(`${Math.min(72, currentSize + 2)}px`).run();
+                  }}
+                  className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-active rounded-md transition-colors"
+                  title="Increase Font Size"
+                >
+                  <Plus size={14} />
+                </button>
+                <div className="w-px h-4 bg-border mx-1"></div>
+                <div className="relative group">
+                  <button 
+                    className="flex items-center gap-1 p-1.5 text-text-primary hover:bg-surface-active rounded-md transition-colors"
+                  >
+                    <Palette size={14} style={{ color: editor.getAttributes('textStyle').color || 'currentColor' }} />
+                  </button>
+                  <div className="absolute top-full left-0 mt-1 bg-surface border border-border rounded-lg shadow-xl p-2 hidden group-hover:grid grid-cols-4 gap-1 z-50 min-w-[120px]">
+                    {[
+                      { name: 'Default', value: '' },
+                      { name: 'Red', value: '#ef4444' },
+                      { name: 'Orange', value: '#f97316' },
+                      { name: 'Yellow', value: '#eab308' },
+                      { name: 'Green', value: '#22c55e' },
+                      { name: 'Blue', value: '#3b82f6' },
+                      { name: 'Purple', value: '#a855f7' },
+                      { name: 'Pink', value: '#ec4899' },
+                      { name: 'White', value: '#ffffff' },
+                      { name: 'Gray', value: '#9ca3af' },
+                      { name: 'Black', value: '#000000' }
+                    ].map(color => (
+                        <button
+                          key={color.name}
+                          onClick={() => {
+                            if (color.value) {
+                              editor.chain().focus().setColor(color.value).run();
+                            } else {
+                              editor.chain().focus().unsetColor().run();
+                            }
+                          }}
+                          className="w-6 h-6 rounded-md border border-border/50 hover:scale-110 transition-transform relative overflow-hidden"
+                          style={{ backgroundColor: color.value || 'transparent' }}
+                          title={color.name}
+                        >
+                          {!color.value && <div className="absolute inset-x-0 inset-y-1/2 h-px bg-red-500 -rotate-45" />}
+                        </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </BubbleMenu>
           )}
