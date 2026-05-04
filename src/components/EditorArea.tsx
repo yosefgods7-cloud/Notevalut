@@ -889,22 +889,18 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
                 <Paperclip size={16} /> Files & Attachments
               </h3>
               <div className="flex items-center gap-2">
-                {isEditing && (
-                  <>
-                    <button 
-                      onClick={() => attachmentInputRef.current?.click()}
-                      className="text-xs bg-surface-active hover:bg-border text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5"
-                    >
-                      + Add File 
-                    </button>
-                    <input 
-                      type="file" 
-                      ref={attachmentInputRef} 
-                      className="hidden" 
-                      onChange={handleFileUpload} 
-                    />
-                  </>
-                )}
+                <button 
+                  onClick={() => attachmentInputRef.current?.click()}
+                  className="text-xs bg-surface-active hover:bg-border text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5"
+                >
+                  + Add File 
+                </button>
+                <input 
+                  type="file" 
+                  ref={attachmentInputRef} 
+                  className="hidden" 
+                  onChange={handleFileUpload} 
+                />
               </div>
             </div>
             
@@ -928,15 +924,13 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
                       >
                         <Download size={14} />
                       </a>
-                      {isEditing && (
-                        <button 
-                          onClick={() => removeAttachment(att.id)}
-                          className="p-1.5 text-text-muted hover:text-red-400 rounded-md hover:bg-surface-active transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
+                      <button 
+                        onClick={() => removeAttachment(att.id)}
+                        className="p-1.5 text-text-muted hover:text-red-400 rounded-md hover:bg-surface-active transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -947,14 +941,12 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
               <h3 className="text-sm font-semibold text-text-muted uppercase tracking-wider flex items-center gap-2">
                 <BarChart3 size={16} /> Charts & Data
               </h3>
-              {isEditing && (
-                <button 
-                  onClick={() => { setEditingChart(undefined); setIsChartBuilderOpen(true); }}
-                  className="text-xs bg-surface-active hover:bg-border text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5"
-                >
-                  + Build Chart
-                </button>
-              )}
+              <button 
+                onClick={() => { setEditingChart(undefined); setIsChartBuilderOpen(true); }}
+                className="text-xs bg-surface-active hover:bg-border text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5"
+              >
+                + Build Chart
+              </button>
             </div>
 
             {note.charts && note.charts.length > 0 && (
@@ -966,24 +958,22 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
                         {chart.type === 'bar' ? <BarChart3 size={18}/> : chart.type === 'line' ? <LineChart size={18}/> : chart.type === 'pie' ? <PieChart size={18}/> : chart.type === 'area' ? <AreaChartIcon size={18} /> : <Hexagon size={18}/>}
                         {chart.title}
                       </h4>
-                      {isEditing && (
-                        <div className="flex items-center gap-1">
-                          <button 
-                            onClick={() => { setEditingChart(chart); setIsChartBuilderOpen(true); }}
-                            className="p-1.5 text-text-muted hover:text-accent rounded-md hover:bg-surface-active transition-colors"
-                            title="Edit Chart"
-                          >
-                            <Pen size={14} />
-                          </button>
-                          <button 
-                            onClick={() => deleteChart(chart.id)}
-                            className="p-1.5 text-text-muted hover:text-red-400 rounded-md hover:bg-surface-active transition-colors"
-                            title="Delete Chart"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-1">
+                        <button 
+                          onClick={() => { setEditingChart(chart); setIsChartBuilderOpen(true); }}
+                          className="p-1.5 text-text-muted hover:text-accent rounded-md hover:bg-surface-active transition-colors"
+                          title="Edit Chart"
+                        >
+                          <Pen size={14} />
+                        </button>
+                        <button 
+                          onClick={() => deleteChart(chart.id)}
+                          className="p-1.5 text-text-muted hover:text-red-400 rounded-md hover:bg-surface-active transition-colors"
+                          title="Delete Chart"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
                     <div className="flex-1 w-full p-2 relative bg-background/50">
                       {renderChartPreview(chart)}
@@ -996,26 +986,22 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
             <div className="flex items-center justify-between mb-4 mt-8">
               <h3 className="text-sm font-semibold text-text-muted uppercase tracking-wider flex items-center gap-2">
                 <ImageIcon size={16} /> Images
-                {isEditing && <span className="text-[10px] bg-accent/20 text-accent px-2 py-0.5 rounded-full normal-case font-medium ml-2">Drag into text ↑</span>}
+                <span className="text-[10px] bg-accent/20 text-accent px-2 py-0.5 rounded-full normal-case font-medium ml-2">Drag into text ↑</span>
               </h3>
-              {isEditing && (
-                <>
-                  <button 
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isProcessingImage}
-                    className="text-xs bg-surface-active hover:bg-border text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5 disabled:opacity-50"
-                  >
-                    {isProcessingImage ? 'Loading...' : '+ Add Photo'}
-                  </button>
-                  <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    className="hidden" 
-                    accept="image/*" 
-                    onChange={handleImageUpload} 
-                  />
-                </>
-              )}
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isProcessingImage}
+                className="text-xs bg-surface-active hover:bg-border text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {isProcessingImage ? 'Loading...' : '+ Add Photo'}
+              </button>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                accept="image/*" 
+                onChange={handleImageUpload} 
+              />
             </div>
 
             {note.images && note.images.length > 0 && (
@@ -1037,18 +1023,16 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
                   >
                     <img src={img.base64} alt={img.name} className="w-full h-48 object-cover" />
                     
-                    {isEditing && (
-                      <button 
-                          onClick={(e) => { 
-                            e.stopPropagation(); 
-                            setImageToDelete(img.id);
-                          }}
-                          className="absolute top-2 right-2 bg-red-500/90 hover:bg-red-600 text-white p-2 rounded-full shadow-lg md:opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-auto"
-                          title="Delete Image"
-                      >
-                          <Trash2 size={14} />
-                      </button>
-                    )}
+                    <button 
+                        onClick={(e) => { 
+                          e.stopPropagation(); 
+                          setImageToDelete(img.id);
+                        }}
+                        className="absolute top-2 right-2 bg-red-500/90 hover:bg-red-600 text-white p-2 rounded-full shadow-lg md:opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-auto"
+                        title="Delete Image"
+                    >
+                        <Trash2 size={14} />
+                    </button>
 
                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-3 no-print pointer-events-none">
                       <button 
@@ -1057,14 +1041,12 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
                       >
                         <Bot size={16} /> Ask AI
                       </button>
-                      {isEditing && (
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); setImageToCrop({ id: img.id, base64: img.base64 }); }}
-                          className="pointer-events-auto bg-surface text-text-primary px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2 hover:bg-surface-active transition-colors border border-border"
-                        >
-                          <Crop size={16} /> Crop Image
-                        </button>
-                      )}
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setImageToCrop({ id: img.id, base64: img.base64 }); }}
+                        className="pointer-events-auto bg-surface text-text-primary px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2 hover:bg-surface-active transition-colors border border-border"
+                      >
+                        <Crop size={16} /> Crop Image
+                      </button>
                     </div>
                   </div>
                 ))}
