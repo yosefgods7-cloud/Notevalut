@@ -26,7 +26,7 @@ import {
   List, ListOrdered, CheckSquare, 
   Code, FileCode2, Table as TableIcon, 
   Minus, Sparkles, Tag as TagIcon, X, Check, Clock,
-  Image as ImageIcon, Download, Trash2, Bot, Undo2, Redo2, FileText, FileJson, Crop, Paperclip, BookOpen, Pen, BarChart3, LineChart, PieChart, Quote, Type, Palette, Plus, ChevronDown, AreaChart as AreaChartIcon, Hexagon
+  Image as ImageIcon, Download, Trash2, Bot, Undo2, Redo2, FileText, FileJson, Crop, Paperclip, BookOpen, Pen, BarChart3, LineChart, PieChart, Quote, Type, Palette, Plus, ChevronDown, AreaChart as AreaChartIcon, Hexagon, Volume2, VolumeX
 } from 'lucide-react';
 import { cn, generateId } from '../lib/utils';
 import { format } from 'date-fns';
@@ -84,6 +84,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
   const [imageToDelete, setImageToDelete] = useState<string | null>(null);
   const [imageToCrop, setImageToCrop] = useState<{ id: string, base64: string } | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [isChartBuilderOpen, setIsChartBuilderOpen] = useState(false);
   const [editingChart, setEditingChart] = useState<NoteChart | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -92,6 +93,34 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
   const [isExporting, setIsExporting] = useState(false);
 
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    window.speechSynthesis.cancel();
+    setIsSpeaking(false);
+    return () => {
+      window.speechSynthesis.cancel();
+    };
+  }, [noteId]);
+
+  const toggleSpeech = () => {
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    } else {
+      if (!editor) return;
+      const text = editor.getText();
+      if (!text.trim()) return;
+
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+      
+      window.speechSynthesis.speak(utterance);
+      setIsSpeaking(true);
+    }
+  };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -686,6 +715,16 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
 
         <div className="flex items-center gap-4 shrink-0 no-print">
           <button 
+            onClick={toggleSpeech}
+            className={`flex items-center justify-center w-8 h-8 rounded-md transition-colors ${
+              isSpeaking ? 'bg-accent/20 text-accent' : 'bg-surface-active hover:bg-border text-text-primary'
+            }`}
+            title={isSpeaking ? "Stop Reading" : "Read Aloud (Offline TTS)"}
+          >
+            {isSpeaking ? <VolumeX size={14} /> : <Volume2 size={14} />}
+          </button>
+          
+          <button 
             onClick={() => setIsEditing(!isEditing)}
             className="flex items-center gap-1.5 px-2.5 py-1 text-sm bg-surface-active hover:bg-border text-text-primary rounded-md font-medium transition-colors h-8"
             title={isEditing ? "Switch to Reading Mode" : "Switch to Editing Mode"}
@@ -813,31 +852,33 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
                 return from !== to && !editor.isActive('image') && !editor.isActive('imageResize');
               }}
             >
-              <div className="bg-surface-header border border-border shadow-xl rounded-lg overflow-visible flex items-center p-1 gap-1 relative z-50">
-                <button
-                  onClick={() => {
-                    const currentSize = parseInt(editor.getAttributes('textStyle').fontSize || '16', 10);
-                    editor.chain().focus().setFontSize(`${Math.max(8, currentSize - 2)}px`).run();
-                  }}
-                  className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-active rounded-md transition-colors"
-                  title="Decrease Font Size"
-                >
-                  <Minus size={14} />
-                </button>
-                <span className="text-xs font-medium px-2 text-text-primary min-w-[32px] text-center">
-                  {parseInt(editor.getAttributes('textStyle').fontSize || '16', 10)}
-                </span>
-                <button
-                  onClick={() => {
-                    const currentSize = parseInt(editor.getAttributes('textStyle').fontSize || '16', 10);
-                    editor.chain().focus().setFontSize(`${Math.min(72, currentSize + 2)}px`).run();
-                  }}
-                  className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-active rounded-md transition-colors"
-                  title="Increase Font Size"
-                >
-                  <Plus size={14} />
-                </button>
-                <div className="w-px h-4 bg-border mx-1"></div>
+              <div className="bg-surface-header border border-border shadow-xl rounded-lg overflow-visible flex items-center p-1.5 gap-2 relative z-50">
+                <div className="flex items-center bg-background border border-border rounded-md shadow-sm">
+                  <button
+                    onClick={() => {
+                      const currentSize = parseInt(editor.getAttributes('textStyle').fontSize || '16', 10);
+                      editor.chain().focus().setFontSize(`${Math.max(8, currentSize - 2)}px`).run();
+                    }}
+                    className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-active rounded-l-md transition-colors"
+                    title="Decrease Font Size"
+                  >
+                    <Minus size={14} />
+                  </button>
+                  <span className="text-xs font-mono font-medium px-2 py-1 text-text-primary min-w-[36px] text-center border-x border-border">
+                    {parseInt(editor.getAttributes('textStyle').fontSize || '16', 10)}
+                  </span>
+                  <button
+                    onClick={() => {
+                      const currentSize = parseInt(editor.getAttributes('textStyle').fontSize || '16', 10);
+                      editor.chain().focus().setFontSize(`${Math.min(72, currentSize + 2)}px`).run();
+                    }}
+                    className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-active rounded-r-md transition-colors"
+                    title="Increase Font Size"
+                  >
+                    <Plus size={14} />
+                  </button>
+                </div>
+                <div className="w-px h-5 bg-border mx-0.5"></div>
                 <div className="relative group">
                   <button 
                     className="flex items-center gap-1 p-1.5 text-text-primary hover:bg-surface-active rounded-md transition-colors"
@@ -889,18 +930,22 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
                 <Paperclip size={16} /> Files & Attachments
               </h3>
               <div className="flex items-center gap-2">
-                <button 
-                  onClick={() => attachmentInputRef.current?.click()}
-                  className="text-xs bg-surface-active hover:bg-border text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5"
-                >
-                  + Add File 
-                </button>
-                <input 
-                  type="file" 
-                  ref={attachmentInputRef} 
-                  className="hidden" 
-                  onChange={handleFileUpload} 
-                />
+                {isEditing && (
+                  <>
+                    <button 
+                      onClick={() => attachmentInputRef.current?.click()}
+                      className="text-xs bg-surface-active hover:bg-border text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5"
+                    >
+                      + Add File 
+                    </button>
+                    <input 
+                      type="file" 
+                      ref={attachmentInputRef} 
+                      className="hidden" 
+                      onChange={handleFileUpload} 
+                    />
+                  </>
+                )}
               </div>
             </div>
             
@@ -941,12 +986,14 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
               <h3 className="text-sm font-semibold text-text-muted uppercase tracking-wider flex items-center gap-2">
                 <BarChart3 size={16} /> Charts & Data
               </h3>
-              <button 
-                onClick={() => { setEditingChart(undefined); setIsChartBuilderOpen(true); }}
-                className="text-xs bg-surface-active hover:bg-border text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5"
-              >
-                + Build Chart
-              </button>
+              {isEditing && (
+                <button 
+                  onClick={() => { setEditingChart(undefined); setIsChartBuilderOpen(true); }}
+                  className="text-xs bg-surface-active hover:bg-border text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5"
+                >
+                  + Build Chart
+                </button>
+              )}
             </div>
 
             {note.charts && note.charts.length > 0 && (
@@ -958,22 +1005,24 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
                         {chart.type === 'bar' ? <BarChart3 size={18}/> : chart.type === 'line' ? <LineChart size={18}/> : chart.type === 'pie' ? <PieChart size={18}/> : chart.type === 'area' ? <AreaChartIcon size={18} /> : <Hexagon size={18}/>}
                         {chart.title}
                       </h4>
-                      <div className="flex items-center gap-1">
-                        <button 
-                          onClick={() => { setEditingChart(chart); setIsChartBuilderOpen(true); }}
-                          className="p-1.5 text-text-muted hover:text-accent rounded-md hover:bg-surface-active transition-colors"
-                          title="Edit Chart"
-                        >
-                          <Pen size={14} />
-                        </button>
-                        <button 
-                          onClick={() => deleteChart(chart.id)}
-                          className="p-1.5 text-text-muted hover:text-red-400 rounded-md hover:bg-surface-active transition-colors"
-                          title="Delete Chart"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
+                      {isEditing && (
+                        <div className="flex items-center gap-1">
+                          <button 
+                            onClick={() => { setEditingChart(chart); setIsChartBuilderOpen(true); }}
+                            className="p-1.5 text-text-muted hover:text-accent rounded-md hover:bg-surface-active transition-colors"
+                            title="Edit Chart"
+                          >
+                            <Pen size={14} />
+                          </button>
+                          <button 
+                            onClick={() => deleteChart(chart.id)}
+                            className="p-1.5 text-text-muted hover:text-red-400 rounded-md hover:bg-surface-active transition-colors"
+                            title="Delete Chart"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      )}
                     </div>
                     <div className="flex-1 w-full p-2 relative bg-background/50">
                       {renderChartPreview(chart)}
@@ -986,22 +1035,26 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
             <div className="flex items-center justify-between mb-4 mt-8">
               <h3 className="text-sm font-semibold text-text-muted uppercase tracking-wider flex items-center gap-2">
                 <ImageIcon size={16} /> Images
-                <span className="text-[10px] bg-accent/20 text-accent px-2 py-0.5 rounded-full normal-case font-medium ml-2">Drag into text ↑</span>
+              {isEditing && <span className="text-[10px] bg-accent/20 text-accent px-2 py-0.5 rounded-full normal-case font-medium ml-2">Drag into text ↑</span>}
               </h3>
-              <button 
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isProcessingImage}
-                className="text-xs bg-surface-active hover:bg-border text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5 disabled:opacity-50"
-              >
-                {isProcessingImage ? 'Loading...' : '+ Add Photo'}
-              </button>
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                className="hidden" 
-                accept="image/*" 
-                onChange={handleImageUpload} 
-              />
+              {isEditing && (
+                <>
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isProcessingImage}
+                    className="text-xs bg-surface-active hover:bg-border text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {isProcessingImage ? 'Loading...' : '+ Add Photo'}
+                  </button>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    className="hidden" 
+                    accept="image/*" 
+                    onChange={handleImageUpload} 
+                  />
+                </>
+              )}
             </div>
 
             {note.images && note.images.length > 0 && (
@@ -1023,16 +1076,18 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
                   >
                     <img src={img.base64} alt={img.name} className="w-full h-48 object-cover" />
                     
-                    <button 
-                        onClick={(e) => { 
-                          e.stopPropagation(); 
-                          setImageToDelete(img.id);
-                        }}
-                        className="absolute top-2 right-2 bg-red-500/90 hover:bg-red-600 text-white p-2 rounded-full shadow-lg md:opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-auto"
-                        title="Delete Image"
-                    >
-                        <Trash2 size={14} />
-                    </button>
+                    {isEditing && (
+                      <button 
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            setImageToDelete(img.id);
+                          }}
+                          className="absolute top-2 right-2 bg-red-500/90 hover:bg-red-600 text-white p-2 rounded-full shadow-lg md:opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-auto"
+                          title="Delete Image"
+                      >
+                          <Trash2 size={14} />
+                      </button>
+                    )}
 
                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-3 no-print pointer-events-none">
                       <button 
@@ -1041,12 +1096,14 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
                       >
                         <Bot size={16} /> Ask AI
                       </button>
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); setImageToCrop({ id: img.id, base64: img.base64 }); }}
-                        className="pointer-events-auto bg-surface text-text-primary px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2 hover:bg-surface-active transition-colors border border-border"
-                      >
-                        <Crop size={16} /> Crop Image
-                      </button>
+                      {isEditing && (
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); setImageToCrop({ id: img.id, base64: img.base64 }); }}
+                          className="pointer-events-auto bg-surface text-text-primary px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2 hover:bg-surface-active transition-colors border border-border"
+                        >
+                          <Crop size={16} /> Crop Image
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
