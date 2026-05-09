@@ -1,0 +1,83 @@
+{
+  "entities": {
+    "UserSetting": {
+      "title": "UserSetting",
+      "description": "User's settings and tags",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "settings": { "type": "object" },
+        "tags": { "type": "array" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "settings", "tags", "updatedAt"]
+    },
+    "Workspace": {
+      "title": "Workspace",
+      "description": "A workspace",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "icon": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "order": { "type": "number" }
+      },
+      "required": ["userId", "id", "name", "createdAt", "order"]
+    },
+    "Collection": {
+      "title": "Collection",
+      "description": "A collection",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "id": { "type": "string" },
+        "workspaceId": { "type": "string" },
+        "name": { "type": "string" },
+        "icon": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "order": { "type": "number" }
+      },
+      "required": ["userId", "id", "workspaceId", "name", "createdAt", "order"]
+    },
+    "Note": {
+      "title": "Note",
+      "description": "A note",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "id": { "type": "string" },
+        "workspaceId": { "type": "string" },
+        "collectionId": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "tags": { "type": "array" },
+        "pinned": { "type": "boolean" },
+        "starred": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "wordCount": { "type": "number" }
+      },
+      "required": ["userId", "id", "workspaceId", "collectionId", "title", "content", "tags", "pinned", "starred", "createdAt", "updatedAt", "wordCount"]
+    }
+  },
+  "firestore": {
+    "users/{userId}/settings/{settingId}": {
+      "schema": "UserSetting",
+      "description": "User specific settings"
+    },
+    "users/{userId}/workspaces/{workspaceId}": {
+      "schema": "Workspace",
+      "description": "User specific workspaces"
+    },
+    "users/{userId}/collections/{collectionId}": {
+      "schema": "Collection",
+      "description": "User specific collections"
+    },
+    "users/{userId}/notes/{noteId}": {
+      "schema": "Note",
+      "description": "User specific notes"
+    }
+  }
+}
