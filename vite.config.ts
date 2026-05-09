@@ -8,7 +8,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   return {
-    base: '/Notevalut/',
+    base: './',
     plugins: [
       react(), 
       tailwindcss(),
@@ -22,8 +22,8 @@ export default defineConfig(({mode}) => {
           theme_color: '#0f0f0f',
           background_color: '#0f0f0f',
           display: 'standalone',
-          start_url: '/Notevalut/',
-          scope: '/Notevalut/',
+          start_url: '.',
+          scope: '.',
           icons: [
             {
               src: 'icon.svg',

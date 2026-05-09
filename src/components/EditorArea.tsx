@@ -668,6 +668,12 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
               <ToolbarButton onClick={() => editor.chain().focus().setHorizontalRule().run()} icon={<Minus size={16} />} />
               
               <div className="w-px h-4 bg-border mx-1"></div>
+
+              <ToolbarButton onClick={() => attachmentInputRef.current?.click()} icon={<Paperclip size={16} />} title="Add File" />
+              <ToolbarButton onClick={() => setIsChartBuilderOpen(true)} icon={<BarChart3 size={16} />} title="Add Chart" />
+              <ToolbarButton onClick={() => fileInputRef.current?.click()} icon={<ImageIcon size={16} />} title="Add Image" />
+              
+              <div className="w-px h-4 bg-border mx-1"></div>
               
               <button 
                 id="btn-smart-paste"
@@ -930,22 +936,18 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
                 <Paperclip size={16} /> Files & Attachments
               </h3>
               <div className="flex items-center gap-2">
-                {isEditing && (
-                  <>
-                    <button 
-                      onClick={() => attachmentInputRef.current?.click()}
-                      className="text-xs bg-surface-active hover:bg-border text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5"
-                    >
-                      + Add File 
-                    </button>
-                    <input 
-                      type="file" 
-                      ref={attachmentInputRef} 
-                      className="hidden" 
-                      onChange={handleFileUpload} 
-                    />
-                  </>
-                )}
+                <button 
+                  onClick={() => attachmentInputRef.current?.click()}
+                  className="text-xs bg-surface-active hover:bg-border text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5"
+                >
+                  + Add File 
+                </button>
+                <input 
+                  type="file" 
+                  ref={attachmentInputRef} 
+                  className="hidden" 
+                  onChange={handleFileUpload} 
+                />
               </div>
             </div>
             
@@ -986,14 +988,12 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
               <h3 className="text-sm font-semibold text-text-muted uppercase tracking-wider flex items-center gap-2">
                 <BarChart3 size={16} /> Charts & Data
               </h3>
-              {isEditing && (
-                <button 
-                  onClick={() => { setEditingChart(undefined); setIsChartBuilderOpen(true); }}
-                  className="text-xs bg-surface-active hover:bg-border text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5"
-                >
-                  + Build Chart
-                </button>
-              )}
+              <button 
+                onClick={() => { setEditingChart(undefined); setIsChartBuilderOpen(true); }}
+                className="text-xs bg-surface-active hover:bg-border text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5"
+              >
+                + Build Chart
+              </button>
             </div>
 
             {note.charts && note.charts.length > 0 && (
@@ -1037,24 +1037,20 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
                 <ImageIcon size={16} /> Images
               {isEditing && <span className="text-[10px] bg-accent/20 text-accent px-2 py-0.5 rounded-full normal-case font-medium ml-2">Drag into text ↑</span>}
               </h3>
-              {isEditing && (
-                <>
-                  <button 
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isProcessingImage}
-                    className="text-xs bg-surface-active hover:bg-border text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5 disabled:opacity-50"
-                  >
-                    {isProcessingImage ? 'Loading...' : '+ Add Photo'}
-                  </button>
-                  <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    className="hidden" 
-                    accept="image/*" 
-                    onChange={handleImageUpload} 
-                  />
-                </>
-              )}
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isProcessingImage}
+                className="text-xs bg-surface-active hover:bg-border text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {isProcessingImage ? 'Loading...' : '+ Add Photo'}
+              </button>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                accept="image/*" 
+                onChange={handleImageUpload} 
+              />
             </div>
 
             {note.images && note.images.length > 0 && (
