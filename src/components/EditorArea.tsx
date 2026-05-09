@@ -841,6 +841,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
             >
               <div className="bg-surface-header border border-border shadow-xl rounded-lg overflow-hidden flex flex-col p-1 gap-1 relative z-10">
                 <button
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => editor.chain().focus().deleteSelection().run()}
                   className="flex items-center gap-2 px-3 py-1.5 text-sm text-red-400 hover:bg-surface hover:text-red-500 rounded-md transition-colors"
                 >
@@ -861,6 +862,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
               <div className="bg-surface-header border border-border shadow-xl rounded-lg overflow-visible flex items-center p-1.5 gap-2 relative z-50">
                 <div className="flex items-center bg-background border border-border rounded-md shadow-sm">
                   <button
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => {
                       const currentSize = parseInt(editor.getAttributes('textStyle').fontSize || '16', 10);
                       editor.chain().focus().setFontSize(`${Math.max(8, currentSize - 2)}px`).run();
@@ -874,6 +876,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
                     {parseInt(editor.getAttributes('textStyle').fontSize || '16', 10)}
                   </span>
                   <button
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => {
                       const currentSize = parseInt(editor.getAttributes('textStyle').fontSize || '16', 10);
                       editor.chain().focus().setFontSize(`${Math.min(72, currentSize + 2)}px`).run();
@@ -907,6 +910,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
                     ].map(color => (
                         <button
                           key={color.name}
+                          onMouseDown={(e) => e.preventDefault()}
                           onClick={() => {
                             if (color.value) {
                               editor.chain().focus().setColor(color.value).run();
@@ -1184,6 +1188,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
 
 const ToolbarButton: React.FC<{ onClick: () => void; active?: boolean; disabled?: boolean; icon: React.ReactNode; title?: string }> = ({ onClick, active, disabled, icon, title }) => (
   <button
+    onMouseDown={(e) => e.preventDefault()}
     onClick={onClick}
     disabled={disabled}
     title={title}
