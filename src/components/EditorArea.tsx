@@ -91,6 +91,32 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const pdfContainerRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [aiSummary, setAiSummary] = useState<{ loading: boolean, text: string | null, open: boolean }>({ loading: false, text: null, open: false });
+
+  const handleSummarizeNote = async () => {
+    if (!editor) return;
+    const ai = getAiClient();
+    if (!ai) {
+      showToast('AI features require an API key to be set');
+      return;
+    }
+    
+    setAiSummary(prev => ({ ...prev, loading: true, open: true }));
+    const textContent = editor.getText();
+    
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Please summarize the following note in a concise but comprehensive way:\n\n${textContent}`
+      });
+      
+      setAiSummary({ loading: false, text: response.text || 'No summary generated.', open: true });
+    } catch (err) {
+      console.error("Summarization error", err);
+      setAiSummary({ loading: false, text: 'Failed to summarize note.', open: true });
+      showToast('Failed to generate summary');
+    }
+  };
 
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -428,12 +454,12 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
         event.preventDefault();
         const text = event.clipboardData?.getData('text/plain');
         if (text) {
-          const cleaned = cleanAIPaste(text);
+          const result = cleanAIPaste(text);
           // Insert the cleaned markdown as HTML
           setTimeout(() => {
-             editor?.commands.insertContent(cleaned);
+             editor?.commands.insertContent(result.html);
           }, 0);
-          showToast(`✓ Smart Paste: Cleaned and inserted`);
+          showToast(`Smart Paste: Cleaned AI artifacts (${result.stats.disclaimersRemoved} disclaimers, ${result.stats.formattingCleaned} formats removed)`);
         }
         return true;
       }
@@ -591,9 +617,9 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
   const handleSmartPasteClick = async () => {
     try {
       const text = await navigator.clipboard.readText();
-      const cleaned = cleanAIPaste(text);
-      editor?.commands.insertContent(cleaned);
-      showToast('✓ Cleaned & pasted clipboard content');
+      const result = cleanAIPaste(text);
+      editor?.commands.insertContent(result.html);
+      showToast(`Smart Paste: Cleaned AI artifacts (${result.stats.disclaimersRemoved} disclaimers, ${result.stats.formattingCleaned} formats removed)`);
     } catch (e) {
       showToast('Failed to read clipboard text');
     }
@@ -721,6 +747,16 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
 
         <div className="flex items-center gap-4 shrink-0 no-print">
           <button 
+            onClick={handleSummarizeNote}
+            disabled={aiSummary.loading}
+            className={`flex items-center gap-1.5 px-2.5 py-1 text-sm bg-surface-active hover:bg-border text-text-primary rounded-md font-medium transition-colors h-8 disabled:opacity-50`}
+            title="Summarize Note via AI"
+          >
+            <Bot size={14} />
+            <span className="hidden sm:inline">Summarize</span>
+          </button>
+
+          <button 
             onClick={toggleSpeech}
             className={`flex items-center justify-center w-8 h-8 rounded-md transition-colors ${
               isSpeaking ? 'bg-accent/20 text-accent' : 'bg-surface-active hover:bg-border text-text-primary'
@@ -832,6 +868,32 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
               </div>
             </div>
           </div>
+
+          {/* AI Summary Section */}
+          {aiSummary.open && (
+            <div className="mb-8 p-5 bg-accent/10 border border-accent/20 rounded-xl relative shadow-sm">
+              <button 
+                onClick={() => setAiSummary(prev => ({ ...prev, open: false }))}
+                className="absolute top-4 right-4 text-text-muted hover:text-text-primary transition-colors p-1"
+                title="Close summary"
+              >
+                <X size={16} />
+              </button>
+              <h4 className="text-accent font-semibold flex items-center gap-2 mb-3">
+                <Bot size={18} /> AI Summary
+              </h4>
+              {aiSummary.loading ? (
+                <div className="flex items-center gap-3 text-text-muted animate-pulse text-sm py-2">
+                  <div className="w-4 h-4 border-2 border-accent/50 border-t-accent rounded-full animate-spin" />
+                  Generating summary...
+                </div>
+              ) : (
+                <div className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap">
+                  {aiSummary.text}
+                </div>
+              )}
+            </div>
+          )}
 
           {isEditing && editor && (
             <BubbleMenu 
