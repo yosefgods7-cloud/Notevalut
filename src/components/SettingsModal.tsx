@@ -165,6 +165,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
 
           <hr className="border-border" />
 
+          {/* AI Settings */}
+          <div>
+            <h3 className="text-sm font-semibold text-text-muted uppercase mb-3">AI Features</h3>
+            <div className="space-y-4">
+              <div className="flex flex-col gap-2">
+                <label className="text-sm flex justify-between">
+                  <span>Gemini API Key</span>
+                  <span className="text-xs text-text-muted">Optional (Free tier used by default)</span>
+                </label>
+                <input 
+                  type="password"
+                  value={localSettings.geminiApiKey || ''}
+                  onChange={e => setLocalSettings(s => ({ ...s, geminiApiKey: e.target.value }))}
+                  placeholder="Paste your API key here to bypass limits..."
+                  className="bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-accent w-full"
+                />
+                <p className="text-xs text-text-muted">
+                  The app uses the free tier Gemini API by default. Add your own key to customize or bypass limits.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <hr className="border-border" />
+
           {/* Cloud Sync */}
           <div>
             <h3 className="text-sm font-semibold text-text-muted uppercase mb-3 flex items-center gap-2">

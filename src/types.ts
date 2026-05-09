@@ -70,6 +70,7 @@ export interface Settings {
   fontSize: 'small' | 'medium' | 'large';
   defaultWorkspace: string;
   smartPaste: boolean;
+  geminiApiKey?: string;
 }
 
 export interface NoteVaultData {

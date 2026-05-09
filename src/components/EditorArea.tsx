@@ -53,11 +53,16 @@ turndownService.addRule('strikethrough', {
 });
 
 let aiClient: GoogleGenAI | null = null;
+let currentApiKey: string | null = null;
 let draggedImageData: { id: string; src: string; alt: string } | null = null;
 
-const getAiClient = () => {
-  if (!aiClient && process.env.GEMINI_API_KEY) {
-    aiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const getAiClient = (customKey?: string) => {
+  const keyToUse = customKey || process.env.GEMINI_API_KEY;
+  if (!keyToUse) return null;
+  
+  if (!aiClient || currentApiKey !== keyToUse) {
+    aiClient = new GoogleGenAI({ apiKey: keyToUse });
+    currentApiKey = keyToUse;
   }
   return aiClient;
 };
@@ -95,7 +100,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
 
   const handleSummarizeNote = async () => {
     if (!editor) return;
-    const ai = getAiClient();
+    const ai = getAiClient(data.settings?.geminiApiKey);
     if (!ai) {
       showToast('AI features require an API key to be set');
       return;
@@ -106,7 +111,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
     
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-2.5-flash',
         contents: `Please summarize the following note in a concise but comprehensive way:\n\n${textContent}`
       });
       
@@ -230,7 +235,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
       const base64Data = base64.split(',')[1];
       const mimeType = base64.split(';')[0].split(':')[1];
       
-      const ai = getAiClient();
+      const ai = getAiClient(data.settings?.geminiApiKey);
       if (!ai) {
         showToast('AI features require an API key to be set');
         return;

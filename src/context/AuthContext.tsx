@@ -43,37 +43,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signIn = async () => {
-    // Detect PWA mode or mobile to decide on login strategy
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-    if (isStandalone || isMobile) {
-      try {
-        await signInWithRedirect(auth, googleProvider);
-        return;
-      } catch (e: any) {
-        console.error("Redirect sign in failed", e);
-      }
-    }
-
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (e: any) {
       if (e.code === 'auth/popup-closed-by-user') {
         return; // User cancelled
       }
-      
-      console.warn("Popup sign in failed, trying redirect fallback...", e);
-      try {
-        await signInWithRedirect(auth, googleProvider);
-      } catch (redirectErr: any) {
-        console.error("Final fallback failed:", redirectErr);
-        alert(`Sign in failed. 
+      console.error("Popup sign in failed:", e);
+      alert(`Sign in failed. 
 If you're using Brave, turn off shields. 
 If on iPhone/Safari, ensure 3rd party cookies are enabled.
 Domain: ${window.location.hostname}
-Error: ${redirectErr.message}`);
-      }
+Error: ${e.message}`);
     }
   };
 
