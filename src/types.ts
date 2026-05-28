@@ -65,12 +65,26 @@ export interface Note {
 }
 
 
+export interface AutoCategorizeRule {
+  tag: string;
+  workspaceId: string;
+  collectionId: string;
+}
+
+export interface PluginSettings {
+  autoCategorize?: {
+    enabled: boolean;
+    rules: AutoCategorizeRule[];
+  };
+}
+
 export interface Settings {
   theme: 'dark' | 'light' | 'system';
   fontSize: 'small' | 'medium' | 'large';
   defaultWorkspace: string;
   smartPaste: boolean;
   geminiApiKey?: string;
+  plugins?: PluginSettings;
 }
 
 export interface NoteVaultData {
@@ -87,4 +101,10 @@ export const DEFAULT_SETTINGS: Settings = {
   fontSize: 'medium',
   defaultWorkspace: '',
   smartPaste: true,
+  plugins: {
+    autoCategorize: {
+      enabled: false,
+      rules: []
+    }
+  }
 };

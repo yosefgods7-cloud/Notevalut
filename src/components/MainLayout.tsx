@@ -7,6 +7,7 @@ import { EditorArea } from './EditorArea';
 import { ExportModal } from './ExportModal';
 import { ImportModal } from './ImportModal';
 import { SettingsModal } from './SettingsModal';
+import { BrainMap } from './BrainMap';
 
 export const MainLayout: React.FC = () => {
   const { data, addNote } = useStorage();
@@ -14,6 +15,7 @@ export const MainLayout: React.FC = () => {
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string>(data.settings.defaultWorkspace || data.workspaces[0]?.id);
   const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
+  const [currentView, setCurrentView] = useState<'editor' | 'brain_map'>('editor');
 
   const [isExportOpen, setExportOpen] = useState(false);
   const [isImportOpen, setImportOpen] = useState(false);
@@ -110,6 +112,8 @@ export const MainLayout: React.FC = () => {
           onOpenExport={() => setExportOpen(true)}
           onOpenImport={() => setImportOpen(true)}
           onOpenSettings={() => setSettingsOpen(true)}
+          onToggleBrainMap={() => setCurrentView(prev => prev === 'brain_map' ? 'editor' : 'brain_map')}
+          isBrainMapActive={currentView === 'brain_map'}
         />
         
         {activeCollectionId ? (
@@ -130,11 +134,26 @@ export const MainLayout: React.FC = () => {
       </div>
       
       <div className="flex-1 flex flex-col min-w-0 h-full relative">
-        {activeCollectionId && activeNoteId ? (
+        {currentView === 'brain_map' ? (
+          <BrainMap 
+            activeWorkspaceId={activeWorkspaceId}
+             onNavigateToNote={(noteId, collectionId, workspaceId) => {
+               setActiveWorkspaceId(workspaceId);
+               setActiveCollectionId(collectionId);
+               setActiveNoteId(noteId);
+               setCurrentView('editor');
+             }}
+          />
+        ) : activeCollectionId && activeNoteId ? (
           <EditorArea 
             noteId={activeNoteId} 
             isSidebarOpen={isSidebarOpen}
             onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+            onNavigateToNote={(noteId, collectionId, workspaceId) => {
+              setActiveWorkspaceId(workspaceId);
+              setActiveCollectionId(collectionId);
+              setActiveNoteId(noteId);
+            }}
           />
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-text-muted bg-background h-full relative">

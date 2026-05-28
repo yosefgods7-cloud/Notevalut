@@ -340,12 +340,41 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const updateNote = useCallback((id: string, updates: Partial<Note>) => {
     setData(prevData => {
-      const newNotes = prevData.notes.map(n => 
-        n.id === id 
-          ? { ...n, ...updates, updatedAt: new Date().toISOString() } 
-          : n
-      );
-      const newData = { ...prevData, notes: newNotes };
+      let targetCollectionId: string | null = null;
+      let targetWorkspaceId: string | null = null;
+
+      const noteToUpdate = prevData.notes.find(n => n.id === id);
+      
+      // Auto-categorize only if tags are explicitly being updated
+      if (updates.tags !== undefined && prevData.settings.plugins?.autoCategorize?.enabled && updates.tags.length > 0) {
+        for (const rule of prevData.settings.plugins.autoCategorize.rules) {
+          if (updates.tags.includes(rule.tag)) {
+            targetCollectionId = rule.collectionId;
+            targetWorkspaceId = rule.workspaceId;
+            break; // First matching rule wins
+          }
+        }
+      }
+
+      const newNotes = prevData.notes.map(n => {
+        if (n.id === id) {
+           const merged = { ...n, ...updates, updatedAt: new Date().toISOString() };
+           if (targetCollectionId && targetWorkspaceId) {
+              merged.collectionId = targetCollectionId;
+              merged.workspaceId = targetWorkspaceId;
+           }
+           return merged;
+        }
+        return n;
+      });
+      
+      // Update global tags
+      const allTags = new Set(prevData.tags);
+      if (updates.tags) {
+        updates.tags.forEach(t => allTags.add(t));
+      }
+
+      const newData = { ...prevData, notes: newNotes, tags: Array.from(allTags) };
       
       // We manually handle saveData's duties here to get the correct prevData
       setHistory(prevHist => [prevData, ...prevHist].slice(0, 20));

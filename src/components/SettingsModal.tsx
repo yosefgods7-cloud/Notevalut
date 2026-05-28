@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStorage } from '../context/StorageContext';
 import { useAuth } from '../context/AuthContext';
-import { X, Save, Trash2, HardDrive, Cloud, LogIn, LogOut, RefreshCw, FileJson, Download } from 'lucide-react';
+import { X, Save, Trash2, HardDrive, Cloud, LogIn, LogOut, RefreshCw, FileJson, Download, Puzzle, Plus, Folder } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Settings as SettingsType } from '../types';
 
@@ -160,6 +160,123 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                   <div className="w-9 h-5 bg-surface-active border border-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2.5px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
                 </div>
               </label>
+            </div>
+          </div>
+
+          <hr className="border-border" />
+
+          {/* Plugins Settings */}
+          <div>
+            <h3 className="text-sm font-semibold text-text-muted uppercase mb-3 flex items-center gap-2">
+              <Puzzle size={16} /> Plugins
+            </h3>
+            
+            {/* Auto Categorize Plugin */}
+            <div className="bg-surface border border-border rounded-lg p-4">
+              <label className="flex items-center justify-between cursor-pointer mb-2">
+                <div>
+                  <div className="text-sm font-medium">Auto-Categorize</div>
+                  <div className="text-xs text-text-muted mt-0.5">Move notes to folders automatically based on tags</div>
+                </div>
+                <div className="relative inline-flex items-center cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={localSettings.plugins?.autoCategorize?.enabled || false}
+                    onChange={e => {
+                       const checked = e.target.checked;
+                       setLocalSettings(s => ({
+                          ...s,
+                          plugins: {
+                             ...s.plugins,
+                             autoCategorize: {
+                                rules: s.plugins?.autoCategorize?.rules || [],
+                                enabled: checked
+                             }
+                          }
+                       }));
+                    }}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-surface-active border border-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2.5px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
+                </div>
+              </label>
+
+              {localSettings.plugins?.autoCategorize?.enabled && (
+                <div className="space-y-3 mt-4 border-t border-border pt-4">
+                   <div className="flex justify-between items-center">
+                     <span className="text-xs font-medium text-text-secondary">Routing Rules</span>
+                     <button
+                        type="button"
+                        onClick={() => {
+                           setLocalSettings(s => ({
+                              ...s,
+                              plugins: {
+                                 ...s.plugins,
+                                 autoCategorize: {
+                                    enabled: true,
+                                    rules: [...(s.plugins?.autoCategorize?.rules || []), { tag: '', workspaceId: data.workspaces[0]?.id || '', collectionId: data.collections[0]?.id || '' }]
+                                 }
+                              }
+                           }));
+                        }}
+                        className="text-accent hover:text-accent/80 text-xs flex items-center gap-1"
+                     >
+                        <Plus size={12} /> Add Rule
+                     </button>
+                   </div>
+                   
+                   {localSettings.plugins.autoCategorize.rules.map((rule, idx) => (
+                      <div key={idx} className="flex flex-col gap-2 bg-background p-3 rounded border border-border relative">
+                         <div className="flex items-center justify-between gap-3">
+                            <div className="flex-1">
+                               <input 
+                                  type="text" 
+                                  placeholder="Tag (e.g. todo)" 
+                                  value={rule.tag}
+                                  onChange={e => {
+                                     const newRules = [...(localSettings.plugins?.autoCategorize?.rules || [])];
+                                     newRules[idx].tag = e.target.value.toLowerCase().replace('#', '');
+                                     setLocalSettings(s => ({ ...s, plugins: { ...s.plugins, autoCategorize: { ...(s.plugins?.autoCategorize as any), enabled: true, rules: newRules } } }));
+                                  }}
+                                  className="w-full bg-surface border border-border rounded px-2 py-1 text-sm focus:border-accent outline-none"
+                               />
+                            </div>
+                            <div className="flex-1">
+                               <select
+                                  value={rule.collectionId}
+                                  onChange={e => {
+                                     const newRules = [...(localSettings.plugins?.autoCategorize?.rules || [])];
+                                     newRules[idx].collectionId = e.target.value;
+                                     const targetCol = data.collections.find(c => c.id === e.target.value);
+                                     newRules[idx].workspaceId = targetCol?.workspaceId || '';
+                                     setLocalSettings(s => ({ ...s, plugins: { ...s.plugins, autoCategorize: { ...(s.plugins?.autoCategorize as any), enabled: true, rules: newRules } } }));
+                                  }}
+                                  className="w-full bg-surface border border-border rounded px-2 py-1 text-sm focus:border-accent outline-none"
+                               >
+                                  {data.collections.map(c => (
+                                     <option key={c.id} value={c.id}>
+                                       {data.workspaces.find(w => w.id === c.workspaceId)?.name} &gt; {c.name}
+                                     </option>
+                                  ))}
+                               </select>
+                            </div>
+                            <button 
+                               onClick={() => {
+                                  const newRules = localSettings.plugins?.autoCategorize?.rules.filter((_, i) => i !== idx) || [];
+                                  setLocalSettings(s => ({ ...s, plugins: { ...s.plugins, autoCategorize: { ...(s.plugins?.autoCategorize as any), enabled: true, rules: newRules } } }));
+                               }}
+                               className="text-text-muted hover:text-red-400"
+                            >
+                               <Trash2 size={14} />
+                            </button>
+                         </div>
+                      </div>
+                   ))}
+                   {(!localSettings.plugins.autoCategorize.rules || localSettings.plugins.autoCategorize.rules.length === 0) && (
+                      <p className="text-xs text-text-muted italic py-2">No rules configured. Add a rule to automatically organize notes.</p>
+                   )}
+                </div>
+              )}
             </div>
           </div>
 

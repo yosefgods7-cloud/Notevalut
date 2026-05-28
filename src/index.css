@@ -172,6 +172,11 @@
     @apply bg-surface font-sans font-semibold text-text-primary;
   }
 
+  /* Wiki link brackets */
+  .ProseMirror[contenteditable="false"] .wiki-bracket {
+    display: none;
+  }
+
   /* Print styles */
   @media print {
     body {

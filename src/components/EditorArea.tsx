@@ -16,17 +16,19 @@ import ImageResize from 'tiptap-extension-resize-image';
 import { Color } from '@tiptap/extension-color';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { FontSize } from '../lib/FontSize';
+import { WikiLink } from '../lib/WikiLink';
 import { cleanAIPaste } from '../lib/paste-cleaner';
 import { NoteHistoryModal } from './NoteHistoryModal';
 import { ImageCropModal } from './ImageCropModal';
 import { ChartBuilderModal } from './ChartBuilderModal';
+import { TableControls } from './TableControls';
 import { 
   Bold, Italic, Underline as UnderlineIcon, 
   Heading1, Heading2, Heading3, 
   List, ListOrdered, CheckSquare, 
   Code, FileCode2, Table as TableIcon, 
   Minus, Sparkles, Tag as TagIcon, X, Check, Clock,
-  Image as ImageIcon, Download, Trash2, Bot, Undo2, Redo2, FileText, FileJson, Crop, Paperclip, BookOpen, Pen, BarChart3, LineChart, PieChart, Quote, Type, Palette, Plus, ChevronDown, AreaChart as AreaChartIcon, Hexagon, Volume2, VolumeX
+  Image as ImageIcon, Download, Trash2, Bot, Undo2, Redo2, FileText, FileJson, Crop, Paperclip, BookOpen, Pen, BarChart3, LineChart, PieChart, Quote, Type, Palette, Plus, ChevronDown, AreaChart as AreaChartIcon, Hexagon, Volume2, VolumeX, Link as LinkIcon
 } from 'lucide-react';
 import { cn, generateId } from '../lib/utils';
 import { format } from 'date-fns';
@@ -71,10 +73,11 @@ interface EditorAreaProps {
   noteId: string;
   isSidebarOpen?: boolean;
   onToggleSidebar?: () => void;
+  onNavigateToNote?: (noteId: string, collectionId: string, workspaceId: string) => void;
 }
 
-export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, onToggleSidebar }) => {
-  const { data, updateNote, updateSettings, showToast } = useStorage();
+export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, onToggleSidebar, onNavigateToNote }) => {
+  const { data, updateNote, addNote, updateSettings, showToast } = useStorage();
   const note = data.notes.find(n => n.id === noteId);
   const settings = data.settings;
   
@@ -425,11 +428,32 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
       TextStyle,
       Color,
       FontSize,
+      WikiLink,
       Placeholder.configure({ placeholder: 'Start writing or paste AI text...' })
     ],
     content: '',
     editable: isEditing,
     editorProps: {
+      handleClick: (view, pos, event) => {
+        const target = event.target as HTMLElement;
+        const wikiLinkNode = target.closest('[data-wiki-link="true"]');
+        if (wikiLinkNode) {
+          const targetNoteText = wikiLinkNode.getAttribute('data-target') || wikiLinkNode.textContent?.replace(/^\[\[/, '').replace(/\]\]$/, '');
+          if (targetNoteText && onNavigateToNote) {
+            const targetNoteObj = data.notes.find(n => n.title.toLowerCase() === targetNoteText.toLowerCase());
+            if (targetNoteObj) {
+              onNavigateToNote(targetNoteObj.id, targetNoteObj.collectionId, targetNoteObj.workspaceId);
+            } else {
+              // Create the non-existing note in the current collection and workspace
+              const newNote = addNote(note!.workspaceId, note!.collectionId, targetNoteText, '<p></p>');
+              onNavigateToNote(newNote.id, newNote.collectionId, newNote.workspaceId);
+              showToast(`Created new note: ${targetNoteText}`);
+            }
+            return true;
+          }
+        }
+        return false;
+      },
       handleDrop: (view, event, slice, moved) => {
         if (draggedImageData) {
           event.preventDefault();
@@ -630,6 +654,18 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
     }
   };
 
+  const handleWikiLink = () => {
+    if (!editor) return;
+    const { state } = editor;
+    const { from, to } = state.selection;
+    const selectedText = state.doc.textBetween(from, to, ' ');
+    if (!selectedText || selectedText.trim() === '') {
+      showToast('Select text to link to a note.');
+      return;
+    }
+    editor.chain().focus().insertContent({ type: 'wikiLink', attrs: { target: selectedText.trim() } }).insertContent(' ').run();
+  };
+
   const handleAddTag = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && tagInput.trim()) {
       e.preventDefault();
@@ -680,6 +716,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
               <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} icon={<Bold size={16} />} />
               <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} icon={<Italic size={16} />} />
               <ToolbarButton onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive('underline')} icon={<UnderlineIcon size={16} />} />
+              <ToolbarButton onClick={handleWikiLink} icon={<LinkIcon size={16} />} title="Wiki Link Note" />
               <ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')} icon={<Quote size={16} />} title="Quote" />
               
               <div className="w-px h-4 bg-border mx-1"></div>
@@ -927,6 +964,20 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
               }}
             >
               <div className="bg-surface-header border border-border shadow-xl rounded-lg overflow-visible flex items-center p-1.5 gap-2 relative z-50">
+                <div className="flex items-center gap-1 bg-background border border-border rounded-md shadow-sm p-1">
+                  <button onMouseDown={(e) => e.preventDefault()} onClick={() => editor.chain().focus().toggleBold().run()} className={cn("p-1.5 rounded-md transition-colors", editor.isActive('bold') ? "bg-accent/20 text-accent" : "text-text-muted hover:text-text-primary hover:bg-surface-active")}>
+                    <Bold size={14} />
+                  </button>
+                  <button onMouseDown={(e) => e.preventDefault()} onClick={() => editor.chain().focus().toggleItalic().run()} className={cn("p-1.5 rounded-md transition-colors", editor.isActive('italic') ? "bg-accent/20 text-accent" : "text-text-muted hover:text-text-primary hover:bg-surface-active")}>
+                    <Italic size={14} />
+                  </button>
+                  <button onMouseDown={(e) => e.preventDefault()} onClick={handleWikiLink} className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-active rounded-md transition-colors" title="Wiki Link Note">
+                    <LinkIcon size={14} />
+                  </button>
+                </div>
+                
+                <div className="w-px h-5 bg-border mx-0.5"></div>
+                
                 <div className="flex items-center bg-background border border-border rounded-md shadow-sm">
                   <button
                     onMouseDown={(e) => e.preventDefault()}
@@ -998,7 +1049,10 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
             </BubbleMenu>
           )}
 
-          <EditorContent editor={editor} className="min-h-[400px]" />
+          <div className="relative" id="editor-container-relative">
+            {isEditing && <TableControls editor={editor} />}
+            <EditorContent editor={editor} className="min-h-[400px]" />
+          </div>
           
           {/* Attachments Section */}
           <div className="mt-12 pt-8 border-t border-border">

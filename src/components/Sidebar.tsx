@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useStorage } from '../context/StorageContext';
 import { cn } from '../lib/utils';
-import { Plus, Tag, Settings as SettingsIcon, Download, Upload, Star, Undo2 } from 'lucide-react';
+import { Plus, Tag, Settings as SettingsIcon, Download, Upload, Star, Undo2, Network } from 'lucide-react';
 
 interface SidebarProps {
   activeWorkspaceId: string;
@@ -11,12 +11,15 @@ interface SidebarProps {
   onOpenExport: () => void;
   onOpenImport: () => void;
   onOpenSettings: () => void;
+  onToggleBrainMap: () => void;
+  isBrainMapActive: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   activeWorkspaceId, setActiveWorkspaceId,
   activeCollectionId, setActiveCollectionId,
-  onOpenExport, onOpenImport, onOpenSettings
+  onOpenExport, onOpenImport, onOpenSettings,
+  onToggleBrainMap, isBrainMapActive
 }) => {
   const { data, addCollection, undo, canUndo } = useStorage();
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
@@ -69,6 +72,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       <div className="flex-1 overflow-y-auto py-4 px-2 no-print">
+        <div className="mb-6">
+          <button
+            onClick={onToggleBrainMap}
+            className={cn(
+              "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors mb-4 border border-transparent shadow-sm",
+              isBrainMapActive 
+                ? "bg-accent text-white shadow-accent/20" 
+                : "bg-surface text-text-primary hover:border-border hover:bg-surface-hover"
+            )}
+          >
+            <Network size={16} className={cn(isBrainMapActive ? "text-white" : "text-accent")} />
+            <span>Brain Mapping</span>
+          </button>
+        </div>
+
         <div className="mb-6">
           <div className="flex items-center justify-between px-2 mb-2 text-xs font-semibold text-text-muted uppercase tracking-wider">
             <span>Collections</span>
