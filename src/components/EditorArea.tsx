@@ -101,6 +101,28 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
   const [isExporting, setIsExporting] = useState(false);
   const [aiSummary, setAiSummary] = useState<{ loading: boolean, text: string | null, open: boolean }>({ loading: false, text: null, open: false });
 
+  const backlinks = React.useMemo(() => {
+    if (!note) return [];
+    const targetLower = note.title.toLowerCase();
+    
+    return data.notes.filter(n => {
+      if (n.id === note.id) return false;
+      // Fast heuristic check before expensive parsing
+      if (!n.content.toLowerCase().includes(targetLower)) {
+        return false;
+      }
+      
+      const regex = /data-target=(["'])(.*?)\1/gi;
+      let match;
+      while ((match = regex.exec(n.content)) !== null) {
+        if (match[2].toLowerCase() === targetLower) {
+          return true;
+        }
+      }
+      return false;
+    });
+  }, [data.notes, note?.title, note?.id]);
+
   const handleSummarizeNote = async () => {
     if (!editor) return;
     const ai = getAiClient(data.settings?.geminiApiKey);
@@ -667,10 +689,10 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
   };
 
   const handleAddTag = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && tagInput.trim()) {
+    if ((e.key === 'Enter' || e.key === ' ') && tagInput.trim()) {
       e.preventDefault();
-      const newTag = tagInput.trim().toLowerCase();
-      if (!tags.includes(newTag)) {
+      const newTag = tagInput.trim().toLowerCase().replace(/^#+/, '');
+      if (newTag && !tags.includes(newTag)) {
         const newTags = [...tags, newTag];
         setTags(newTags);
         updateNote(noteId, { tags: newTags });
@@ -808,17 +830,6 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
             {isSpeaking ? <VolumeX size={14} /> : <Volume2 size={14} />}
           </button>
           
-          <button 
-            onClick={() => setIsEditing(!isEditing)}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-sm bg-surface-active hover:bg-border text-text-primary rounded-md font-medium transition-colors h-8"
-            title={isEditing ? "Switch to Reading Mode" : "Switch to Editing Mode"}
-          >
-            {isEditing ? (
-              <><BookOpen size={14} /> <span className="hidden sm:inline">Read</span></>
-            ) : (
-              <><Pen size={14} /> <span className="hidden sm:inline">Edit</span></>
-            )}
-          </button>
           <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 bg-surface-active rounded border border-border text-xs text-text-muted h-8">
             <span className="flex items-center gap-1"><span className="text-text-primary text-[10px] w-3 h-3 flex items-center justify-center bg-border rounded">A</span> {editor.storage.characterCount.characters()}</span>
             <span className="text-border mx-1">|</span>
@@ -1232,6 +1243,31 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
             )}
           </div>
 
+          {/* Backlinks Section */}
+          {backlinks.length > 0 && (
+            <div className="mt-12 pt-8 border-t border-border">
+              <h3 className="text-sm font-semibold text-text-muted uppercase tracking-wider flex items-center gap-2 mb-4">
+                <LinkIcon size={16} /> Backlinks
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {backlinks.map(bl => (
+                  <div 
+                    key={bl.id}
+                    onClick={() => onNavigateToNote?.(bl.id, bl.collectionId, bl.workspaceId)}
+                    className="p-3 bg-surface border border-border hover:border-accent hover:bg-surface-active rounded-lg cursor-pointer transition-colors"
+                  >
+                    <h4 className="font-medium text-sm text-text-primary mb-1">
+                      {bl.title || 'Untitled Note'}
+                    </h4>
+                    <p className="text-xs text-text-muted line-clamp-2">
+                       {bl.content.replace(/<[^>]+>/g, '') || 'No content...'}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
       
@@ -1287,6 +1323,15 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
           </div>
         </div>
       )}
+
+      {/* Read/Edit Floating Action Button */}
+      <button 
+        onClick={() => setIsEditing(!isEditing)}
+        className="fixed bottom-8 right-24 w-14 h-14 bg-surface hover:bg-surface-hover text-text-primary border border-border shadow-[0_8px_30px_rgba(0,0,0,0.1)] rounded-full flex items-center justify-center z-40 transition-transform hover:scale-105 active:scale-95 no-print"
+        title={isEditing ? "Switch to Reading Mode" : "Switch to Editing Mode"}
+      >
+        {isEditing ? <BookOpen size={20} /> : <Pen size={20} />}
+      </button>
 
       {imageToCrop && (
         <ImageCropModal 
