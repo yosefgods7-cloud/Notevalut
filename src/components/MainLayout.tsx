@@ -143,6 +143,7 @@ export const MainLayout: React.FC = () => {
                setActiveNoteId(noteId);
                setCurrentView('editor');
              }}
+             onClose={() => setCurrentView('editor')}
           />
         ) : activeCollectionId && activeNoteId ? (
           <EditorArea 

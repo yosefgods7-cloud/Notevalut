@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useMemo, useState } from 'react';
 import * as d3 from 'd3';
 import { useStorage } from '../context/StorageContext';
-import { Network, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
+import { Network, ZoomIn, ZoomOut, Maximize, X } from 'lucide-react';
 import { Note } from '../types';
 
 interface BrainMapProps {
   activeWorkspaceId: string;
   onNavigateToNote: (noteId: string, collectionId: string, workspaceId: string) => void;
+  onClose: () => void;
 }
 
 interface GraphNode extends d3.SimulationNodeDatum {
@@ -23,7 +24,7 @@ interface GraphLink extends d3.SimulationLinkDatum<GraphNode> {
   type: 'col' | 'tag'; // col = same folder, tag = hashtag link
 }
 
-export const BrainMap: React.FC<BrainMapProps> = ({ activeWorkspaceId, onNavigateToNote }) => {
+export const BrainMap: React.FC<BrainMapProps> = ({ activeWorkspaceId, onNavigateToNote, onClose }) => {
   const { data } = useStorage();
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -129,6 +130,20 @@ export const BrainMap: React.FC<BrainMapProps> = ({ activeWorkspaceId, onNavigat
       .force("center", d3.forceCenter(0, 0))
       .force("x", d3.forceX().strength(0.05))
       .force("y", d3.forceY().strength(0.05));
+      
+    // Apply floating force
+    simulation.force("float", () => {
+      const alpha = simulation.alpha();
+      graphData.nodes.forEach(node => {
+        if (node.fx == null && node.fy == null && node.vx !== undefined && node.vy !== undefined) {
+          node.vx += (Math.random() - 0.5) * alpha * 6;
+          node.vy += (Math.random() - 0.5) * alpha * 6;
+        }
+      });
+    });
+    
+    // Keep simulation running gently
+    simulation.alphaTarget(0.02);
 
     // Draw Links
     const link = g.append("g")
@@ -136,9 +151,9 @@ export const BrainMap: React.FC<BrainMapProps> = ({ activeWorkspaceId, onNavigat
       .selectAll("line")
       .data(graphData.links)
       .join("line")
-      .attr("stroke", d => d.type === 'tag' ? "rgba(124, 106, 247, 0.4)" : "rgba(156, 163, 175, 0.3)") // Accent for tags, muted for col
-      .attr("stroke-width", d => d.type === 'tag' ? 2 : 1.5)
-      .attr("stroke-dasharray", d => d.type === 'col' ? "4,4" : "none");
+      .attr("stroke", "var(--color-text-primary)")
+      .attr("stroke-width", 1.5)
+      .attr("stroke-dasharray", "none");
 
     const nodeG = g.append("g")
       .selectAll("g")
@@ -152,9 +167,9 @@ export const BrainMap: React.FC<BrainMapProps> = ({ activeWorkspaceId, onNavigat
     // Draw Nodes (Circles)
     nodeG.append("circle")
       .attr("r", d => d.val)
-      .attr("fill", d => d.type === 'tag' ? "#7c6af7" : "#3b82f6") // Accent vs blue
-      .attr("stroke", "#fff")
-      .attr("stroke-width", 2)
+      .attr("fill", d => d.type === 'tag' ? "rgba(124, 106, 247, 0.15)" : "rgba(59, 130, 246, 0.15)") // Less colored, transparent
+      .attr("stroke", d => d.type === 'tag' ? "rgba(124, 106, 247, 0.8)" : "rgba(59, 130, 246, 0.8)")
+      .attr("stroke-width", 1.5)
       .attr("cursor", "pointer")
       .style("filter", "drop-shadow(0px 4px 6px rgba(0, 0, 0, 0.1))")
       .on("click", (event, d) => {
@@ -240,6 +255,10 @@ export const BrainMap: React.FC<BrainMapProps> = ({ activeWorkspaceId, onNavigat
         <div className="w-px h-4 bg-border mx-1"></div>
         <button className="p-2 hover:bg-surface border-border rounded-md text-text-muted hover:text-text-primary transition-colors" onClick={handleReset}>
           <Maximize size={16} />
+        </button>
+        <div className="w-px h-4 bg-border mx-1"></div>
+        <button title="Exit Brain Map" className="p-2 hover:bg-red-500/10 hover:text-red-500 border-border rounded-md text-text-muted transition-colors" onClick={onClose}>
+          <X size={16} />
         </button>
       </div>
 
