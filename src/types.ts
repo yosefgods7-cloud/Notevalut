@@ -85,6 +85,7 @@ export interface Settings {
   smartPaste: boolean;
   geminiApiKey?: string;
   plugins?: PluginSettings;
+  toolbarItems?: string[];
 }
 
 export interface NoteVaultData {
@@ -106,5 +107,14 @@ export const DEFAULT_SETTINGS: Settings = {
       enabled: false,
       rules: []
     }
-  }
+  },
+  toolbarItems: [
+    'undo', 'redo', '|', 
+    'h1', 'h2', 'h3', '|', 
+    'bold', 'italic', 'underline', 'link', 'blockquote', '|', 
+    'bulletList', 'orderedList', 'taskList', '|', 
+    'code', 'codeBlock', '|', 
+    'table', 'hr', '|', 
+    'attachment', 'chart', 'image'
+  ]
 };

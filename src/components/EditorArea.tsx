@@ -34,7 +34,7 @@ import { cn, generateId } from '../lib/utils';
 import { format } from 'date-fns';
 import imageCompression from 'browser-image-compression';
 import { GoogleGenAI } from '@google/genai';
-import { NoteChart } from '../types';
+import { NoteChart, DEFAULT_SETTINGS } from '../types';
 import {
   BarChart as RechartsBarChart, Bar, LineChart as RechartsLineChart, Line, PieChart as RechartsPieChart, Pie,
   AreaChart as RechartsAreaChart, Area, RadarChart as RechartsRadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
@@ -1171,44 +1171,33 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
           <div className="flex items-center space-x-1 shrink-0">
           {isEditing && (
             <>
-              <ToolbarButton onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} icon={<Undo2 size={16} />} title="Undo (Ctrl+Z)" />
-              <ToolbarButton onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} icon={<Redo2 size={16} />} title="Redo (Ctrl+Shift+Z)" />
-              
-              <div className="w-px h-4 bg-border mx-1"></div>
-
-              <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive('heading', { level: 1 })} icon={<Heading1 size={16} />} />
-              <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive('heading', { level: 2 })} icon={<Heading2 size={16} />} />
-              <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive('heading', { level: 3 })} icon={<Heading3 size={16} />} />
-              
-              <div className="w-px h-4 bg-border mx-1"></div>
-              
-              <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} icon={<Bold size={16} />} />
-              <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} icon={<Italic size={16} />} />
-              <ToolbarButton onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive('underline')} icon={<UnderlineIcon size={16} />} />
-              <ToolbarButton onClick={handleWikiLink} icon={<LinkIcon size={16} />} title="Wiki Link Note" />
-              <ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')} icon={<Quote size={16} />} title="Quote" />
-              
-              <div className="w-px h-4 bg-border mx-1"></div>
-              
-              <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} icon={<List size={16} />} />
-              <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} icon={<ListOrdered size={16} />} />
-              <ToolbarButton onClick={() => editor.chain().focus().toggleTaskList().run()} active={editor.isActive('taskList')} icon={<CheckSquare size={16} />} />
-              
-              <div className="w-px h-4 bg-border mx-1"></div>
-              
-              <ToolbarButton onClick={() => editor.chain().focus().toggleCode().run()} active={editor.isActive('code')} icon={<Code size={16} />} />
-              <ToolbarButton onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')} icon={<FileCode2 size={16} />} />
-              
-              <div className="w-px h-4 bg-border mx-1"></div>
-              
-              <ToolbarButton onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} icon={<TableIcon size={16} />} />
-              <ToolbarButton onClick={() => editor.chain().focus().setHorizontalRule().run()} icon={<Minus size={16} />} />
-              
-              <div className="w-px h-4 bg-border mx-1"></div>
-
-              <ToolbarButton onClick={() => attachmentInputRef.current?.click()} icon={<Paperclip size={16} />} title="Add File" />
-              <ToolbarButton onClick={() => setIsChartBuilderOpen(true)} icon={<BarChart3 size={16} />} title="Add Chart" />
-              <ToolbarButton onClick={() => fileInputRef.current?.click()} icon={<ImageIcon size={16} />} title="Add Image" />
+              {(data.settings.toolbarItems || DEFAULT_SETTINGS.toolbarItems || []).map((item, idx) => {
+                if (item === '|') return <div key={`sep-${idx}`} className="w-px h-4 bg-border mx-1"></div>;
+                
+                switch (item) {
+                  case 'undo': return <ToolbarButton key={item} onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} icon={<Undo2 size={16} />} title="Undo (Ctrl+Z)" />;
+                  case 'redo': return <ToolbarButton key={item} onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} icon={<Redo2 size={16} />} title="Redo (Ctrl+Shift+Z)" />;
+                  case 'h1': return <ToolbarButton key={item} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive('heading', { level: 1 })} icon={<Heading1 size={16} />} />;
+                  case 'h2': return <ToolbarButton key={item} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive('heading', { level: 2 })} icon={<Heading2 size={16} />} />;
+                  case 'h3': return <ToolbarButton key={item} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive('heading', { level: 3 })} icon={<Heading3 size={16} />} />;
+                  case 'bold': return <ToolbarButton key={item} onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} icon={<Bold size={16} />} />;
+                  case 'italic': return <ToolbarButton key={item} onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} icon={<Italic size={16} />} />;
+                  case 'underline': return <ToolbarButton key={item} onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive('underline')} icon={<UnderlineIcon size={16} />} />;
+                  case 'link': return <ToolbarButton key={item} onClick={handleWikiLink} icon={<LinkIcon size={16} />} title="Wiki Link Note" />;
+                  case 'blockquote': return <ToolbarButton key={item} onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')} icon={<Quote size={16} />} title="Quote" />;
+                  case 'bulletList': return <ToolbarButton key={item} onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} icon={<List size={16} />} />;
+                  case 'orderedList': return <ToolbarButton key={item} onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} icon={<ListOrdered size={16} />} />;
+                  case 'taskList': return <ToolbarButton key={item} onClick={() => editor.chain().focus().toggleTaskList().run()} active={editor.isActive('taskList')} icon={<CheckSquare size={16} />} />;
+                  case 'code': return <ToolbarButton key={item} onClick={() => editor.chain().focus().toggleCode().run()} active={editor.isActive('code')} icon={<Code size={16} />} />;
+                  case 'codeBlock': return <ToolbarButton key={item} onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')} icon={<FileCode2 size={16} />} />;
+                  case 'table': return <ToolbarButton key={item} onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} icon={<TableIcon size={16} />} />;
+                  case 'hr': return <ToolbarButton key={item} onClick={() => editor.chain().focus().setHorizontalRule().run()} icon={<Minus size={16} />} />;
+                  case 'attachment': return <ToolbarButton key={item} onClick={() => attachmentInputRef.current?.click()} icon={<Paperclip size={16} />} title="Add File" />;
+                  case 'chart': return <ToolbarButton key={item} onClick={() => setIsChartBuilderOpen(true)} icon={<BarChart3 size={16} />} title="Add Chart" />;
+                  case 'image': return <ToolbarButton key={item} onClick={() => fileInputRef.current?.click()} icon={<ImageIcon size={16} />} title="Add Image" />;
+                  default: return null;
+                }
+              })}
               
               <div className="w-px h-4 bg-border mx-1"></div>
               

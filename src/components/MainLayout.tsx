@@ -193,48 +193,18 @@ export const MainLayout: React.FC = () => {
             >
               <ArrowLeft size={16} />
             </button>
-            <div className="relative group mx-1">
+            <div className="relative mx-1">
               <button 
+                onClick={() => {
+                  const newTabId = 'new-tab-' + Date.now();
+                  setOpenTabs(prev => [...prev, newTabId]);
+                  setActiveNoteId(newTabId);
+                }}
                 className="p-1.5 hover:bg-surface-active rounded text-text-muted hover:text-text-primary transition-colors flex items-center justify-center"
-                title="Tab Options"
+                title="Open New Tab"
               >
                 <Plus size={16} />
               </button>
-              <div className="absolute top-full left-0 mt-1 w-48 bg-surface border border-border rounded-md shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 py-1">
-                <button 
-                  onClick={() => {
-                    if (activeCollectionId && activeWorkspaceId) {
-                       const newNote = addNote(activeWorkspaceId, activeCollectionId);
-                       setActiveNoteId(newNote.id);
-                       if (window.innerWidth < 768) setIsSidebarOpen(false);
-                    } else if (data.workspaces.length > 0) {
-                       if (data.collections.length > 0) {
-                          const col = data.collections[0];
-                          const newNote = addNote(col.workspaceId, col.id);
-                          setActiveWorkspaceId(col.workspaceId);
-                          setActiveCollectionId(col.id);
-                          setActiveNoteId(newNote.id);
-                       }
-                    }
-                  }}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-surface-active flex items-center gap-2 text-text-primary"
-                >
-                  <FilePlus size={14} /> Create New Note
-                </button>
-                <button 
-                  onClick={() => setIsSidebarOpen(true)}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-surface-active flex items-center gap-2 text-text-primary"
-                >
-                  <FolderOpen size={14} /> Open Existing Note
-                </button>
-                <div className="h-px bg-border my-1"></div>
-                <button 
-                  onClick={handleCloseAllTabs}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-red-500/10 text-red-500 hover:text-red-400 flex items-center gap-2"
-                >
-                  <XCircle size={14} /> Close All Tabs
-                </button>
-              </div>
             </div>
             
             <div className="w-px h-5 bg-border mx-2"></div>
@@ -242,6 +212,7 @@ export const MainLayout: React.FC = () => {
             <div className="flex items-end h-full gap-1 pt-1.5">
               <AnimatePresence>
                 {openTabs.map(tabId => {
+                  const isNewTab = tabId.startsWith('new-tab-');
                   const note = data.notes.find(n => n.id === tabId);
                   const isActive = tabId === activeNoteId;
                   return (
@@ -266,7 +237,7 @@ export const MainLayout: React.FC = () => {
                           : "bg-surface-active text-text-muted hover:bg-surface-hover border-transparent"
                       )}
                     >
-                      <span className="truncate">{note?.title || 'Untitled'}</span>
+                      <span className="truncate">{isNewTab ? 'New Tab' : (note?.title || 'Untitled')}</span>
                       <button
                         onClick={(e) => handleCloseTab(tabId, e)}
                         className={cn(
@@ -294,6 +265,57 @@ export const MainLayout: React.FC = () => {
              }}
              onClose={() => setCurrentView('editor')}
           />
+        ) : activeNoteId?.startsWith('new-tab-') ? (
+          <div className="flex-1 flex flex-col items-center justify-center p-8 bg-background h-full w-full relative z-0">
+             <button 
+               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+               className="absolute top-4 left-4 p-2 bg-surface hover:bg-surface-hover rounded-md text-text-secondary transition-colors z-10 md:hidden"
+             >
+               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+             </button>
+             <h2 className="text-2xl font-semibold mb-8 text-text-primary">New Tab</h2>
+             <div className="flex flex-col gap-4 w-full max-w-sm">
+                <button 
+                  onClick={() => {
+                    if (activeCollectionId && activeWorkspaceId) {
+                       const newNote = addNote(activeWorkspaceId, activeCollectionId);
+                       setOpenTabs(prev => prev.map(t => t === activeNoteId ? newNote.id : t));
+                       setActiveNoteId(newNote.id);
+                       if (window.innerWidth < 768) setIsSidebarOpen(false);
+                    } else if (data.workspaces.length > 0 && data.collections.length > 0) {
+                       const col = data.collections[0];
+                       const newNote = addNote(col.workspaceId, col.id);
+                       setActiveWorkspaceId(col.workspaceId);
+                       setActiveCollectionId(col.id);
+                       setOpenTabs(prev => prev.map(t => t === activeNoteId ? newNote.id : t));
+                       setActiveNoteId(newNote.id);
+                    } else {
+                       alert("Please create a workspace and collection first.");
+                       setIsSidebarOpen(true);
+                    }
+                  }}
+                  className="p-4 bg-surface hover:bg-surface-hover border border-border rounded-xl flex items-center justify-center gap-3 text-text-primary transition-all hover:border-accent group shadow-sm hover:shadow"
+                >
+                  <FilePlus className="text-accent group-hover:scale-110 transition-transform" />
+                  <span className="font-medium">Create New Note</span>
+                </button>
+                <button 
+                  onClick={() => setIsSidebarOpen(true)}
+                  className="p-4 bg-surface hover:bg-surface-hover border border-border rounded-xl flex items-center justify-center gap-3 text-text-primary transition-all hover:border-accent group shadow-sm hover:shadow"
+                >
+                  <FolderOpen className="text-accent group-hover:scale-110 transition-transform" />
+                  <span className="font-medium">Open Existing Note</span>
+                </button>
+                <div className="h-4"></div>
+                <button 
+                  onClick={handleCloseAllTabs}
+                  className="p-4 bg-red-500/5 hover:bg-red-500/10 border border-red-500/20 hover:border-red-500/50 rounded-xl flex items-center justify-center gap-3 text-red-500 transition-all group shadow-sm"
+                >
+                  <XCircle className="group-hover:scale-110 transition-transform" />
+                  <span className="font-medium">Close All Tabs</span>
+                </button>
+             </div>
+          </div>
         ) : activeCollectionId && activeNoteId ? (
           <EditorArea 
             noteId={activeNoteId} 

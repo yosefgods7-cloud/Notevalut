@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStorage } from '../context/StorageContext';
 import { useAuth } from '../context/AuthContext';
-import { X, Save, Trash2, HardDrive, Cloud, LogIn, LogOut, RefreshCw, FileJson, Download, Puzzle, Plus, Folder, ChevronDown, ChevronUp, Monitor, Code, Cpu, Database } from 'lucide-react';
+import { X, Save, Trash2, HardDrive, Cloud, LogIn, LogOut, RefreshCw, FileJson, Download, Puzzle, Plus, Folder, ChevronDown, ChevronUp, Monitor, Code, Cpu, Database, ArrowUp, ArrowDown, Minus } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Settings as SettingsType } from '../types';
 
@@ -266,7 +266,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             )}
           </div>
 
-          {/* Editor Settings */}
+         {/* Editor Settings */}
           <div className="border border-border bg-background rounded-xl overflow-hidden">
             <button onClick={() => toggleSection('Editor')} className="w-full flex items-center justify-between p-4 hover:bg-surface-active transition-colors">
               <div className="flex items-center gap-3">
@@ -276,7 +276,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
               <ChevronDown size={16} className={cn("text-text-muted transition-transform", expandedSection === 'Editor' && "rotate-180")} />
             </button>
             {expandedSection === 'Editor' && (
-              <div className="p-4 border-t border-border space-y-4 bg-surface/30">
+              <div className="p-4 border-t border-border space-y-6 bg-surface/30">
                 <label className="flex items-center justify-between cursor-pointer">
                   <div>
                     <div className="text-sm font-medium">Smart Paste</div>
@@ -292,6 +292,89 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                     <div className="w-9 h-5 bg-surface-active border border-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2.5px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
                   </div>
                 </label>
+
+                <div className="border-t border-border pt-4">
+                  <div className="text-sm font-medium mb-1">Bottom Bar Button Configuration</div>
+                  <div className="text-xs text-text-muted mb-4">Reorder, add, or remove tools from the editor toolbar.</div>
+                  
+                  <div className="flex flex-col gap-2">
+                    {(localSettings.toolbarItems || []).map((item, idx) => {
+                       if (item === '|') return null;
+                       return (
+                         <div key={`${item}-${idx}`} className="flex items-center justify-between bg-surface p-2 border border-border rounded-md">
+                           <span className="text-sm text-text-primary capitalize">{item.replace(/([A-Z])/g, ' $1').trim()}</span>
+                           <div className="flex items-center gap-2">
+                             <button
+                               onClick={() => {
+                                 const items = [...(localSettings.toolbarItems || [])];
+                                 const withoutSeps = items.filter(x => x !== '|');
+                                 const selfIdx = withoutSeps.indexOf(item);
+                                 if (selfIdx > 0) {
+                                   const tmp = withoutSeps[selfIdx - 1];
+                                   withoutSeps[selfIdx - 1] = item;
+                                   withoutSeps[selfIdx] = tmp;
+                                   setLocalSettings(s => ({ ...s, toolbarItems: withoutSeps }));
+                                 }
+                               }}
+                               className="p-1 hover:bg-surface-active rounded text-text-muted transition-colors disabled:opacity-30"
+                               disabled={idx === 0}
+                             >
+                               <ArrowUp size={14} />
+                             </button>
+                             <button
+                               onClick={() => {
+                                 const items = [...(localSettings.toolbarItems || [])];
+                                 const withoutSeps = items.filter(x => x !== '|');
+                                 const selfIdx = withoutSeps.indexOf(item);
+                                 if (selfIdx < withoutSeps.length - 1) {
+                                   const tmp = withoutSeps[selfIdx + 1];
+                                   withoutSeps[selfIdx + 1] = item;
+                                   withoutSeps[selfIdx] = tmp;
+                                   setLocalSettings(s => ({ ...s, toolbarItems: withoutSeps }));
+                                 }
+                               }}
+                               className="p-1 hover:bg-surface-active rounded text-text-muted transition-colors disabled:opacity-30"
+                             >
+                               <ArrowDown size={14} />
+                             </button>
+                             <div className="w-px h-4 bg-border mx-1"></div>
+                             <button 
+                               onClick={() => {
+                                 const items = [...(localSettings.toolbarItems || [])].filter(x => x !== '|');
+                                 setLocalSettings(s => ({ ...s, toolbarItems: items.filter(x => x !== item) }));
+                               }}
+                               className="p-1 hover:bg-red-500/10 text-red-400 rounded transition-colors"
+                             >
+                               <Minus size={14} />
+                             </button>
+                           </div>
+                         </div>
+                       );
+                    })}
+
+                    {['undo', 'redo', 'h1', 'h2', 'h3', 'bold', 'italic', 'underline', 'link', 'blockquote', 'bulletList', 'orderedList', 'taskList', 'code', 'codeBlock', 'table', 'hr', 'attachment', 'chart', 'image'].filter(item => !(localSettings.toolbarItems || []).includes(item)).length > 0 && (
+                      <div className="mt-4">
+                        <div className="text-xs font-medium text-text-muted mb-2 uppercase tracking-wider">Available Features</div>
+                        {['undo', 'redo', 'h1', 'h2', 'h3', 'bold', 'italic', 'underline', 'link', 'blockquote', 'bulletList', 'orderedList', 'taskList', 'code', 'codeBlock', 'table', 'hr', 'attachment', 'chart', 'image'].filter(item => !(localSettings.toolbarItems || []).includes(item)).map(item => (
+                           <div key={`avail-${item}`} className="flex items-center justify-between bg-surface-active p-2 rounded-md mb-2 opacity-70 hover:opacity-100 transition-opacity border border-dashed border-border">
+                             <span className="text-sm text-text-muted capitalize">{item.replace(/([A-Z])/g, ' $1').trim()}</span>
+                             <button 
+                               onClick={() => {
+                                 const items = [...(localSettings.toolbarItems || [])].filter(x => x !== '|');
+                                 items.push(item);
+                                 setLocalSettings(s => ({ ...s, toolbarItems: items }));
+                               }}
+                               className="p-1 hover:bg-green-500/20 text-green-500 rounded transition-colors"
+                             >
+                               <Plus size={14} />
+                             </button>
+                           </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
               </div>
             )}
           </div>
