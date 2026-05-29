@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { X, ArrowLeft, XCircle, Plus, FilePlus, FolderOpen } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useStorage } from '../context/StorageContext';
 import { cn } from '../lib/utils';
 import { Sidebar } from './Sidebar';
@@ -12,10 +14,47 @@ import { BrainMap } from './BrainMap';
 export const MainLayout: React.FC = () => {
   const { data, addNote } = useStorage();
   
+  const [openTabs, setOpenTabs] = useState<string[]>([]);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string>(data.settings.defaultWorkspace || data.workspaces[0]?.id);
   const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<'editor' | 'brain_map'>('editor');
+
+  // Sync openTabs with activeNoteId if activeNoteId changes and is not in openTabs
+  useEffect(() => {
+    if (activeNoteId && !openTabs.includes(activeNoteId)) {
+      setOpenTabs(prev => [...prev, activeNoteId]);
+    }
+  }, [activeNoteId, openTabs]);
+
+  const handleCloseTab = (idToClose: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newTabs = openTabs.filter(id => id !== idToClose);
+    setOpenTabs(newTabs);
+
+    if (idToClose === activeNoteId) {
+      if (newTabs.length > 0) {
+        // Find adjacent tab
+        const closedIndex = openTabs.indexOf(idToClose);
+        const nextId = newTabs[Math.min(closedIndex, newTabs.length - 1)];
+        setActiveNoteId(nextId);
+        // We might want to find its collection/workspace but keeping it simple for now
+        const nextNote = data.notes.find(n => n.id === nextId);
+        if (nextNote) {
+          setActiveCollectionId(nextNote.collectionId);
+          setActiveWorkspaceId(nextNote.workspaceId);
+        }
+      } else {
+        setActiveNoteId(null);
+      }
+    }
+  };
+
+  const handleCloseAllTabs = () => {
+    setOpenTabs([]);
+    setActiveNoteId(null);
+  };
+
 
   const [isExportOpen, setExportOpen] = useState(false);
   const [isImportOpen, setImportOpen] = useState(false);
@@ -100,8 +139,8 @@ export const MainLayout: React.FC = () => {
       {/* Sidebars wrapping div */}
       <div 
         className={cn(
-          "fixed inset-y-0 left-0 z-30 flex h-full transition-[transform,opacity] duration-300 ease-in-out border-r border-border overflow-x-auto overflow-y-hidden bg-background shadow-2xl",
-          isSidebarOpen ? "translate-x-0 w-full max-w-[540px] opacity-100" : "-translate-x-full w-full max-w-[540px] opacity-0 pointer-events-none"
+          "fixed top-4 left-4 z-40 flex max-h-[calc(100vh-2rem)] rounded-xl transition-[transform,opacity] duration-300 ease-in-out border border-border overflow-hidden bg-background shadow-2xl drop-shadow-2xl",
+          isSidebarOpen ? "translate-x-0 opacity-100" : "-translate-x-[600px] opacity-0 pointer-events-none"
         )}
       >
         <Sidebar 
@@ -133,7 +172,117 @@ export const MainLayout: React.FC = () => {
         )}
       </div>
       
-      <div className="flex-1 flex flex-col min-w-0 h-full relative">
+      <div className="flex-1 flex flex-col min-w-0 h-full relative pl-20">
+        {openTabs.length > 0 && currentView === 'editor' && (
+          <div className="flex items-center w-full overflow-x-auto bg-surface border-b border-border h-12 no-print px-2 select-none shrink-0 no-scrollbar relative z-10 shadow-sm border-t">
+            <button 
+              onClick={() => {
+                const currentIndex = openTabs.indexOf(activeNoteId || '');
+                if (currentIndex > 0) {
+                     const prevId = openTabs[currentIndex - 1];
+                     setActiveNoteId(prevId);
+                     const note = data.notes.find(n => n.id === prevId);
+                     if (note) {
+                       setActiveCollectionId(note.collectionId);
+                       setActiveWorkspaceId(note.workspaceId);
+                     }
+                }
+              }}
+              className="p-1.5 mx-1 hover:bg-surface-active rounded text-text-muted hover:text-text-primary transition-colors"
+              title="Previous Tab"
+            >
+              <ArrowLeft size={16} />
+            </button>
+            <div className="relative group mx-1">
+              <button 
+                className="p-1.5 hover:bg-surface-active rounded text-text-muted hover:text-text-primary transition-colors flex items-center justify-center"
+                title="Tab Options"
+              >
+                <Plus size={16} />
+              </button>
+              <div className="absolute top-full left-0 mt-1 w-48 bg-surface border border-border rounded-md shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 py-1">
+                <button 
+                  onClick={() => {
+                    if (activeCollectionId && activeWorkspaceId) {
+                       const newNote = addNote(activeWorkspaceId, activeCollectionId);
+                       setActiveNoteId(newNote.id);
+                       if (window.innerWidth < 768) setIsSidebarOpen(false);
+                    } else if (data.workspaces.length > 0) {
+                       if (data.collections.length > 0) {
+                          const col = data.collections[0];
+                          const newNote = addNote(col.workspaceId, col.id);
+                          setActiveWorkspaceId(col.workspaceId);
+                          setActiveCollectionId(col.id);
+                          setActiveNoteId(newNote.id);
+                       }
+                    }
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-surface-active flex items-center gap-2 text-text-primary"
+                >
+                  <FilePlus size={14} /> Create New Note
+                </button>
+                <button 
+                  onClick={() => setIsSidebarOpen(true)}
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-surface-active flex items-center gap-2 text-text-primary"
+                >
+                  <FolderOpen size={14} /> Open Existing Note
+                </button>
+                <div className="h-px bg-border my-1"></div>
+                <button 
+                  onClick={handleCloseAllTabs}
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-red-500/10 text-red-500 hover:text-red-400 flex items-center gap-2"
+                >
+                  <XCircle size={14} /> Close All Tabs
+                </button>
+              </div>
+            </div>
+            
+            <div className="w-px h-5 bg-border mx-2"></div>
+            
+            <div className="flex items-end h-full gap-1 pt-1.5">
+              <AnimatePresence>
+                {openTabs.map(tabId => {
+                  const note = data.notes.find(n => n.id === tabId);
+                  const isActive = tabId === activeNoteId;
+                  return (
+                    <motion.div
+                      key={tabId}
+                      layout
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
+                      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                      onClick={() => {
+                        setActiveNoteId(tabId);
+                        if (note) {
+                          setActiveCollectionId(note.collectionId);
+                          setActiveWorkspaceId(note.workspaceId);
+                        }
+                      }}
+                      className={cn(
+                        "group flex items-center justify-between gap-3 px-3 min-w-[120px] max-w-[200px] cursor-pointer text-sm font-medium transition-colors rounded-t-lg border-t border-x border-b-0 h-full",
+                        isActive 
+                          ? "bg-background text-text-primary border-border border-t-accent" 
+                          : "bg-surface-active text-text-muted hover:bg-surface-hover border-transparent"
+                      )}
+                    >
+                      <span className="truncate">{note?.title || 'Untitled'}</span>
+                      <button
+                        onClick={(e) => handleCloseTab(tabId, e)}
+                        className={cn(
+                          "p-0.5 rounded-sm hover:bg-red-500/20 hover:text-red-400 transition-colors shrink-0",
+                          isActive ? "opacity-100" : "sm:opacity-0 sm:group-hover:opacity-100 opacity-100"
+                        )}
+                      >
+                        <X size={14} />
+                      </button>
+                    </motion.div>
+                  )
+                })}
+              </AnimatePresence>
+            </div>
+          </div>
+        )}
         {currentView === 'brain_map' ? (
           <BrainMap 
             activeWorkspaceId={activeWorkspaceId}
@@ -155,6 +304,7 @@ export const MainLayout: React.FC = () => {
               setActiveCollectionId(collectionId);
               setActiveNoteId(noteId);
             }}
+            onOpenSettings={() => setSettingsOpen(true)}
           />
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-text-muted bg-background h-full relative">
@@ -195,7 +345,7 @@ export const MainLayout: React.FC = () => {
             setActiveNoteId(newNote.id);
           }
         }}
-        className="fixed bottom-8 right-8 w-14 h-14 bg-accent hover:bg-accent-hover text-white rounded-full shadow-[0_8px_30px_rgba(124,106,247,0.3)] flex items-center justify-center z-40 transition-transform hover:scale-105 active:scale-95 no-print"
+        className="fixed bottom-[4.5rem] right-8 w-14 h-14 bg-accent hover:bg-accent-hover text-white rounded-full shadow-[0_8px_30px_rgba(124,106,247,0.3)] flex items-center justify-center z-40 transition-transform hover:scale-105 active:scale-95 no-print"
         title="Quick Capture"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>

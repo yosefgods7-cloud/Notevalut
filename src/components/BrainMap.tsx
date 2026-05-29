@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useMemo, useState } from 'react';
 import * as d3 from 'd3';
 import { useStorage } from '../context/StorageContext';
-import { Network, ZoomIn, ZoomOut, Maximize, X } from 'lucide-react';
+import { Network, ZoomIn, ZoomOut, Maximize, X, Download } from 'lucide-react';
 import { Note } from '../types';
 
 interface BrainMapProps {
@@ -12,7 +12,7 @@ interface BrainMapProps {
 
 interface GraphNode extends d3.SimulationNodeDatum {
   id: string;
-  type: 'note' | 'tag';
+  type: 'workspace' | 'collection' | 'note' | 'tag';
   label: string;
   noteRef?: Note; // Reference to the note if type is 'note'
   val: number; // size
@@ -21,7 +21,7 @@ interface GraphNode extends d3.SimulationNodeDatum {
 interface GraphLink extends d3.SimulationLinkDatum<GraphNode> {
   source: string | GraphNode;
   target: string | GraphNode;
-  type: 'col' | 'tag'; // col = same folder, tag = hashtag link
+  type: 'parent' | 'tag'; // parent = hierarchy, tag = hashtag link
 }
 
 export const BrainMap: React.FC<BrainMapProps> = ({ activeWorkspaceId, onNavigateToNote, onClose }) => {
@@ -34,6 +34,35 @@ export const BrainMap: React.FC<BrainMapProps> = ({ activeWorkspaceId, onNavigat
     const nodes: GraphNode[] = [];
     const links: GraphLink[] = [];
     
+    // Add Workspace Node (Main Holder)
+    const activeWorkspace = data.workspaces.find(w => w.id === activeWorkspaceId);
+    if (activeWorkspace) {
+      nodes.push({
+        id: `workspace-${activeWorkspace.id}`,
+        type: 'workspace',
+        label: activeWorkspace.name,
+        val: 35, // bigger circle
+      });
+    }
+
+    // Collections in active workspace
+    const workspaceCollections = data.collections.filter(c => c.workspaceId === activeWorkspaceId);
+    workspaceCollections.forEach(col => {
+      nodes.push({
+        id: `collection-${col.id}`,
+        type: 'collection',
+        label: col.name,
+        val: 20,
+      });
+
+      // Link Collection -> Workspace
+      links.push({
+        source: `collection-${col.id}`,
+        target: `workspace-${activeWorkspaceId}`,
+        type: 'parent'
+      });
+    });
+
     // Notes in active workspace
     const workspaceNotes = data.notes.filter(n => n.workspaceId === activeWorkspaceId);
     
@@ -48,6 +77,13 @@ export const BrainMap: React.FC<BrainMapProps> = ({ activeWorkspaceId, onNavigat
         noteRef: note
       });
 
+      // Link Note -> Collection
+      links.push({
+        source: `note-${note.id}`,
+        target: `collection-${note.collectionId}`,
+        type: 'parent'
+      });
+
       note.tags.forEach(tag => tagSet.add(tag));
     });
 
@@ -57,7 +93,7 @@ export const BrainMap: React.FC<BrainMapProps> = ({ activeWorkspaceId, onNavigat
         id: `tag-${tag}`,
         type: 'tag',
         label: `#${tag}`,
-        val: 18, // slightly larger for tags
+        val: 18, 
       });
     });
 
@@ -72,26 +108,8 @@ export const BrainMap: React.FC<BrainMapProps> = ({ activeWorkspaceId, onNavigat
       });
     });
 
-    // Links for collections (connect notes in the same collection)
-    const collectionsMap = new Map<string, string[]>();
-    workspaceNotes.forEach(note => {
-      const arr = collectionsMap.get(note.collectionId) || [];
-      arr.push(`note-${note.id}`);
-      collectionsMap.set(note.collectionId, arr);
-    });
-
-    collectionsMap.forEach((noteIds) => {
-      for (let i = 0; i < noteIds.length - 1; i++) {
-        links.push({
-          source: noteIds[i],
-          target: noteIds[i+1],
-          type: 'col'
-        });
-      }
-    });
-
     return { nodes, links };
-  }, [data.notes, activeWorkspaceId]);
+  }, [data, activeWorkspaceId]);
 
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
 
@@ -124,54 +142,76 @@ export const BrainMap: React.FC<BrainMapProps> = ({ activeWorkspaceId, onNavigat
 
     // Force Simulation
     const simulation = d3.forceSimulation<GraphNode>(graphData.nodes)
-      .force("link", d3.forceLink<GraphNode, GraphLink>(graphData.links).id(d => d.id).distance(d => d.type === 'tag' ? 120 : 80))
-      .force("charge", d3.forceManyBody().strength(-300))
-      .force("collide", d3.forceCollide().radius(d => typeof d !== 'number' ? (d as GraphNode).val + 20 : 20))
+      .force("link", d3.forceLink<GraphNode, GraphLink>(graphData.links).id(d => d.id).distance(d => {
+        if (d.type === 'tag') return 240;
+        if (d.type === 'parent') return 180;
+        return 140;
+      }))
+      .force("charge", d3.forceManyBody().strength(-500))
+      .force("collide", d3.forceCollide().radius(d => typeof d !== 'number' ? (d as GraphNode).val + 40 : 40).iterations(3))
       .force("center", d3.forceCenter(0, 0))
-      .force("x", d3.forceX().strength(0.05))
-      .force("y", d3.forceY().strength(0.05));
+      .force("x", d3.forceX().strength(0.03))
+      .force("y", d3.forceY().strength(0.03));
       
-    // Apply floating force
+    // Apply very gentle rotation instead of random shaking
     simulation.force("float", () => {
       const alpha = simulation.alpha();
       graphData.nodes.forEach(node => {
-        if (node.fx == null && node.fy == null && node.vx !== undefined && node.vy !== undefined) {
-          node.vx += (Math.random() - 0.5) * alpha * 6;
-          node.vy += (Math.random() - 0.5) * alpha * 6;
+        if (node.fx == null && node.fy == null && node.x !== undefined && node.y !== undefined && node.vx !== undefined && node.vy !== undefined) {
+          // Slow continuous rotation around center
+          const dist = Math.sqrt(node.x * node.x + node.y * node.y) || 1;
+          node.vx += (-node.y / dist) * alpha * 0.5;
+          node.vy += (node.x / dist) * alpha * 0.5;
         }
       });
     });
     
     // Keep simulation running gently
-    simulation.alphaTarget(0.02);
+    simulation.alphaTarget(0.01);
 
     // Draw Links
     const link = g.append("g")
-      .attr("stroke-opacity", 0.6)
+      .attr("stroke-opacity", 0.8)
       .selectAll("line")
       .data(graphData.links)
       .join("line")
-      .attr("stroke", "var(--color-text-primary)")
-      .attr("stroke-width", 1.5)
-      .attr("stroke-dasharray", "none");
+      .attr("stroke", d => d.type === 'tag' ? "var(--color-accent)" : "var(--color-text-secondary)")
+      .attr("stroke-width", d => d.type === 'tag' ? 1.5 : 1)
+      .attr("stroke-dasharray", d => d.type === 'parent' ? "4,4" : "none");
 
     const nodeG = g.append("g")
       .selectAll("g")
       .data(graphData.nodes)
       .join("g")
       .call(d3.drag<SVGGElement, GraphNode>()
-        .on("start", dragstarted)
-        .on("drag", dragged)
-        .on("end", dragended));
+        .on("start", function(event, d) {
+          if (!event.active) simulation.alphaTarget(0.1).restart();
+          d.fx = d.x;
+          d.fy = d.y;
+        })
+        .on("drag", function(event, d) {
+          d.fx = event.x;
+          d.fy = event.y;
+        })
+        .on("end", function(event, d) {
+          if (!event.active) simulation.alphaTarget(0.01);
+          d.fx = null;
+          d.fy = null;
+        }));
 
     // Draw Nodes (Circles)
     nodeG.append("circle")
       .attr("r", d => d.val)
-      .attr("fill", d => d.type === 'tag' ? "rgba(124, 106, 247, 0.15)" : "rgba(59, 130, 246, 0.15)") // Less colored, transparent
-      .attr("stroke", d => d.type === 'tag' ? "rgba(124, 106, 247, 0.8)" : "rgba(59, 130, 246, 0.8)")
-      .attr("stroke-width", 1.5)
+      .attr("fill", d => {
+        if (d.type === 'workspace') return "var(--color-text-primary)";
+        if (d.type === 'collection') return "var(--color-text-secondary)";
+        if (d.type === 'tag') return "var(--color-accent)";
+        return "rgba(59, 130, 246, 0.4)";
+      })
+      .attr("stroke", "none")
+      .attr("stroke-width", 0)
       .attr("cursor", "pointer")
-      .style("filter", "drop-shadow(0px 4px 6px rgba(0, 0, 0, 0.1))")
+      .style("filter", d => d.type === 'workspace' ? "none" : "drop-shadow(0px 4px 6px rgba(0, 0, 0, 0.1))")
       .on("click", (event, d) => {
         if (d.type === 'note' && d.noteRef) {
           onNavigateToNote(d.noteRef.id, d.noteRef.collectionId, d.noteRef.workspaceId);
@@ -183,7 +223,11 @@ export const BrainMap: React.FC<BrainMapProps> = ({ activeWorkspaceId, onNavigat
       .text(d => d.label)
       .attr("y", d => d.val + 15)
       .attr("text-anchor", "middle")
-      .attr("font-size", d => d.type === 'tag' ? "12px" : "10px")
+      .attr("font-size", d => {
+        if (d.type === 'workspace') return "14px";
+        if (d.type === 'collection' || d.type === 'tag') return "12px";
+        return "10px";
+      })
       .attr("font-weight", d => d.type === 'tag' ? "bold" : "normal")
       .attr("fill", d => d.type === 'tag' ? "var(--color-accent)" : "var(--color-text-primary)")
       .attr("pointer-events", "none")
@@ -200,29 +244,33 @@ export const BrainMap: React.FC<BrainMapProps> = ({ activeWorkspaceId, onNavigat
         .attr("transform", d => `translate(${d.x},${d.y})`);
     });
 
-    // Drag functions
-    function dragstarted(event: d3.D3DragEvent<SVGGElement, GraphNode, GraphNode>, d: GraphNode) {
-      if (!event.active) simulation.alphaTarget(0.3).restart();
-      d.fx = d.x;
-      d.fy = d.y;
-    }
-
-    function dragged(event: d3.D3DragEvent<SVGGElement, GraphNode, GraphNode>, d: GraphNode) {
-      d.fx = event.x;
-      d.fy = event.y;
-    }
-
-    function dragended(event: d3.D3DragEvent<SVGGElement, GraphNode, GraphNode>, d: GraphNode) {
-      if (!event.active) simulation.alphaTarget(0);
-      d.fx = null;
-      d.fy = null;
-    }
-
     // Cleanup
     return () => {
       simulation.stop();
     };
   }, [graphData, onNavigateToNote]);
+
+  const handleExportSVG = () => {
+    if (!svgRef.current) return;
+    const svgClone = svgRef.current.cloneNode(true) as SVGSVGElement;
+    const serializer = new XMLSerializer();
+    let source = serializer.serializeToString(svgClone);
+    if (!source.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)) {
+        source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+    }
+    if (!source.match(/^<svg[^>]+"http\:\/\/www\.w3\.org\/1999\/xlink"/)) {
+        source = source.replace(/^<svg/, '<svg xmlns:xlink="http://www.w3.org/1999/xlink"');
+    }
+    source = '<?xml version="1.0" standalone="no"?>\r\n' + source;
+    const url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(source);
+    
+    const element = document.createElement("a");
+    element.href = url;
+    element.download = "brain-map.svg";
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
 
   const handleZoom = (factor: number) => {
     if (!svgRef.current || !zoomRef.current) return;
@@ -246,15 +294,19 @@ export const BrainMap: React.FC<BrainMapProps> = ({ activeWorkspaceId, onNavigat
       </div>
 
       <div className="absolute top-4 right-4 z-10 flex items-center gap-1 bg-surface/80 backdrop-blur-sm p-1 rounded-lg border border-border shadow-sm">
-        <button className="p-2 hover:bg-surface border-border rounded-md text-text-muted hover:text-text-primary transition-colors" onClick={() => handleZoom(1.2)}>
+        <button className="p-2 hover:bg-surface border-border rounded-md text-text-muted hover:text-text-primary transition-colors" onClick={() => handleZoom(1.2)} title="Zoom In">
           <ZoomIn size={16} />
         </button>
-        <button className="p-2 hover:bg-surface border-border rounded-md text-text-muted hover:text-text-primary transition-colors" onClick={() => handleZoom(0.8)}>
+        <button className="p-2 hover:bg-surface border-border rounded-md text-text-muted hover:text-text-primary transition-colors" onClick={() => handleZoom(0.8)} title="Zoom Out">
           <ZoomOut size={16} />
         </button>
         <div className="w-px h-4 bg-border mx-1"></div>
-        <button className="p-2 hover:bg-surface border-border rounded-md text-text-muted hover:text-text-primary transition-colors" onClick={handleReset}>
+        <button className="p-2 hover:bg-surface border-border rounded-md text-text-muted hover:text-text-primary transition-colors" onClick={handleReset} title="Reset View">
           <Maximize size={16} />
+        </button>
+        <div className="w-px h-4 bg-border mx-1"></div>
+        <button className="p-2 hover:bg-surface border-border rounded-md text-text-muted hover:text-text-primary transition-colors" onClick={handleExportSVG} title="Export SVG">
+          <Download size={16} />
         </button>
         <div className="w-px h-4 bg-border mx-1"></div>
         <button title="Exit Brain Map" className="p-2 hover:bg-red-500/10 hover:text-red-500 border-border rounded-md text-text-muted transition-colors" onClick={onClose}>

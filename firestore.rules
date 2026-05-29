@@ -55,36 +55,38 @@ service cloud.firestore {
              data.updatedAt is string &&
              data.wordCount is number &&
              (data.keys().hasAll(['headerMeta']) == false || data.headerMeta is map) &&
-             (data.keys().hasAll(['images']) == false || data.images is list);
+             (data.keys().hasAll(['images']) == false || data.images is list) &&
+             (data.keys().hasAll(['attachments']) == false || data.attachments is list) &&
+             (data.keys().hasAll(['charts']) == false || data.charts is list);
     }
 
     match /users/{userId} {
       match /settings/{settingId} {
-        allow get, list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow get, list: if isOwner(userId);
         allow create: if isOwner(userId) && isValidId(settingId) && isValidUserSetting(incoming()) && incoming().userId == userId && incoming().keys().size() <= 5;
-        allow update: if isOwner(userId) && isValidId(settingId) && isValidUserSetting(incoming()) && incoming().userId == existing().userId && incoming().diff(existing()).affectedKeys().hasOnly(['settings', 'tags', 'updatedAt']);
-        allow delete: if isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow update: if isOwner(userId) && isValidId(settingId) && isValidUserSetting(incoming()) && incoming().userId == existing().userId && incoming().diff(existing()).affectedKeys().hasOnly(['settings', 'tags', 'updatedAt', 'userId']);
+        allow delete: if isOwner(userId);
       }
       
       match /workspaces/{workspaceId} {
-        allow get, list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow get, list: if isOwner(userId);
         allow create: if isOwner(userId) && isValidId(workspaceId) && isValidWorkspace(incoming()) && incoming().userId == userId && incoming().keys().size() <= 6;
-        allow update: if isOwner(userId) && isValidId(workspaceId) && isValidWorkspace(incoming()) && incoming().userId == existing().userId && incoming().id == existing().id && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'icon', 'order']);
-        allow delete: if isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow update: if isOwner(userId) && isValidId(workspaceId) && isValidWorkspace(incoming()) && incoming().userId == existing().userId && incoming().id == existing().id && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'icon', 'order', 'userId']);
+        allow delete: if isOwner(userId);
       }
 
       match /collections/{collectionId} {
-        allow get, list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow get, list: if isOwner(userId);
         allow create: if isOwner(userId) && isValidId(collectionId) && isValidCollection(incoming()) && incoming().userId == userId && incoming().keys().size() <= 7;
-        allow update: if isOwner(userId) && isValidId(collectionId) && isValidCollection(incoming()) && incoming().userId == existing().userId && incoming().id == existing().id && incoming().workspaceId == existing().workspaceId && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'icon', 'order']);
-        allow delete: if isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow update: if isOwner(userId) && isValidId(collectionId) && isValidCollection(incoming()) && incoming().userId == existing().userId && incoming().id == existing().id && incoming().workspaceId == existing().workspaceId && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'icon', 'order', 'userId']);
+        allow delete: if isOwner(userId);
       }
 
       match /notes/{noteId} {
-        allow get, list: if isOwner(userId) && resource.data.userId == request.auth.uid;
-        allow create: if isOwner(userId) && isValidId(noteId) && isValidNote(incoming()) && incoming().userId == userId && incoming().keys().size() <= 15;
-        allow update: if isOwner(userId) && isValidId(noteId) && isValidNote(incoming()) && incoming().userId == existing().userId && incoming().id == existing().id && incoming().diff(existing()).affectedKeys().hasOnly(['workspaceId', 'collectionId', 'title', 'content', 'tags', 'pinned', 'starred', 'updatedAt', 'wordCount', 'headerMeta', 'images']);
-        allow delete: if isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(noteId) && isValidNote(incoming()) && incoming().userId == userId && incoming().keys().size() <= 17;
+        allow update: if isOwner(userId) && isValidId(noteId) && isValidNote(incoming()) && incoming().userId == existing().userId && incoming().id == existing().id && incoming().diff(existing()).affectedKeys().hasOnly(['workspaceId', 'collectionId', 'title', 'content', 'tags', 'pinned', 'starred', 'updatedAt', 'wordCount', 'headerMeta', 'images', 'attachments', 'charts', 'userId']);
+        allow delete: if isOwner(userId);
       }
     }
   }

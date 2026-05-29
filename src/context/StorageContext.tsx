@@ -368,16 +368,18 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return n;
       });
       
-      // Update global tags
-      const allTags = new Set(prevData.tags);
-      if (updates.tags) {
-        updates.tags.forEach(t => allTags.add(t));
-      }
+      // Recalculate global tags properly
+      const allTags = new Set<string>();
+      newNotes.forEach((n: Note) => {
+        if (n.tags) {
+           n.tags.forEach((t: string) => allTags.add(t));
+        }
+      });
 
       const newData = { ...prevData, notes: newNotes, tags: Array.from(allTags) };
       
       // We manually handle saveData's duties here to get the correct prevData
-      setHistory(prevHist => [prevData, ...prevHist].slice(0, 20));
+      setHistory((prevHist: NoteVaultData[]) => [prevData, ...prevHist].slice(0, 20));
       safeStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
       return newData;
     });

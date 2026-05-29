@@ -74,9 +74,10 @@ interface EditorAreaProps {
   isSidebarOpen?: boolean;
   onToggleSidebar?: () => void;
   onNavigateToNote?: (noteId: string, collectionId: string, workspaceId: string) => void;
+  onOpenSettings?: () => void;
 }
 
-export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, onToggleSidebar, onNavigateToNote }) => {
+export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, onToggleSidebar, onNavigateToNote, onOpenSettings }) => {
   const { data, updateNote, addNote, updateSettings, showToast } = useStorage();
   const note = data.notes.find(n => n.id === noteId);
   const settings = data.settings;
@@ -534,7 +535,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
       setTitle(note.title);
       setSource(note.headerMeta?.source || '');
       setSummary(note.headerMeta?.summary || '');
-      setTags(note.tags);
+      setTags(note.tags || []);
     }
   }, [noteId, editor]); // intentionally don't include note.content here to avoid cursor jumping
 
@@ -688,21 +689,35 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
     editor.chain().focus().insertContent({ type: 'wikiLink', attrs: { target: selectedText.trim() } }).insertContent(' ').run();
   };
 
-  const handleAddTag = (e: React.KeyboardEvent) => {
-    if ((e.key === 'Enter' || e.key === ' ') && tagInput.trim()) {
-      e.preventDefault();
-      const newTag = tagInput.trim().toLowerCase().replace(/^#+/, '');
-      if (newTag && !tags.includes(newTag)) {
-        const newTags = [...tags, newTag];
-        setTags(newTags);
-        updateNote(noteId, { tags: newTags });
+  const addTagsFromInput = (input: string) => {
+    const newTagsList = input.split(/[\s,]+/).map(t => t.trim().toLowerCase().replace(/^#+/, '')).filter(Boolean);
+    if (newTagsList.length > 0) {
+      let inserted = false;
+      let currentTags = tags ? [...tags] : [];
+      newTagsList.forEach(newTag => {
+         if (!currentTags.includes(newTag)) {
+           currentTags.push(newTag);
+           inserted = true;
+         }
+      });
+      if (inserted) {
+         setTags(currentTags);
+         updateNote(noteId, { tags: currentTags });
       }
-      setTagInput('');
+    }
+    setTagInput('');
+  };
+
+  const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addTagsFromInput(tagInput);
     }
   };
 
   const removeTag = (tagToRemove: string) => {
-    const newTags = tags.filter(t => t !== tagToRemove);
+    let currentTags = tags ? [...tags] : [];
+    const newTags = currentTags.filter(t => t !== tagToRemove);
     setTags(newTags);
     updateNote(noteId, { tags: newTags });
   };
@@ -711,136 +726,6 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background overflow-hidden relative">
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-background shrink-0 no-print gap-2">
-        <div className="flex items-center gap-2 overflow-x-auto min-w-0">
-          <button 
-            onClick={onToggleSidebar}
-            className="p-1.5 bg-surface hover:bg-surface-hover rounded-md text-text-secondary transition-colors shrink-0"
-            title="Toggle Sidebar"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-          </button>
-          {/* Toolbar */}
-          <div className="flex items-center space-x-1 shrink-0">
-          {isEditing && (
-            <>
-              <ToolbarButton onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} icon={<Undo2 size={16} />} title="Undo (Ctrl+Z)" />
-              <ToolbarButton onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} icon={<Redo2 size={16} />} title="Redo (Ctrl+Shift+Z)" />
-              
-              <div className="w-px h-4 bg-border mx-1"></div>
-
-              <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive('heading', { level: 1 })} icon={<Heading1 size={16} />} />
-              <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive('heading', { level: 2 })} icon={<Heading2 size={16} />} />
-              <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive('heading', { level: 3 })} icon={<Heading3 size={16} />} />
-              
-              <div className="w-px h-4 bg-border mx-1"></div>
-              
-              <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} icon={<Bold size={16} />} />
-              <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} icon={<Italic size={16} />} />
-              <ToolbarButton onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive('underline')} icon={<UnderlineIcon size={16} />} />
-              <ToolbarButton onClick={handleWikiLink} icon={<LinkIcon size={16} />} title="Wiki Link Note" />
-              <ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')} icon={<Quote size={16} />} title="Quote" />
-              
-              <div className="w-px h-4 bg-border mx-1"></div>
-              
-              <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} icon={<List size={16} />} />
-              <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} icon={<ListOrdered size={16} />} />
-              <ToolbarButton onClick={() => editor.chain().focus().toggleTaskList().run()} active={editor.isActive('taskList')} icon={<CheckSquare size={16} />} />
-              
-              <div className="w-px h-4 bg-border mx-1"></div>
-              
-              <ToolbarButton onClick={() => editor.chain().focus().toggleCode().run()} active={editor.isActive('code')} icon={<Code size={16} />} />
-              <ToolbarButton onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')} icon={<FileCode2 size={16} />} />
-              
-              <div className="w-px h-4 bg-border mx-1"></div>
-              
-              <ToolbarButton onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} icon={<TableIcon size={16} />} />
-              <ToolbarButton onClick={() => editor.chain().focus().setHorizontalRule().run()} icon={<Minus size={16} />} />
-              
-              <div className="w-px h-4 bg-border mx-1"></div>
-
-              <ToolbarButton onClick={() => attachmentInputRef.current?.click()} icon={<Paperclip size={16} />} title="Add File" />
-              <ToolbarButton onClick={() => setIsChartBuilderOpen(true)} icon={<BarChart3 size={16} />} title="Add Chart" />
-              <ToolbarButton onClick={() => fileInputRef.current?.click()} icon={<ImageIcon size={16} />} title="Add Image" />
-              
-              <div className="w-px h-4 bg-border mx-1"></div>
-              
-              <button 
-                id="btn-smart-paste"
-                onClick={handleSmartPasteClick}
-                className="flex items-center gap-1.5 px-2.5 py-1 text-sm bg-accent/10 text-accent hover:bg-accent/20 rounded-md font-medium transition-colors h-8"
-              >
-                <Sparkles size={14} />
-                <span>Smart Paste</span>
-              </button>
-            </>
-          )}
-
-          <div className="relative group">
-            <button 
-              id="btn-export-main"
-              className="flex items-center gap-1.5 px-2.5 py-1 text-sm bg-surface-active text-text-primary hover:bg-border rounded-md font-medium transition-colors h-8"
-            >
-              <Download size={14} />
-              <span>Export</span>
-            </button>
-            <div className="absolute top-full right-0 mt-1 w-40 bg-surface border border-border rounded-md shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 py-1">
-              <button 
-                onClick={exportToPdf}
-                disabled={isExporting}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-surface-active flex items-center gap-2"
-              >
-                <FileText size={14} /> PDF Document
-              </button>
-              <button 
-                onClick={exportAsMarkdown}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-surface-active flex items-center gap-2"
-              >
-                <Bot size={14} /> Markdown (.md)
-              </button>
-              <button 
-                onClick={exportAsText}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-surface-active flex items-center gap-2"
-              >
-                <FileText size={14} /> Plain Text (.txt)
-              </button>
-            </div>
-          </div>
-        </div>
-        </div>
-
-        <div className="flex items-center gap-4 shrink-0 no-print">
-          <button 
-            onClick={handleSummarizeNote}
-            disabled={aiSummary.loading}
-            className={`flex items-center gap-1.5 px-2.5 py-1 text-sm bg-surface-active hover:bg-border text-text-primary rounded-md font-medium transition-colors h-8 disabled:opacity-50`}
-            title="Summarize Note via AI"
-          >
-            <Bot size={14} />
-            <span className="hidden sm:inline">Summarize</span>
-          </button>
-
-          <button 
-            onClick={toggleSpeech}
-            className={`flex items-center justify-center w-8 h-8 rounded-md transition-colors ${
-              isSpeaking ? 'bg-accent/20 text-accent' : 'bg-surface-active hover:bg-border text-text-primary'
-            }`}
-            title={isSpeaking ? "Stop Reading" : "Read Aloud (Offline TTS)"}
-          >
-            {isSpeaking ? <VolumeX size={14} /> : <Volume2 size={14} />}
-          </button>
-          
-          <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 bg-surface-active rounded border border-border text-xs text-text-muted h-8">
-            <span className="flex items-center gap-1"><span className="text-text-primary text-[10px] w-3 h-3 flex items-center justify-center bg-border rounded">A</span> {editor.storage.characterCount.characters()}</span>
-            <span className="text-border mx-1">|</span>
-            <span>{editor.storage.characterCount.words()} <span className="hidden lg:inline">words</span></span>
-          </div>
-          <div className="text-xs text-text-muted select-none w-16 text-right">
-            {savedStatus === 'saving' ? 'Saving...' : '✓ Saved'}
-          </div>
-        </div>
-      </div>
-
       <div className="flex-1 overflow-y-auto no-scrollbar relative flex justify-center pb-32 pt-8 print:pt-0">
         <div className="w-full max-w-[720px] px-8 print:px-0" ref={pdfContainerRef}>
           
@@ -900,7 +785,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
 
               <span className="text-text-muted font-medium flex items-center gap-2 pt-1"><span className="text-[1.1em]">🏷️</span> Tags</span>
               <div className="flex flex-wrap gap-2 items-center min-h-7">
-                {tags.map(tag => (
+                {(tags || []).map(tag => (
                   <span key={tag} className="flex items-center gap-1 bg-surface-active px-2 py-0.5 rounded-md text-xs text-text-primary border border-border">
                     {tag}
                     {isEditing && (
@@ -909,14 +794,15 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
                   </span>
                 ))}
                 {isEditing && (
-                  <input
-                    type="text"
-                    value={tagInput}
-                    onChange={(e) => setTagInput(e.target.value)}
-                    onKeyDown={handleAddTag}
-                    placeholder="+ Add tag..."
-                    className="bg-transparent border-none outline-none text-text-muted placeholder:text-surface-active text-xs w-24"
-                  />
+                    <input
+                      type="text"
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      onKeyDown={handleAddTag}
+                      onBlur={() => addTagsFromInput(tagInput)}
+                      placeholder="+ Add tag..."
+                      className="bg-transparent border-none outline-none text-text-muted placeholder:text-surface-active text-xs w-24"
+                    />
                 )}
               </div>
             </div>
@@ -1271,14 +1157,144 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
         </div>
       </div>
       
-      {/* Footer Info */}
-      <div className="h-8 border-t border-border bg-background shrink-0 px-4 flex items-center justify-between text-xs text-text-muted no-print">
-        <div className="flex items-center gap-4">
-          <span>{editor.storage.characterCount.words()} words</span>
-          <span>{Math.max(1, Math.ceil(editor.storage.characterCount.words() / 200))} min read</span>
+      {/* Bottom Toolbar replacing Footer Info */}
+      <div className="flex items-center justify-between px-4 py-2 border-t border-border bg-background shrink-0 no-print gap-2 safe-area-bottom sticky bottom-0 z-50 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] w-full w-[100%] max-w-[100%]">
+        <div className="flex items-center gap-2 overflow-x-auto min-w-0">
+          <button 
+            onClick={onToggleSidebar}
+            className="p-1.5 bg-surface hover:bg-surface-hover rounded-md text-text-secondary transition-colors shrink-0"
+            title="Toggle Sidebar"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+          </button>
+          
+          <div className="flex items-center space-x-1 shrink-0">
+          {isEditing && (
+            <>
+              <ToolbarButton onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} icon={<Undo2 size={16} />} title="Undo (Ctrl+Z)" />
+              <ToolbarButton onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} icon={<Redo2 size={16} />} title="Redo (Ctrl+Shift+Z)" />
+              
+              <div className="w-px h-4 bg-border mx-1"></div>
+
+              <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive('heading', { level: 1 })} icon={<Heading1 size={16} />} />
+              <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive('heading', { level: 2 })} icon={<Heading2 size={16} />} />
+              <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive('heading', { level: 3 })} icon={<Heading3 size={16} />} />
+              
+              <div className="w-px h-4 bg-border mx-1"></div>
+              
+              <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} icon={<Bold size={16} />} />
+              <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} icon={<Italic size={16} />} />
+              <ToolbarButton onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive('underline')} icon={<UnderlineIcon size={16} />} />
+              <ToolbarButton onClick={handleWikiLink} icon={<LinkIcon size={16} />} title="Wiki Link Note" />
+              <ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')} icon={<Quote size={16} />} title="Quote" />
+              
+              <div className="w-px h-4 bg-border mx-1"></div>
+              
+              <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} icon={<List size={16} />} />
+              <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} icon={<ListOrdered size={16} />} />
+              <ToolbarButton onClick={() => editor.chain().focus().toggleTaskList().run()} active={editor.isActive('taskList')} icon={<CheckSquare size={16} />} />
+              
+              <div className="w-px h-4 bg-border mx-1"></div>
+              
+              <ToolbarButton onClick={() => editor.chain().focus().toggleCode().run()} active={editor.isActive('code')} icon={<Code size={16} />} />
+              <ToolbarButton onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')} icon={<FileCode2 size={16} />} />
+              
+              <div className="w-px h-4 bg-border mx-1"></div>
+              
+              <ToolbarButton onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} icon={<TableIcon size={16} />} />
+              <ToolbarButton onClick={() => editor.chain().focus().setHorizontalRule().run()} icon={<Minus size={16} />} />
+              
+              <div className="w-px h-4 bg-border mx-1"></div>
+
+              <ToolbarButton onClick={() => attachmentInputRef.current?.click()} icon={<Paperclip size={16} />} title="Add File" />
+              <ToolbarButton onClick={() => setIsChartBuilderOpen(true)} icon={<BarChart3 size={16} />} title="Add Chart" />
+              <ToolbarButton onClick={() => fileInputRef.current?.click()} icon={<ImageIcon size={16} />} title="Add Image" />
+              
+              <div className="w-px h-4 bg-border mx-1"></div>
+              
+              <button 
+                id="btn-smart-paste"
+                onClick={handleSmartPasteClick}
+                className="flex items-center gap-1.5 px-2.5 py-1 text-sm bg-accent/10 text-accent hover:bg-accent/20 rounded-md font-medium transition-colors h-8"
+              >
+                <Sparkles size={14} />
+                <span>Smart Paste</span>
+              </button>
+            </>
+          )}
+
+          <div className="relative group">
+            <button 
+              id="btn-export-main"
+              className="flex items-center gap-1.5 px-2.5 py-1 text-sm bg-surface-active text-text-primary hover:bg-border rounded-md font-medium transition-colors h-8"
+            >
+              <Download size={14} />
+              <span>Export</span>
+            </button>
+            <div className="absolute bottom-full right-0 mb-1 w-40 bg-surface border border-border rounded-md shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 py-1">
+              <button 
+                onClick={exportToPdf}
+                disabled={isExporting}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-surface-active flex items-center gap-2"
+              >
+                <FileText size={14} /> PDF Document
+              </button>
+              <button 
+                onClick={exportAsMarkdown}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-surface-active flex items-center gap-2"
+              >
+                <Bot size={14} /> Markdown (.md)
+              </button>
+              <button 
+                onClick={exportAsText}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-surface-active flex items-center gap-2"
+              >
+                <FileText size={14} /> Plain Text (.txt)
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-1.5 opacity-60">
-          <Check size={12} /> Auto-saving enabled
+        </div>
+
+        <div className="flex items-center gap-4 shrink-0 no-print">
+          {onOpenSettings && (
+            <button 
+              onClick={onOpenSettings}
+              className="p-1.5 bg-surface hover:bg-surface-hover rounded-md text-text-secondary hover:text-text-primary transition-colors shrink-0"
+              title="Settings"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            </button>
+          )}
+
+          <button 
+            onClick={handleSummarizeNote}
+            disabled={aiSummary.loading}
+            className={`flex items-center gap-1.5 px-2.5 py-1 text-sm bg-surface-active hover:bg-border text-text-primary rounded-md font-medium transition-colors h-8 disabled:opacity-50`}
+            title="Summarize Note via AI"
+          >
+            <Bot size={14} />
+            <span className="hidden sm:inline">Summarize</span>
+          </button>
+
+          <button 
+            onClick={toggleSpeech}
+            className={`flex items-center justify-center w-8 h-8 rounded-md transition-colors ${
+              isSpeaking ? 'bg-accent/20 text-accent' : 'bg-surface-active hover:bg-border text-text-primary'
+            }`}
+            title={isSpeaking ? "Stop Reading" : "Read Aloud (Offline TTS)"}
+          >
+            {isSpeaking ? <VolumeX size={14} /> : <Volume2 size={14} />}
+          </button>
+          
+          <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 bg-surface-active rounded border border-border text-xs text-text-muted h-8">
+            <span className="flex items-center gap-1"><span className="text-text-primary text-[10px] w-3 h-3 flex items-center justify-center bg-border rounded">A</span> {editor.storage.characterCount.characters()}</span>
+            <span className="text-border mx-1">|</span>
+            <span>{editor.storage.characterCount.words()} <span className="hidden lg:inline">words</span></span>
+          </div>
+          <div className="text-xs text-text-muted select-none w-16 text-right">
+            {savedStatus === 'saving' ? 'Saving...' : '✓ Saved'}
+          </div>
         </div>
       </div>
       
@@ -1327,7 +1343,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
       {/* Read/Edit Floating Action Button */}
       <button 
         onClick={() => setIsEditing(!isEditing)}
-        className="fixed bottom-8 right-24 w-14 h-14 bg-surface hover:bg-surface-hover text-text-primary border border-border shadow-[0_8px_30px_rgba(0,0,0,0.1)] rounded-full flex items-center justify-center z-40 transition-transform hover:scale-105 active:scale-95 no-print"
+        className="fixed bottom-[4.5rem] right-24 w-14 h-14 bg-surface hover:bg-surface-hover text-text-primary border border-border shadow-[0_8px_30px_rgba(0,0,0,0.1)] rounded-full flex items-center justify-center z-40 transition-transform hover:scale-105 active:scale-95 no-print"
         title={isEditing ? "Switch to Reading Mode" : "Switch to Editing Mode"}
       >
         {isEditing ? <BookOpen size={20} /> : <Pen size={20} />}
