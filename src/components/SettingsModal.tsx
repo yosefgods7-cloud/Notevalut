@@ -11,7 +11,7 @@ interface SettingsModalProps {
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
-  const { data, updateSettings, clearAllData, syncFromCloud, syncToCloud, isSyncing, importData, showToast, addNote } = useStorage();
+  const { data, updateSettings, clearAllData, syncFromCloud, syncToCloud, isSyncing, importData, showToast, addNote, addWorkspace, updateWorkspace, deleteWorkspace, addCollection, updateCollection, deleteCollection } = useStorage();
   const { user, signIn, signOut } = useAuth();
   const [localSettings, setLocalSettings] = useState<SettingsType>(data.settings);
   const [deleteInput, setDeleteInput] = useState('');
@@ -158,6 +158,142 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
 
         <div className="flex-1 overflow-y-auto p-3 space-y-2 no-scrollbar">
           
+          {/* File Manager */}
+          <div className="border border-border bg-background rounded-xl overflow-hidden">
+            <button onClick={() => toggleSection('FileManager')} className="w-full flex items-center justify-between p-4 hover:bg-surface-active transition-colors">
+              <div className="flex items-center gap-3">
+                <Folder size={18} className="text-yellow-500" />
+                <span className="font-medium text-text-primary text-sm">File Manager</span>
+              </div>
+              <ChevronDown size={16} className={cn("text-text-muted transition-transform", expandedSection === 'FileManager' && "rotate-180")} />
+            </button>
+            {expandedSection === 'FileManager' && (
+              <div className="p-4 border-t border-border space-y-4 bg-surface/30">
+                <div className="flex flex-col gap-4">
+                  <div>
+                    <h4 className="text-xs font-semibold text-text-muted uppercase mb-3 flex items-center justify-between">
+                      <span>Holders</span>
+                      <button 
+                        onClick={() => {
+                          const name = prompt('New Holder Name:');
+                          if (name) {
+                            const icon = prompt('New Holder Icon/Emoji:', '🧠');
+                            addWorkspace(name, icon || '🧠');
+                          }
+                        }}
+                        className="p-1 hover:bg-surface rounded text-accent transition-colors"
+                        title="Add Holder"
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </h4>
+                    <div className="space-y-2">
+                      {data.workspaces.map(w => (
+                        <div key={w.id} className="flex items-center justify-between bg-surface border border-border rounded-lg p-2.5">
+                          <div className="flex items-center gap-3">
+                            <span className="text-lg">{w.icon}</span>
+                            <span className="text-sm font-medium text-text-primary">{w.name}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => {
+                                const newName = prompt('Update Holder Name:', w.name);
+                                if (newName === null) return;
+                                const newIcon = prompt('Update Holder Icon:', w.icon);
+                                updateWorkspace(w.id, { name: newName || w.name, icon: newIcon || w.icon });
+                              }}
+                              className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-active rounded transition-colors"
+                              title="Edit Holder"
+                            >
+                              <Code size={14} className="hidden" /> 
+                              <span className="text-xs font-medium">Edit</span>
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`Are you sure you want to completely delete the holder "${w.name}" and ALL its folders and notes? This cannot be undone.`)) {
+                                  deleteWorkspace(w.id);
+                                }
+                              }}
+                              className="p-1.5 text-text-muted hover:text-red-500 hover:bg-red-500/10 rounded transition-colors"
+                              title="Delete Holder"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="pt-4 border-t border-border">
+                    <h4 className="text-xs font-semibold text-text-muted uppercase mb-3 flex items-center justify-between">
+                      <span>Folders</span>
+                      <button 
+                        onClick={() => {
+                           // Pick a random workspace if there are none, though not likely. Best to offer a select if we wanted, but prompt is simple.
+                           const ws = data.workspaces[0]; 
+                           if (!ws) {
+                              alert("Create a holder first."); return;
+                           }
+                           const name = prompt('New Folder Name:');
+                           if (name) {
+                             const icon = prompt('New Folder Icon/Emoji:', '📁');
+                             // Find active workspace if possible, else use first.
+                             addCollection(ws.id, name, icon || '📁');
+                           }
+                        }}
+                        className="p-1 hover:bg-surface rounded text-accent transition-colors"
+                        title="Add Folder"
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </h4>
+                    <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                      {data.collections.map(c => {
+                        const ws = data.workspaces.find(w => w.id === c.workspaceId);
+                        return (
+                          <div key={c.id} className="flex items-center justify-between bg-surface border border-border rounded-lg p-2.5">
+                            <div className="flex items-center gap-3 overflow-hidden">
+                              <span className="text-lg shrink-0">{c.icon}</span>
+                              <div className="flex flex-col truncate">
+                                <span className="text-sm font-medium text-text-primary truncate">{c.name}</span>
+                                <span className="text-[10px] text-text-muted truncate">in {ws?.name || 'Unknown'}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                onClick={() => {
+                                  const newName = prompt('Update Folder Name:', c.name);
+                                  if (newName === null) return;
+                                  const newIcon = prompt('Update Folder Icon:', c.icon);
+                                  updateCollection(c.id, { name: newName || c.name, icon: newIcon || c.icon });
+                                }}
+                                className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-active rounded transition-colors"
+                                title="Edit Folder"
+                              >
+                                <span className="text-xs font-medium">Edit</span>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (window.confirm(`Are you sure you want to completely delete the folder "${c.name}" and ALL its notes? This cannot be undone.`)) {
+                                    deleteCollection(c.id);
+                                  }
+                                }}
+                                className="p-1.5 text-text-muted hover:text-red-500 hover:bg-red-500/10 rounded transition-colors"
+                                title="Delete Folder"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
           {/* Appearance */}
           <div className="border border-border bg-background rounded-xl overflow-hidden">
             <button onClick={() => toggleSection('Appearance')} className="w-full flex items-center justify-between p-4 hover:bg-surface-active transition-colors">

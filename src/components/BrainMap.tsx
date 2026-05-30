@@ -34,20 +34,32 @@ export const BrainMap: React.FC<BrainMapProps> = ({ activeWorkspaceId, onNavigat
     const nodes: GraphNode[] = [];
     const links: GraphLink[] = [];
     
-    // Add Workspace Node (Main Holder)
-    const activeWorkspace = data.workspaces.find(w => w.id === activeWorkspaceId);
-    if (activeWorkspace) {
+    // Add central "Universe" node to connect all workspaces
+    nodes.push({
+      id: 'universe',
+      type: 'tag', // reuse styling
+      label: 'My Data',
+      val: 5,
+    });
+
+    // All Workspaces (Holders)
+    data.workspaces.forEach(ws => {
       nodes.push({
-        id: `workspace-${activeWorkspace.id}`,
+        id: `workspace-${ws.id}`,
         type: 'workspace',
-        label: activeWorkspace.name,
+        label: ws.name,
         val: 35, // bigger circle
       });
-    }
+      
+      links.push({
+        source: `workspace-${ws.id}`,
+        target: 'universe',
+        type: 'parent'
+      });
+    });
 
-    // Collections in active workspace
-    const workspaceCollections = data.collections.filter(c => c.workspaceId === activeWorkspaceId);
-    workspaceCollections.forEach(col => {
+    // All Collections
+    data.collections.forEach(col => {
       nodes.push({
         id: `collection-${col.id}`,
         type: 'collection',
@@ -58,17 +70,15 @@ export const BrainMap: React.FC<BrainMapProps> = ({ activeWorkspaceId, onNavigat
       // Link Collection -> Workspace
       links.push({
         source: `collection-${col.id}`,
-        target: `workspace-${activeWorkspaceId}`,
+        target: `workspace-${col.workspaceId}`,
         type: 'parent'
       });
     });
 
-    // Notes in active workspace
-    const workspaceNotes = data.notes.filter(n => n.workspaceId === activeWorkspaceId);
-    
+    // All Notes
     const tagSet = new Set<string>();
 
-    workspaceNotes.forEach(note => {
+    data.notes.forEach(note => {
       nodes.push({
         id: `note-${note.id}`,
         type: 'note',
@@ -98,7 +108,7 @@ export const BrainMap: React.FC<BrainMapProps> = ({ activeWorkspaceId, onNavigat
     });
 
     // Links for tags
-    workspaceNotes.forEach(note => {
+    data.notes.forEach(note => {
       note.tags.forEach(tag => {
         links.push({
           source: `note-${note.id}`,
@@ -109,7 +119,7 @@ export const BrainMap: React.FC<BrainMapProps> = ({ activeWorkspaceId, onNavigat
     });
 
     return { nodes, links };
-  }, [data, activeWorkspaceId]);
+  }, [data]);
 
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
 
@@ -158,16 +168,16 @@ export const BrainMap: React.FC<BrainMapProps> = ({ activeWorkspaceId, onNavigat
       const alpha = simulation.alpha();
       graphData.nodes.forEach(node => {
         if (node.fx == null && node.fy == null && node.x !== undefined && node.y !== undefined && node.vx !== undefined && node.vy !== undefined) {
-          // Slow continuous rotation around center
+          // Slow continuous rotation around center like a universe
           const dist = Math.sqrt(node.x * node.x + node.y * node.y) || 1;
-          node.vx += (-node.y / dist) * alpha * 0.5;
-          node.vy += (node.x / dist) * alpha * 0.5;
+          node.vx += (-node.y / dist) * alpha * 1.5;
+          node.vy += (node.x / dist) * alpha * 1.5;
         }
       });
     });
     
     // Keep simulation running gently
-    simulation.alphaTarget(0.01);
+    simulation.alphaTarget(0.02);
 
     // Draw Links
     const link = g.append("g")
@@ -318,10 +328,10 @@ export const BrainMap: React.FC<BrainMapProps> = ({ activeWorkspaceId, onNavigat
         <svg ref={svgRef} className="w-full h-full" style={{ outline: 'none' }} />
       </div>
 
-      {graphData.nodes.length === 0 && (
+      {graphData.nodes.length <= 1 && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <p className="text-text-muted text-sm bg-surface p-4 rounded-lg border border-border shadow-xl">
-             No notes or hashtags found in this workspace. Create notes with hashtags to build the brain map.
+          <p className="text-text-muted text-sm bg-surface p-4 rounded-lg border border-border shadow-xl mx-4 text-center">
+             No notes or features found. Create holders, folders, and notes with hashtags to build the universe brain map.
           </p>
         </div>
       )}
