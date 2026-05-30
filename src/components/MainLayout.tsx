@@ -122,8 +122,28 @@ export const MainLayout: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeWorkspaceId, activeCollectionId, addNote, isExportOpen, isImportOpen, isSettingsOpen]);
 
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.visualViewport) {
+        document.documentElement.style.setProperty('--vh', `${window.visualViewport.height}px`);
+      }
+    };
+    
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleResize);
+      handleResize();
+    }
+    
+    return () => {
+      if (window.visualViewport) window.visualViewport.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
   return (
-    <div className={cn("flex h-screen w-full overflow-hidden bg-background relative text-sm")}>
+    <div 
+      className={cn("flex w-full overflow-hidden bg-background relative text-sm")}
+      style={{ height: 'var(--vh, 100dvh)' }}
+    >
       
       {/* Backdrop Overlay */}
       {isSidebarOpen && (

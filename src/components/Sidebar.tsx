@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useStorage } from '../context/StorageContext';
 import { cn } from '../lib/utils';
-import { Plus, Tag, Settings as SettingsIcon, Download, Upload, Star, Undo2, Network, Menu, Folder } from 'lucide-react';
+import { Plus, Tag, Settings as SettingsIcon, Download, Upload, Star, Undo2, Network, Menu, Folder, Pencil, Trash2, MoreHorizontal, ArrowUp, ArrowDown } from 'lucide-react';
 
 interface SidebarProps {
   activeWorkspaceId: string;
@@ -21,9 +21,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenExport, onOpenImport, onOpenSettings,
   onToggleBrainMap, isBrainMapActive
 }) => {
-  const { data, addCollection, addWorkspace, undo, canUndo } = useStorage();
+  const { data, saveData, addCollection, updateCollection, deleteCollection, addWorkspace, updateWorkspace, deleteWorkspace, undo, canUndo } = useStorage();
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  
+  const [editingWorkspace, setEditingWorkspace] = useState<string | null>(null);
+  const [editingCollection, setEditingCollection] = useState<string | null>(null);
 
   const activeWorkspace = data.workspaces.find(w => w.id === activeWorkspaceId);
   const collections = data.collections.filter(c => c.workspaceId === activeWorkspaceId);
@@ -34,6 +37,110 @@ export const Sidebar: React.FC<SidebarProps> = ({
       const newCol = addCollection(activeWorkspaceId, name, '📁');
       setActiveCollectionId(newCol.id);
     }
+  };
+
+  const handleEditWorkspace = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    const ws = data.workspaces.find(w => w.id === id);
+    if (!ws) return;
+    const name = prompt('Update Holder Name:', ws.name);
+    if (name === null) return;
+    const icon = prompt('Update Holder Icon/Emoji:', ws.icon);
+    if (name || icon) {
+      updateWorkspace(id, { name: name || ws.name, icon: icon || ws.icon });
+    }
+  };
+
+  const handleDeleteWorkspace = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    const ws = data.workspaces.find(w => w.id === id);
+    if (window.confirm(`Are you sure you want to completely delete the holder "${ws?.name}" and ALL its folders and notes? This cannot be undone.`)) {
+      deleteWorkspace(id);
+      if (activeWorkspaceId === id) {
+         setActiveWorkspaceId(data.workspaces[0]?.id || '');
+         setActiveCollectionId(null);
+      }
+    }
+  };
+
+  const handleEditCollection = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    const col = data.collections.find(c => c.id === id);
+    if (!col) return;
+    const name = prompt('Update Folder Name:', col.name);
+    if (name === null) return;
+    const icon = prompt('Update Folder Icon/Emoji:', col.icon);
+    if (name || icon) {
+      updateCollection(id, { name: name || col.name, icon: icon || col.icon });
+    }
+  };
+
+  const handleDeleteCollection = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    const col = data.collections.find(c => c.id === id);
+    if (window.confirm(`Are you sure you want to completely delete the folder "${col?.name}" and ALL its notes? This cannot be undone.`)) {
+      deleteCollection(id);
+      if (activeCollectionId === id) {
+         setActiveCollectionId(null);
+      }
+    }
+  };
+
+  const handleMoveWorkspace = (e: React.MouseEvent, id: string, direction: 'up' | 'down') => {
+    e.stopPropagation();
+    const index = data.workspaces.findIndex(w => w.id === id);
+    if (index === -1) return;
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === data.workspaces.length - 1) return;
+
+    const newWorkspaces = [...data.workspaces];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    const temp = newWorkspaces[index];
+    newWorkspaces[index] = newWorkspaces[targetIndex];
+    newWorkspaces[targetIndex] = temp;
+    
+    // update order properties just in case
+    newWorkspaces.forEach((w, i) => w.order = i);
+
+    saveData({ ...data, workspaces: newWorkspaces });
+  };
+
+  const handleMoveCollection = (e: React.MouseEvent, id: string, direction: 'up' | 'down') => {
+    e.stopPropagation();
+    const colToMove = data.collections.find(c => c.id === id);
+    if (!colToMove) return;
+    
+    const wsCollections = data.collections.filter(c => c.workspaceId === colToMove.workspaceId);
+    const index = wsCollections.findIndex(c => c.id === id);
+    
+    if (index === -1) return;
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === wsCollections.length - 1) return;
+
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    const temp = wsCollections[index];
+    wsCollections[index] = wsCollections[targetIndex];
+    wsCollections[targetIndex] = temp;
+    
+    // Rebuild global collections array with new order for this workspace
+    const newCollections = data.collections.map(c => {
+      if (c.workspaceId === colToMove.workspaceId) {
+        const newIndex = wsCollections.findIndex(wsc => wsc.id === c.id);
+        return { ...c, order: newIndex };
+      }
+      return c;
+    }).sort((a, b) => {
+      if (a.workspaceId === b.workspaceId) return (a.order || 0) - (b.order || 0);
+      return 0; // maintain relative workspace chunk (not actually strict, but good enough since we filter)
+    });
+    
+    // To strictly sort by new order without messing up the array
+    const finalList = [
+       ...data.collections.filter(c => c.workspaceId !== colToMove.workspaceId),
+       ...wsCollections
+    ];
+
+    saveData({ ...data, collections: finalList });
   };
 
   return (
@@ -54,31 +161,69 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="relative">
             <button 
               onClick={() => setIsWorkspaceOpen(!isWorkspaceOpen)}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-md hover:bg-surface-hover text-text-primary"
+              className="w-full flex items-center justify-between px-3 py-2 rounded-md hover:bg-surface-hover text-text-primary group"
             >
               <span className="flex items-center gap-2">
                 <Folder size={16} />
                 <span className="truncate">{activeWorkspace?.name || 'Workspace'}</span>
               </span>
-              <span className="text-xs text-text-muted">▼</span>
+              <span className="flex items-center gap-2">
+                {activeWorkspaceId && (
+                  <span 
+                    onClick={(e) => { e.stopPropagation(); setEditingWorkspace(activeWorkspaceId); }}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center"
+                  >
+                    <MoreHorizontal size={14} className="text-text-muted hover:text-text-primary" />
+                  </span>
+                )}
+                <span className="text-xs text-text-muted">▼</span>
+              </span>
             </button>
+            
+            {editingWorkspace === activeWorkspaceId && activeWorkspaceId && (
+               <div className="flex items-center gap-1 bg-surface-hover rounded-md p-1 mx-3 mb-1 justify-end">
+                   <button onClick={(e) => handleMoveWorkspace(e, activeWorkspaceId, 'up')} className="hover:bg-surface p-1 rounded text-text-secondary hover:text-text-primary" title="Move Up"><ArrowUp size={14} /></button>
+                   <button onClick={(e) => handleMoveWorkspace(e, activeWorkspaceId, 'down')} className="hover:bg-surface p-1 rounded text-text-secondary hover:text-text-primary" title="Move Down"><ArrowDown size={14} /></button>
+                   <div className="w-px h-4 bg-border mx-1"></div>
+                   <button onClick={(e) => { handleEditWorkspace(e, activeWorkspaceId); setEditingWorkspace(null); }} className="hover:bg-surface p-1 rounded text-text-secondary hover:text-text-primary" title="Edit"><Pencil size={14} /></button>
+                   <button onClick={(e) => { handleDeleteWorkspace(e, activeWorkspaceId); setEditingWorkspace(null); }} className="hover:bg-red-500/10 p-1 rounded text-red-500" title="Delete"><Trash2 size={14} /></button>
+               </div>
+            )}
             
             {isWorkspaceOpen && (
               <div className="absolute z-50 top-full left-0 w-full mt-1 bg-surface border border-border rounded-lg shadow-xl py-1">
                 {data.workspaces.map(w => (
-                  <button
-                    key={w.id}
-                    onClick={() => {
-                      setActiveWorkspaceId(w.id);
-                      const firstCol = data.collections.find(c => c.workspaceId === w.id);
-                      setActiveCollectionId(firstCol ? firstCol.id : null);
-                      setIsWorkspaceOpen(false);
-                    }}
-                    className={cn("w-full flex items-center gap-2 px-4 py-2 hover:bg-surface-hover text-sm", w.id === activeWorkspaceId ? "text-accent bg-accent-transparent" : "text-text-primary")}
-                  >
-                    <span>{w.icon}</span>
-                    <span>{w.name}</span>
-                  </button>
+                  <div key={w.id} className="relative group flex flex-col">
+                    <button
+                      onClick={() => {
+                        setActiveWorkspaceId(w.id);
+                        const firstCol = data.collections.find(c => c.workspaceId === w.id);
+                        setActiveCollectionId(firstCol ? firstCol.id : null);
+                        setIsWorkspaceOpen(false);
+                      }}
+                      className={cn("w-full flex items-center justify-between px-4 py-2 hover:bg-surface-hover text-sm", w.id === activeWorkspaceId ? "text-accent bg-accent-transparent" : "text-text-primary")}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span>{w.icon}</span>
+                        <span className="truncate">{w.name}</span>
+                      </span>
+                      <span 
+                        onClick={(e) => { e.stopPropagation(); setEditingWorkspace(editingWorkspace === w.id ? null : w.id); }}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-surface rounded-md"
+                      >
+                         <MoreHorizontal size={14} className="text-text-muted hover:text-text-primary" />
+                      </span>
+                    </button>
+                    {editingWorkspace === w.id && (
+                      <div className="flex items-center gap-1 bg-surface-active px-4 py-1 justify-end border-b border-border/50">
+                         <button onClick={(e) => handleMoveWorkspace(e, w.id, 'up')} className="hover:bg-surface p-1.5 rounded text-text-secondary hover:text-text-primary" title="Move Up"><ArrowUp size={14} /></button>
+                         <button onClick={(e) => handleMoveWorkspace(e, w.id, 'down')} className="hover:bg-surface p-1.5 rounded text-text-secondary hover:text-text-primary" title="Move Down"><ArrowDown size={14} /></button>
+                         <div className="w-px h-4 bg-border mx-1"></div>
+                         <button onClick={(e) => { handleEditWorkspace(e, w.id); setEditingWorkspace(null); }} className="hover:bg-surface p-1.5 rounded text-text-secondary hover:text-text-primary" title="Edit"><Pencil size={14} /></button>
+                         <button onClick={(e) => { handleDeleteWorkspace(e, w.id); setEditingWorkspace(null); }} className="hover:bg-red-500/10 p-1.5 rounded text-red-500" title="Delete"><Trash2 size={14} /></button>
+                      </div>
+                    )}
+                  </div>
                 ))}
                 <div className="border-t border-border mt-1 pt-1">
                   <button
@@ -159,17 +304,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span className="truncate">Starred</span>
             </button>
             {collections.map(c => (
-              <button
-                key={c.id}
-                onClick={() => setActiveCollectionId(c.id)}
-                className={cn(
-                  "w-full flex items-center gap-3 px-3 py-1.5 rounded-md text-sm transition-colors",
-                  activeCollectionId === c.id ? "bg-surface-active text-text-primary font-medium" : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+              <div key={c.id} className="flex flex-col group relative">
+                <button
+                  onClick={() => setActiveCollectionId(c.id)}
+                  className={cn(
+                    "w-full flex items-center justify-between px-3 py-1.5 rounded-md text-sm transition-colors",
+                    activeCollectionId === c.id ? "bg-surface-active text-text-primary font-medium" : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                  )}
+                >
+                  <span className="flex items-center gap-3 overflow-hidden">
+                    <span className="text-lg leading-none shrink-0">{c.icon}</span>
+                    <span className="truncate">{c.name}</span>
+                  </span>
+                  <span 
+                     onClick={(e) => { e.stopPropagation(); setEditingCollection(editingCollection === c.id ? null : c.id); }}
+                     className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-surface rounded-md"
+                  >
+                     <MoreHorizontal size={14} className="text-text-muted hover:text-text-primary" />
+                  </span>
+                </button>
+                {editingCollection === c.id && (
+                  <div className="flex items-center gap-1 bg-surface-active px-3 py-1 justify-end rounded-md mt-0.5">
+                     <button onClick={(e) => handleMoveCollection(e, c.id, 'up')} className="hover:bg-surface p-1.5 rounded-md text-text-secondary hover:text-text-primary" title="Move Up"><ArrowUp size={14} /></button>
+                     <button onClick={(e) => handleMoveCollection(e, c.id, 'down')} className="hover:bg-surface p-1.5 rounded-md text-text-secondary hover:text-text-primary" title="Move Down"><ArrowDown size={14} /></button>
+                     <div className="w-px h-4 bg-border mx-1"></div>
+                     <button onClick={(e) => { handleEditCollection(e, c.id); setEditingCollection(null); }} className="hover:bg-surface p-1.5 rounded-md text-text-secondary hover:text-text-primary" title="Edit"><Pencil size={14} /></button>
+                     <button onClick={(e) => { handleDeleteCollection(e, c.id); setEditingCollection(null); }} className="hover:bg-red-500/10 p-1.5 rounded-md text-red-500" title="Delete"><Trash2 size={14} /></button>
+                  </div>
                 )}
-              >
-                <span className="text-lg leading-none shrink-0">{c.icon}</span>
-                <span className="truncate">{c.name}</span>
-              </button>
+              </div>
             ))}
           </div>
         </div>
