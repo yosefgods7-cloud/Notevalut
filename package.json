@@ -37,6 +37,7 @@
     "file-saver": "^2.0.5",
     "firebase": "^12.12.1",
     "html2pdf.js": "^0.14.0",
+    "idb-keyval": "^6.2.4",
     "jszip": "^3.10.1",
     "lucide-react": "^0.546.0",
     "marked": "^18.0.2",

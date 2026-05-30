@@ -4,6 +4,7 @@ import { generateId } from '../lib/utils';
 import { useAuth } from './AuthContext';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { doc, setDoc, deleteDoc, writeBatch, collection, onSnapshot, query, getDocs } from 'firebase/firestore';
+import { get, set, del } from 'idb-keyval';
 
 const STORAGE_KEY = 'notevault_data';
 
@@ -71,58 +72,14 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [isSyncing, setIsSyncing] = useState(false);
   const { user } = useAuth();
   const [history, setHistory] = useState<NoteVaultData[]>([]);
+  const [isInitialized, setIsInitialized] = useState(false);
 
-  const [data, setData] = useState<NoteVaultData>(() => {
-    try {
-      const stored = safeStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        let parsed = JSON.parse(stored) as Partial<NoteVaultData>;
-        
-        const now = new Date().toISOString();
-        const defaultWsId = generateId();
-
-        const migratedData: NoteVaultData = {
-          version: parsed.version || 1,
-          workspaces: parsed.workspaces?.length ? parsed.workspaces : [{ id: defaultWsId, name: 'My Notes', icon: '🧠', createdAt: now, order: 0 }],
-          collections: parsed.collections || [],
-          notes: parsed.notes || [],
-          tags: parsed.tags || [],
-          settings: { ...DEFAULT_SETTINGS, ...(parsed.settings || {}) },
-        };
-        
-        return migratedData;
-      }
-    } catch (e) {
-      console.error('Failed to parse NoteVault data from localStorage', e);
-    }
-    
-    const workspaceId = generateId();
-    const collectionId = generateId();
-    const now = new Date().toISOString();
-    
-    const initialData: NoteVaultData = {
+  const [data, setData] = useState<NoteVaultData>(() => ({
       ...DEFAULT_DATA,
-      workspaces: [{ id: workspaceId, name: 'My Notes', icon: '🧠', createdAt: now, order: 0 }],
-      collections: [{ id: collectionId, workspaceId, name: 'Quick Notes', icon: '⚡', createdAt: now, order: 0 }],
-      settings: { ...DEFAULT_SETTINGS, defaultWorkspace: workspaceId },
-      notes: [{
-        id: generateId(),
-        workspaceId,
-        collectionId,
-        title: 'Welcome to NoteVault',
-        content: '<p>This is your private, offline-first note system.</p><p>Try the <strong>Smart Paste</strong> capability using <code>Cmd/Ctrl + Shift + V</code> to instantly clean up AI-generated text.</p>',
-        tags: ['welcome'],
-        pinned: true,
-        starred: true,
-        createdAt: now,
-        updatedAt: now,
-        wordCount: 20,
-      }]
-    };
-    
-    safeStorage.setItem(STORAGE_KEY, JSON.stringify(initialData));
-    return initialData;
-  });
+      workspaces: [{ id: 'temp', name: 'Loading...', icon: '🧠', createdAt: new Date().toISOString(), order: 0 }],
+      collections: [],
+      notes: [],
+  }));
 
   const [toast, setToast] = useState<string | null>(null);
   const showToast = useCallback((msg: string) => {
@@ -130,20 +87,109 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setTimeout(() => setToast(null), 2500);
   }, []);
 
-  const saveData = useCallback((newData: NoteVaultData, skipHistory = false) => {
+  const saveData = useCallback(async (newData: NoteVaultData, skipHistory = false) => {
     if (!skipHistory) {
       setHistory(prev => [data, ...prev].slice(0, 20));
     }
     setData(newData);
-    safeStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
+    try {
+      await set(STORAGE_KEY, JSON.stringify(newData));
+    } catch (e) {
+      console.warn("Failed to write to IndexedDB, fallback to localStorage");
+      safeStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
+    }
   }, [data]);
 
-  const undo = useCallback(() => {
+  useEffect(() => {
+    const initStorage = async () => {
+        let storedData: string | undefined;
+        
+        try {
+           storedData = await get(STORAGE_KEY);
+        } catch(e) {
+           console.error("Failed to read from IndexedDB", e);
+        }
+
+        // Migrate from localStorage to IndexedDB
+        if (!storedData) {
+            const localStored = safeStorage.getItem(STORAGE_KEY);
+            if (localStored) {
+                storedData = localStored;
+                try {
+                  await set(STORAGE_KEY, localStored);
+                  safeStorage.removeItem(STORAGE_KEY);
+                  console.log("Migrated data from localStorage to IndexedDB");
+                } catch(e) {}
+            }
+        }
+        
+        const now = new Date().toISOString();
+        if (storedData) {
+            try {
+                let parsed = JSON.parse(storedData) as Partial<NoteVaultData>;
+                const defaultWsId = generateId();
+                const migratedData: NoteVaultData = {
+                  version: parsed.version || 1,
+                  workspaces: parsed.workspaces?.length ? parsed.workspaces : [{ id: defaultWsId, name: 'My Notes', icon: '🧠', createdAt: now, order: 0 }],
+                  collections: parsed.collections || [],
+                  notes: parsed.notes || [],
+                  tags: parsed.tags || [],
+                  settings: { ...DEFAULT_SETTINGS, ...(parsed.settings || {}) },
+                };
+                setData(migratedData);
+                setIsInitialized(true);
+                return;
+            } catch (e) {
+               console.error('Failed to parse NoteVault data', e);
+            }
+        }
+        
+        // Initial setup if no data exists
+        const workspaceId = generateId();
+        const collectionId = generateId();
+        
+        const initialData: NoteVaultData = {
+          ...DEFAULT_DATA,
+          workspaces: [{ id: workspaceId, name: 'My Notes', icon: '🧠', createdAt: now, order: 0 }],
+          collections: [{ id: collectionId, workspaceId, name: 'Quick Notes', icon: '⚡', createdAt: now, order: 0 }],
+          settings: { ...DEFAULT_SETTINGS, defaultWorkspace: workspaceId },
+          notes: [{
+            id: generateId(),
+            workspaceId,
+            collectionId,
+            title: 'Welcome to NoteVault',
+            content: '<p>This is your private, offline-first note system.</p><p>Try the <strong>Smart Paste</strong> capability using <code>Cmd/Ctrl + Shift + V</code> to instantly clean up AI-generated text.</p>',
+            tags: ['welcome'],
+            pinned: true,
+            starred: true,
+            createdAt: now,
+            updatedAt: now,
+            wordCount: 20,
+          }]
+        };
+        
+        setData(initialData);
+        try {
+           await set(STORAGE_KEY, JSON.stringify(initialData));
+        } catch(e) {
+           safeStorage.setItem(STORAGE_KEY, JSON.stringify(initialData));
+        }
+        setIsInitialized(true);
+    };
+    
+    initStorage();
+  }, []);
+
+  const undo = useCallback(async () => {
     if (history.length === 0) return;
     const previous = history[0];
     setHistory(prev => prev.slice(1));
     setData(previous);
-    safeStorage.setItem(STORAGE_KEY, JSON.stringify(previous));
+    try {
+        await set(STORAGE_KEY, JSON.stringify(previous));
+    } catch(e) {
+        safeStorage.setItem(STORAGE_KEY, JSON.stringify(previous));
+    }
     showToast('Action Undone');
   }, [history, showToast]);
 
@@ -339,6 +385,8 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [data, saveData]);
 
   const updateNote = useCallback((id: string, updates: Partial<Note>) => {
+    let finalUpdates: Partial<Note> = { ...updates, updatedAt: new Date().toISOString() };
+    
     setData(prevData => {
       let targetCollectionId: string | null = null;
       let targetWorkspaceId: string | null = null;
@@ -356,14 +404,14 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
       }
 
+      if (targetCollectionId && targetWorkspaceId) {
+         finalUpdates.collectionId = targetCollectionId;
+         finalUpdates.workspaceId = targetWorkspaceId;
+      }
+
       const newNotes = prevData.notes.map(n => {
         if (n.id === id) {
-           const merged = { ...n, ...updates, updatedAt: new Date().toISOString() };
-           if (targetCollectionId && targetWorkspaceId) {
-              merged.collectionId = targetCollectionId;
-              merged.workspaceId = targetWorkspaceId;
-           }
-           return merged;
+           return { ...n, ...finalUpdates };
         }
         return n;
       });
@@ -383,7 +431,14 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       safeStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
       return newData;
     });
-  }, []);
+
+    // Auto-update specific fields in firebase with precision
+    if (user) {
+      setDoc(doc(db, `users/${user.uid}/notes/${id}`), finalUpdates, { merge: true }).catch(err => {
+        console.error("Firebase precise update failed", err);
+      });
+    }
+  }, [user]);
 
   const deleteNote = useCallback(async (id: string) => {
     saveData({
@@ -417,8 +472,11 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [data, saveData, user]);
 
-  const clearAllData = useCallback(() => {
+  const clearAllData = useCallback(async () => {
     safeStorage.removeItem(STORAGE_KEY);
+    try {
+      await del(STORAGE_KEY);
+    } catch(e) {}
     window.location.reload();
   }, []);
 
@@ -435,6 +493,8 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       saveData(importedData);
     }
   }, [data, saveData]);
+
+  if (!isInitialized) return null;
 
   return (
     <StorageContext.Provider value={{

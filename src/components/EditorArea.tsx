@@ -78,7 +78,7 @@ interface EditorAreaProps {
 }
 
 export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, onToggleSidebar, onNavigateToNote, onOpenSettings }) => {
-  const { data, updateNote, addNote, updateSettings, showToast } = useStorage();
+  const { data, updateNote, addNote, deleteNote, updateSettings, showToast } = useStorage();
   const note = data.notes.find(n => n.id === noteId);
   const settings = data.settings;
   
@@ -609,18 +609,28 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
     setSavedStatus('saving');
     if (updateTimeoutRef.current) clearTimeout(updateTimeoutRef.current);
     
-    updateTimeoutRef.current = setTimeout(() => {
+    updateTimeoutRef.current = setTimeout(async () => {
       // Version history logic
       try {
-        const currentHistoryStr = localStorage.getItem(`notevault_history_${noteId}`);
-        const history = currentHistoryStr ? JSON.parse(currentHistoryStr) : [];
+        const { get, set } = await import('idb-keyval');
+        const currentHistoryStr = await get(`notevault_history_${noteId}`);
+        let history = currentHistoryStr ? JSON.parse(currentHistoryStr) : [];
+        if (!history.length) {
+            const ls = localStorage.getItem(`notevault_history_${noteId}`);
+            if (ls) {
+               history = JSON.parse(ls);
+               await set(`notevault_history_${noteId}`, ls);
+               localStorage.removeItem(`notevault_history_${noteId}`);
+            }
+        }
+        
         const lastVersion = history[0];
         
         // Save version if heavily changed (e.g. > 50 chars diff)
         if (!lastVersion || Math.abs(lastVersion.content.length - content.length) > 50) {
           const newVersion = { timestamp: new Date().toISOString(), content, wordCount };
           const newHistory = [newVersion, ...history].slice(0, 10);
-          localStorage.setItem(`notevault_history_${noteId}`, JSON.stringify(newHistory));
+          await set(`notevault_history_${noteId}`, JSON.stringify(newHistory));
         }
       } catch (e) {
         console.warn('History save failed', e);
@@ -1242,6 +1252,20 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
               </button>
             </div>
           </div>
+          
+          <div className="w-px h-4 bg-border mx-1"></div>
+          
+          <button 
+            onClick={() => {
+              if (window.confirm("Are you sure you want to permanently delete this note from local storage and the cloud?")) {
+                deleteNote(noteId);
+              }
+            }}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-sm bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-md font-medium transition-colors h-8"
+            title="Delete Note"
+          >
+            <Trash2 size={14} />
+          </button>
         </div>
         </div>
 

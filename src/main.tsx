@@ -6,14 +6,10 @@ import './index.css';
 // Register Service Worker
 import { registerSW } from 'virtual:pwa-register';
 
-// Aggressive cache clearing for development/refresh
-if ('caches' in window) {
-  caches.keys().then((names) => {
-    // Clear all caches to force a fresh load
-    names.forEach(name => {
-      if (name.includes('google-fonts-cache') || name.includes('gstatic-fonts-cache')) return;
-      caches.delete(name);
-    });
+// Request persistent storage on app launch
+if (navigator.storage && navigator.storage.persist) {
+  navigator.storage.persist().then(granted => {
+    console.log('Persistent storage granted:', granted);
   });
 }
 

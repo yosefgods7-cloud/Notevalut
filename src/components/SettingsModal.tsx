@@ -68,22 +68,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
       setLocalSettings(data.settings);
       setDeleteInput('');
       
-      try {
-        let total = 0;
-        for (let key in localStorage) {
-          if (localStorage.hasOwnProperty(key)) {
-            total += ((localStorage[key].length + key.length) * 2);
+      const calculateSize = async () => {
+        try {
+          const { entries } = await import('idb-keyval');
+          const allEntries = await entries();
+          let total = 0;
+          for (const [key, value] of allEntries) {
+            const keyStr = String(key);
+            const valStr = typeof value === 'string' ? value : JSON.stringify(value);
+            total += ((valStr.length + keyStr.length) * 2);
           }
+          const kb = total / 1024;
+          if (kb > 1024) {
+            setStorageUsage((kb / 1024).toFixed(2) + ' MB');
+          } else {
+            setStorageUsage(kb.toFixed(2) + ' KB');
+          }
+        } catch (e) {
+          setStorageUsage('Unknown (Storage Access Denied)');
         }
-        const kb = total / 1024;
-        if (kb > 1024) {
-          setStorageUsage((kb / 1024).toFixed(2) + ' MB');
-        } else {
-          setStorageUsage(kb.toFixed(2) + ' KB');
-        }
-      } catch (e) {
-        setStorageUsage('Unknown (Storage Access Denied)');
-      }
+      };
+      
+      calculateSize();
     }
   }, [isOpen, data.settings]);
 

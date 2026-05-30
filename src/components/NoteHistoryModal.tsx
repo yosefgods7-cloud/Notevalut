@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Clock, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
+import { get } from 'idb-keyval';
 
 interface NoteHistoryModalProps {
   isOpen: boolean;
@@ -14,16 +15,25 @@ export const NoteHistoryModal: React.FC<NoteHistoryModalProps> = ({ isOpen, onCl
 
   useEffect(() => {
     if (isOpen) {
-      try {
-        const stored = localStorage.getItem(`notevault_history_${noteId}`);
-        if (stored) {
-          setHistory(JSON.parse(stored));
-        } else {
+      const fetchHistory = async () => {
+        try {
+          const stored = await get(`notevault_history_${noteId}`);
+          if (stored) {
+            setHistory(JSON.parse(stored));
+          } else {
+             // Fallback migration check
+             const ls = localStorage.getItem(`notevault_history_${noteId}`);
+             if (ls) {
+               setHistory(JSON.parse(ls));
+             } else {
+               setHistory([]);
+             }
+          }
+        } catch (e) {
           setHistory([]);
         }
-      } catch (e) {
-        setHistory([]);
-      }
+      };
+      fetchHistory();
     }
   }, [isOpen, noteId]);
 
