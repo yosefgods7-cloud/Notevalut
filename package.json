@@ -13,9 +13,11 @@
   "dependencies": {
     "@google/genai": "^1.50.1",
     "@tailwindcss/vite": "^4.1.14",
+    "@tiptap/extension-bold": "^3.23.6",
     "@tiptap/extension-character-count": "^3.22.5",
     "@tiptap/extension-color": "^3.22.5",
     "@tiptap/extension-image": "^3.22.5",
+    "@tiptap/extension-italic": "^3.23.6",
     "@tiptap/extension-placeholder": "^3.22.5",
     "@tiptap/extension-table": "^3.22.5",
     "@tiptap/extension-table-cell": "^3.22.5",

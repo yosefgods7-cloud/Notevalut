@@ -80,7 +80,7 @@ export interface PluginSettings {
 
 export interface Settings {
   theme: 'dark' | 'light' | 'system';
-  fontSize: 'small' | 'medium' | 'large';
+  fontSize: 'small' | 'medium' | 'large' | 'ultralarge';
   defaultWorkspace: string;
   smartPaste: boolean;
   geminiApiKey?: string;

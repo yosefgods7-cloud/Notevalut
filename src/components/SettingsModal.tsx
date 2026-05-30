@@ -11,11 +11,15 @@ interface SettingsModalProps {
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
-  const { data, updateSettings, clearAllData, syncFromCloud, syncToCloud, isSyncing, importData, showToast } = useStorage();
+  const { data, updateSettings, clearAllData, syncFromCloud, syncToCloud, isSyncing, importData, showToast, addNote } = useStorage();
   const { user, signIn, signOut } = useAuth();
   const [localSettings, setLocalSettings] = useState<SettingsType>(data.settings);
   const [deleteInput, setDeleteInput] = useState('');
   const [storageUsage, setStorageUsage] = useState<string>('0 KB');
+  
+  const [importPendingFile, setImportPendingFile] = useState<{name: string, content: string} | null>(null);
+  const [importTargetWorkspace, setImportTargetWorkspace] = useState(data.workspaces[0]?.id || '');
+  const [importTargetCollection, setImportTargetCollection] = useState(data.collections[0]?.id || '');
   
   const [expandedSection, setExpandedSection] = useState<string | null>('Appearance');
 
@@ -38,10 +42,47 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     showToast('Backup JSON exported successfully');
   };
 
-  const handleImportJson = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDataImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (file.name.endsWith('.txt') || file.name.endsWith('.md')) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const content = event.target?.result as string;
+        let htmlContent = content;
+        
+        // Basic Markdown to HTML conversion if it's md
+        if (file.name.endsWith('.md')) {
+          htmlContent = content
+            .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+            .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+            .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+            .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
+            .replace(/\*(.*)\*/gim, '<em>$1</em>')
+            .replace(/\n\n/g, '<p></p>')
+            .replace(/\n/g, '<br/>');
+        } else {
+          htmlContent = `<p>${content.replace(/\n/g, '<br/>')}</p>`;
+        }
+        
+        let initialWorkspace = data.workspaces[0]?.id || '';
+        let initialCollection = initialWorkspace ? (data.collections.find(c => c.workspaceId === initialWorkspace)?.id || '') : '';
+        
+        setImportTargetWorkspace(initialWorkspace);
+        setImportTargetCollection(initialCollection);
+        
+        setImportPendingFile({
+          name: file.name.replace(/\.[^/.]+$/, ""), // remove extension
+          content: htmlContent
+        });
+      };
+      reader.readAsText(file);
+      e.target.value = '';
+      return;
+    }
+
+    // Default JSON backup restore
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
@@ -141,15 +182,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                   </select>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm">Default Font Size</span>
+                  <span className="text-sm">Note Output Font Size</span>
                   <select 
                     value={localSettings.fontSize}
                     onChange={e => setLocalSettings(s => ({ ...s, fontSize: e.target.value as any }))}
                     className="bg-surface border border-border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:border-accent font-medium"
                   >
-                    <option value="small">Small (14px)</option>
-                    <option value="medium">Medium (16px)</option>
-                    <option value="large">Large (18px)</option>
+                    <option value="small">Small</option>
+                    <option value="medium">Medium</option>
+                    <option value="large">Large</option>
+                    <option value="ultralarge">Ultra Large</option>
                   </select>
                 </div>
               </div>
@@ -484,7 +526,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                     <label className="flex items-center gap-2 p-2.5 bg-surface border border-border rounded-lg hover:border-accent hover:text-accent transition-all cursor-pointer">
                       <Download size={16} />
                       <span className="text-xs font-medium">Import</span>
-                      <input type="file" accept=".json" onChange={handleImportJson} className="hidden" />
+                      <input type="file" accept=".json,.txt,.md" onChange={handleDataImport} className="hidden" />
                     </label>
                   </div>
                 </div>
@@ -529,6 +571,80 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             Apply Settings
           </button>
         </div>
+
+        {importPendingFile && (
+          <div className="absolute inset-0 bg-background/90 backdrop-blur-[2px] rounded-2xl z-50 flex items-center justify-center p-6">
+            <div className="bg-surface border border-border rounded-xl shadow-2xl p-5 w-full max-w-sm">
+              <h3 className="text-lg font-bold text-text-primary mb-3 flex items-center gap-2">
+                <FileJson size={18} /> Import Note
+              </h3>
+              <p className="text-sm text-text-secondary mb-4">
+                Select where to save <strong>{importPendingFile.name}</strong>:
+              </p>
+              
+              <div className="space-y-4 mb-6">
+                <div>
+                  <label className="text-xs font-medium text-text-muted mb-1.5 block">Workspace</label>
+                  <div className="relative">
+                    <select
+                      value={importTargetWorkspace}
+                      onChange={e => {
+                         setImportTargetWorkspace(e.target.value);
+                         setImportTargetCollection(data.collections.find(c => c.workspaceId === e.target.value)?.id || '');
+                      }}
+                      className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm appearance-none focus:outline-none focus:border-accent"
+                    >
+                      {data.workspaces.map(w => (
+                        <option key={w.id} value={w.id}>{w.name}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-2.5 text-text-muted pointer-events-none" size={16} />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-text-muted mb-1.5 block">Folder (Collection)</label>
+                  <div className="relative">
+                    <select
+                      value={importTargetCollection}
+                      onChange={e => setImportTargetCollection(e.target.value)}
+                      className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm appearance-none focus:outline-none focus:border-accent"
+                      disabled={!importTargetWorkspace}
+                    >
+                      {data.collections.filter(c => c.workspaceId === importTargetWorkspace).map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-2.5 text-text-muted pointer-events-none" size={16} />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex gap-2 justify-end">
+                <button 
+                  onClick={() => setImportPendingFile(null)}
+                  className="px-4 py-2 rounded-md hover:bg-surface-active transition-colors text-sm font-medium"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => {
+                    if (importTargetWorkspace && importTargetCollection) {
+                      addNote(importTargetWorkspace, importTargetCollection, importPendingFile.name, importPendingFile.content);
+                      showToast('✓ Note imported');
+                      setImportPendingFile(null);
+                    }
+                  }}
+                  disabled={!importTargetWorkspace || !importTargetCollection}
+                  className="px-4 py-2 bg-accent hover:bg-accent-hover disabled:opacity-50 text-white font-medium rounded-md transition-colors text-sm"
+                >
+                  Import File
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );

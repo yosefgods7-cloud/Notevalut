@@ -86,10 +86,36 @@
     @apply bg-text-muted;
   }
 
+  .editor-size-small {
+    --note-base-size: 0.875rem;
+    --note-h1-size: 1.5rem;
+    --note-h2-size: 1.25rem;
+    --note-h3-size: 1.125rem;
+  }
+  .editor-size-medium {
+    --note-base-size: 1rem;
+    --note-h1-size: 1.875rem;
+    --note-h2-size: 1.5rem;
+    --note-h3-size: 1.25rem;
+  }
+  .editor-size-large {
+    --note-base-size: 1.125rem;
+    --note-h1-size: 2.25rem;
+    --note-h2-size: 1.875rem;
+    --note-h3-size: 1.5rem;
+  }
+  .editor-size-ultralarge {
+    --note-base-size: 1.25rem;
+    --note-h1-size: 2.75rem;
+    --note-h2-size: 2.25rem;
+    --note-h3-size: 1.75rem;
+  }
+
   /* Tiptap styles */
   .ProseMirror {
     outline: none;
-    @apply font-serif text-[1rem] leading-[1.8] text-[var(--doc-text)];
+    @apply font-serif leading-[1.8] text-[var(--doc-text)];
+    font-size: var(--note-base-size, 1rem);
   }
   
   .ProseMirror p.is-editor-empty:first-child::before {
@@ -102,13 +128,16 @@
 
   /* Tiptap elements styling */
   .ProseMirror h1 {
-    @apply font-sans font-bold text-3xl mb-4 mt-8 leading-tight text-[var(--doc-h1)];
+    @apply font-sans font-bold mb-4 mt-8 leading-tight text-[var(--doc-h1)];
+    font-size: var(--note-h1-size, 1.875rem);
   }
   .ProseMirror h2 {
-    @apply font-sans font-semibold text-2xl mb-3 mt-6 leading-tight text-[var(--doc-h2)];
+    @apply font-sans font-semibold mb-3 mt-6 leading-tight text-[var(--doc-h2)];
+    font-size: var(--note-h2-size, 1.5rem);
   }
   .ProseMirror h3 {
-    @apply font-sans font-semibold text-xl mb-2 mt-5 leading-snug text-[var(--doc-h3)];
+    @apply font-sans font-semibold mb-2 mt-5 leading-snug text-[var(--doc-h3)];
+    font-size: var(--note-h3-size, 1.25rem);
   }
   .ProseMirror p {
     @apply mb-4;

@@ -123,10 +123,7 @@ export const MainLayout: React.FC = () => {
   }, [activeWorkspaceId, activeCollectionId, addNote, isExportOpen, isImportOpen, isSettingsOpen]);
 
   return (
-    <div className={cn("flex h-screen w-full overflow-hidden bg-background relative", 
-      data.settings.fontSize === 'small' ? 'text-xs md:text-sm' : 
-      data.settings.fontSize === 'large' ? 'text-base md:text-lg' : 'text-sm'
-    )}>
+    <div className={cn("flex h-screen w-full overflow-hidden bg-background relative text-sm")}>
       
       {/* Backdrop Overlay */}
       {isSidebarOpen && (

@@ -23,28 +23,49 @@ export const TableControls: React.FC<TableControlsProps> = ({ editor }) => {
     const selection = view.state.selection;
     
     let tableNode: HTMLElement | null = null;
-    try {
-      const { $from } = selection;
-      for (let depth = $from.depth; depth > 0; depth--) {
-        if ($from.node(depth).type.name === 'table') {
-          const domAtPos = view.domAtPos($from.before(depth));
-          if (domAtPos && domAtPos.node) {
-             let el = domAtPos.node as HTMLElement;
-             if (el.nodeType !== 1) el = el.parentElement as HTMLElement;
-             if (el.tagName !== 'TABLE') {
-               const table = el.querySelector('table') || el.closest('table');
-               if (table) tableNode = table as HTMLTableElement;
-             } else {
-               tableNode = el as HTMLTableElement;
-             }
+    
+    // First try finding it via native DOM (most reliable for clicks/cursors inside the table)
+    const domSelection = window.getSelection();
+    if (domSelection && domSelection.rangeCount > 0) {
+       let node = domSelection.anchorNode as Node | null;
+       if (node && node.nodeType !== Node.ELEMENT_NODE) {
+          node = node.parentElement;
+       }
+       if (node) {
+          const element = node as HTMLElement;
+          const closestTable = element.closest('table');
+          if (closestTable && editor.view.dom.contains(closestTable)) {
+             tableNode = closestTable;
           }
-          break;
+       }
+    }
+
+    if (!tableNode) {
+      try {
+        const { $from } = selection;
+        for (let depth = $from.depth; depth > 0; depth--) {
+          if ($from.node(depth).type.name === 'table') {
+            const dom = view.nodeDOM($from.before(depth)) as HTMLElement;
+            if (dom) {
+               if (dom.tagName === 'TABLE') {
+                  tableNode = dom;
+               } else {
+                  tableNode = dom.querySelector('table');
+               }
+            }
+            break;
+          }
         }
-      }
-    } catch (e) {}
+      } catch (e) {}
+    }
 
     if (!tableNode && editor.isActive('table')) {
-       tableNode = view.dom.querySelector('.ProseMirror table');
+       // Only fallback if there's exactly one table, else it's wrong to pick the first one 
+       // if we're theoretically in a table but can't find it. 
+       const tables = view.dom.querySelectorAll('.ProseMirror table');
+       if (tables.length === 1) {
+           tableNode = tables[0] as HTMLTableElement;
+       }
     }
 
     if (tableNode) {
@@ -138,23 +159,41 @@ export const TableControls: React.FC<TableControlsProps> = ({ editor }) => {
   };
 
   const hackSelection = (type: 'col'|'row', index: number, callback: () => void) => {
-    const tableRectNode = activeTable.getBoundingClientRect();
-    let x = tableRectNode.left + 5;
-    let y = tableRectNode.top + 5;
-    if (type === 'col') {
-      const col = cols[index];
-      if (col) x += col.left + col.width / 2;
-    } else {
-      const row = rows[index];
-      if (row) y += row.top + row.height / 2;
+    let cell: HTMLElement | null = null;
+    if (activeTable) {
+      if (type === 'col') {
+        const firstRow = activeTable.querySelector('tr');
+        if (firstRow) {
+           const cells = Array.from(firstRow.children) as HTMLElement[];
+           cell = cells[index];
+        }
+      } else {
+        const allRows = Array.from(activeTable.querySelectorAll('tr')) as HTMLElement[];
+        const targetRow = allRows[index];
+        if (targetRow) {
+           const cells = Array.from(targetRow.children) as HTMLElement[];
+           cell = cells[0];
+        }
+      }
     }
-    const pos = editor.view.posAtCoords({ left: x, top: y });
-    if (pos) {
-      editor.chain().focus().setTextSelection(pos.pos).run();
-      requestAnimationFrame(callback);
-    } else {
-      callback();
+
+    if (cell) {
+      const rect = cell.getBoundingClientRect();
+      // Use exactly the center of the target cell
+      const x = rect.left + rect.width / 2;
+      const y = rect.top + rect.height / 2;
+      
+      const pos = editor.view.posAtCoords({ left: x, top: y });
+      if (pos) {
+        editor.chain().focus().setTextSelection(pos.pos).run();
+        // Give the editor a tick to update selection
+        setTimeout(callback, 20);
+        return;
+      }
     }
+    
+    // Fallback if cell not found or coords failed
+    callback();
   };
 
   const handleAction = (action: string) => {

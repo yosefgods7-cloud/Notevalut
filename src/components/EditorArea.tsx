@@ -4,6 +4,8 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
+import TiptapBold from '@tiptap/extension-bold';
+import TiptapItalic from '@tiptap/extension-italic';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import { Table } from '@tiptap/extension-table';
@@ -14,7 +16,7 @@ import CharacterCount from '@tiptap/extension-character-count';
 import Placeholder from '@tiptap/extension-placeholder';
 import ImageResize from 'tiptap-extension-resize-image';
 import { Color } from '@tiptap/extension-color';
-import { TextStyle } from '@tiptap/extension-text-style';
+import { TextStyle as TiptapTextStyle } from '@tiptap/extension-text-style';
 import { FontSize } from '../lib/FontSize';
 import { WikiLink } from '../lib/WikiLink';
 import { cleanAIPaste } from '../lib/paste-cleaner';
@@ -438,8 +440,13 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
-      Underline,
+      StarterKit.configure({
+        bold: false,
+        italic: false,
+      }),
+      TiptapBold.extend({ inclusive: false }),
+      TiptapItalic.extend({ inclusive: false }),
+      Underline.extend({ inclusive: false }),
       TaskList,
       TaskItem.configure({ nested: true }),
       Table.configure({ resizable: true }),
@@ -448,7 +455,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
       TableCell,
       CharacterCount,
       ImageResize,
-      TextStyle,
+      TiptapTextStyle.extend({ inclusive: false }),
       Color,
       FontSize,
       WikiLink,
@@ -604,6 +611,18 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
     URL.revokeObjectURL(url);
     showToast('Text exported');
   }, [editor, note, showToast]);
+
+  const exportAsJson = useCallback(() => {
+    if (!note) return;
+    const blob = new Blob([JSON.stringify(note, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${note.title || 'Untitled_Note'}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('✓ Exported as JSON');
+  }, [note, showToast]);
 
   const handleSaveContent = useCallback((content: string, wordCount: number) => {
     setSavedStatus('saving');
@@ -956,7 +975,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
             </BubbleMenu>
           )}
 
-          <div className="relative" id="editor-container-relative">
+          <div className={`relative editor-size-${settings.fontSize}`} id="editor-container-relative">
             {isEditing && <TableControls editor={editor} />}
             <EditorContent editor={editor} className="min-h-[400px]" />
           </div>
@@ -1221,14 +1240,17 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
               </button>
             </>
           )}
+        </div>
+        </div>
 
+        <div className="flex items-center gap-2 shrink-0 no-print pl-2">
           <div className="relative group">
             <button 
               id="btn-export-main"
               className="flex items-center gap-1.5 px-2.5 py-1 text-sm bg-surface-active text-text-primary hover:bg-border rounded-md font-medium transition-colors h-8"
             >
               <Download size={14} />
-              <span>Export</span>
+              <span className="hidden sm:inline">Export</span>
             </button>
             <div className="absolute bottom-full right-0 mb-1 w-40 bg-surface border border-border rounded-md shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 py-1">
               <button 
@@ -1242,7 +1264,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
                 onClick={exportAsMarkdown}
                 className="w-full text-left px-3 py-2 text-sm hover:bg-surface-active flex items-center gap-2"
               >
-                <Bot size={14} /> Markdown (.md)
+                <FileText size={14} /> Markdown (.md)
               </button>
               <button 
                 onClick={exportAsText}
@@ -1250,10 +1272,14 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
               >
                 <FileText size={14} /> Plain Text (.txt)
               </button>
+              <button 
+                onClick={exportAsJson}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-surface-active flex items-center gap-2"
+              >
+                <FileJson size={14} /> JSON Data
+              </button>
             </div>
           </div>
-          
-          <div className="w-px h-4 bg-border mx-1"></div>
           
           <button 
             onClick={() => {
@@ -1266,10 +1292,9 @@ export const EditorArea: React.FC<EditorAreaProps> = ({ noteId, isSidebarOpen, o
           >
             <Trash2 size={14} />
           </button>
-        </div>
-        </div>
+          
+          <div className="w-px h-4 bg-border mx-1"></div>
 
-        <div className="flex items-center gap-4 shrink-0 no-print">
           {onOpenSettings && (
             <button 
               onClick={onOpenSettings}
