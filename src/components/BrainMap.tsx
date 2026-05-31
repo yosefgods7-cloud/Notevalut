@@ -1,18 +1,30 @@
-import React, { useEffect, useRef, useMemo, useState } from 'react';
-import * as d3 from 'd3';
-import { useStorage } from '../context/StorageContext';
-import { Network, ZoomIn, ZoomOut, Maximize, X, Download } from 'lucide-react';
-import { Note } from '../types';
+import React, { useEffect, useRef, useMemo, useState } from "react";
+import * as d3 from "d3";
+import { useStorage } from "../context/StorageContext";
+import {
+  Network,
+  ZoomIn,
+  ZoomOut,
+  Maximize,
+  X,
+  Download,
+  Palette,
+} from "lucide-react";
+import { Note } from "../types";
 
 interface BrainMapProps {
   activeWorkspaceId: string;
-  onNavigateToNote: (noteId: string, collectionId: string, workspaceId: string) => void;
+  onNavigateToNote: (
+    noteId: string,
+    collectionId: string,
+    workspaceId: string,
+  ) => void;
   onClose: () => void;
 }
 
 interface GraphNode extends d3.SimulationNodeDatum {
   id: string;
-  type: 'workspace' | 'collection' | 'note' | 'tag';
+  type: "workspace" | "collection" | "note" | "tag";
   label: string;
   noteRef?: Note; // Reference to the note if type is 'note'
   val: number; // size
@@ -21,48 +33,90 @@ interface GraphNode extends d3.SimulationNodeDatum {
 interface GraphLink extends d3.SimulationLinkDatum<GraphNode> {
   source: string | GraphNode;
   target: string | GraphNode;
-  type: 'parent' | 'tag'; // parent = hierarchy, tag = hashtag link
+  type: "parent" | "tag"; // parent = hierarchy, tag = hashtag link
 }
 
-export const BrainMap: React.FC<BrainMapProps> = ({ activeWorkspaceId, onNavigateToNote, onClose }) => {
+export const BrainMap: React.FC<BrainMapProps> = ({
+  activeWorkspaceId,
+  onNavigateToNote,
+  onClose,
+}) => {
   const { data } = useStorage();
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [colorTheme, setColorTheme] = useState<
+    "default" | "neon" | "pastel" | "monochrome"
+  >("default");
+
+  const themes = {
+    default: {
+      workspace: "var(--color-text-primary)",
+      collection: "var(--color-text-secondary)",
+      tag: "var(--color-accent)",
+      note: "rgba(59, 130, 246, 0.4)",
+      linkTag: "var(--color-accent)",
+      linkDefault: "var(--color-text-secondary)",
+    },
+    neon: {
+      workspace: "#ff00ff",
+      collection: "#00ffff",
+      tag: "#00ff00",
+      note: "rgba(255, 255, 0, 0.4)",
+      linkTag: "#00ff00",
+      linkDefault: "#00ffff",
+    },
+    pastel: {
+      workspace: "#ffb3ba",
+      collection: "#ffdfba",
+      tag: "#ffffba",
+      note: "rgba(186, 255, 201, 0.4)",
+      linkTag: "#ffffba",
+      linkDefault: "#ffdfba",
+    },
+    monochrome: {
+      workspace: "#333333",
+      collection: "#666666",
+      tag: "#cccccc",
+      note: "rgba(153, 153, 153, 0.4)",
+      linkTag: "#cccccc",
+      linkDefault: "#666666",
+    },
+  };
 
   // Compute Graph Data
   const graphData = useMemo(() => {
     const nodes: GraphNode[] = [];
     const links: GraphLink[] = [];
-    
+
     // Add central "Universe" node to connect all workspaces
     nodes.push({
-      id: 'universe',
-      type: 'tag', // reuse styling
-      label: 'My Data',
+      id: "universe",
+      type: "tag", // reuse styling
+      label: "My Data",
       val: 5,
     });
 
     // All Workspaces (Holders)
-    data.workspaces.forEach(ws => {
+    data.workspaces.forEach((ws) => {
       nodes.push({
         id: `workspace-${ws.id}`,
-        type: 'workspace',
+        type: "workspace",
         label: ws.name,
         val: 35, // bigger circle
       });
-      
+
       links.push({
         source: `workspace-${ws.id}`,
-        target: 'universe',
-        type: 'parent'
+        target: "universe",
+        type: "parent",
       });
     });
 
     // All Collections
-    data.collections.forEach(col => {
+    data.collections.forEach((col) => {
       nodes.push({
         id: `collection-${col.id}`,
-        type: 'collection',
+        type: "collection",
         label: col.name,
         val: 20,
       });
@@ -71,49 +125,49 @@ export const BrainMap: React.FC<BrainMapProps> = ({ activeWorkspaceId, onNavigat
       links.push({
         source: `collection-${col.id}`,
         target: `workspace-${col.workspaceId}`,
-        type: 'parent'
+        type: "parent",
       });
     });
 
     // All Notes
     const tagSet = new Set<string>();
 
-    data.notes.forEach(note => {
+    data.notes.forEach((note) => {
       nodes.push({
         id: `note-${note.id}`,
-        type: 'note',
-        label: note.title || 'Untitled',
+        type: "note",
+        label: note.title || "Untitled",
         val: 12,
-        noteRef: note
+        noteRef: note,
       });
 
       // Link Note -> Collection
       links.push({
         source: `note-${note.id}`,
         target: `collection-${note.collectionId}`,
-        type: 'parent'
+        type: "parent",
       });
 
-      note.tags.forEach(tag => tagSet.add(tag));
+      note.tags.forEach((tag) => tagSet.add(tag));
     });
 
     // Tag nodes
-    tagSet.forEach(tag => {
+    tagSet.forEach((tag) => {
       nodes.push({
         id: `tag-${tag}`,
-        type: 'tag',
+        type: "tag",
         label: `#${tag}`,
-        val: 18, 
+        val: 18,
       });
     });
 
     // Links for tags
-    data.notes.forEach(note => {
-      note.tags.forEach(tag => {
+    data.notes.forEach((note) => {
+      note.tags.forEach((tag) => {
         links.push({
           source: `note-${note.id}`,
           target: `tag-${tag}`,
-          type: 'tag'
+          type: "tag",
         });
       });
     });
@@ -137,37 +191,63 @@ export const BrainMap: React.FC<BrainMapProps> = ({ activeWorkspaceId, onNavigat
     const g = svg.append("g");
 
     // Zoom behavior
-    const zoom = d3.zoom<SVGSVGElement, unknown>()
+    const zoom = d3
+      .zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.1, 4])
       .on("zoom", (event) => {
         g.attr("transform", event.transform);
       });
-      
+
     zoomRef.current = zoom;
 
     svg.call(zoom);
 
     // Initial transform
-    svg.call(zoom.transform, d3.zoomIdentity.translate(width / 2, height / 2).scale(1));
+    svg.call(
+      zoom.transform,
+      d3.zoomIdentity.translate(width / 2, height / 2).scale(1),
+    );
 
     // Force Simulation
-    const simulation = d3.forceSimulation<GraphNode>(graphData.nodes)
-      .force("link", d3.forceLink<GraphNode, GraphLink>(graphData.links).id(d => d.id).distance(d => {
-        if (d.type === 'tag') return 240;
-        if (d.type === 'parent') return 180;
-        return 140;
-      }))
+    const simulation = d3
+      .forceSimulation<GraphNode>(graphData.nodes)
+      .force(
+        "link",
+        d3
+          .forceLink<GraphNode, GraphLink>(graphData.links)
+          .id((d) => d.id)
+          .distance((d) => {
+            if (d.type === "tag") return 240;
+            if (d.type === "parent") return 180;
+            return 140;
+          }),
+      )
       .force("charge", d3.forceManyBody().strength(-500))
-      .force("collide", d3.forceCollide().radius(d => typeof d !== 'number' ? (d as GraphNode).val + 40 : 40).iterations(3))
+      .force(
+        "collide",
+        d3
+          .forceCollide()
+          .radius((d) =>
+            typeof d !== "number" ? (d as GraphNode).val + 40 : 40,
+          )
+          .iterations(3),
+      )
       .force("center", d3.forceCenter(0, 0))
       .force("x", d3.forceX().strength(0.03))
       .force("y", d3.forceY().strength(0.03));
-      
+
     // Apply very gentle rotation instead of random shaking
     simulation.force("float", () => {
       const alpha = simulation.alpha();
-      graphData.nodes.forEach(node => {
-        if (node.fx == null && node.fy == null && node.x !== undefined && node.y !== undefined && node.vx !== undefined && node.vy !== undefined) {
+      graphData.nodes.forEach((node) => {
+        if (
+          node.fx == null &&
+          node.fy == null &&
+          node.x !== undefined &&
+          node.y !== undefined &&
+          node.vx !== undefined &&
+          node.vy !== undefined
+        ) {
           // Slow continuous rotation around center like a universe
           const dist = Math.sqrt(node.x * node.x + node.y * node.y) || 1;
           node.vx += (-node.y / dist) * alpha * 1.5;
@@ -175,90 +255,115 @@ export const BrainMap: React.FC<BrainMapProps> = ({ activeWorkspaceId, onNavigat
         }
       });
     });
-    
-    // Keep simulation running gently
-    simulation.alphaTarget(0.02);
+
+    // Keep simulation running gently so elements drift continuously
+    simulation.alphaTarget(0.05);
 
     // Draw Links
-    const link = g.append("g")
+    const link = g
+      .append("g")
       .attr("stroke-opacity", 0.8)
       .selectAll("line")
       .data(graphData.links)
       .join("line")
-      .attr("stroke", d => d.type === 'tag' ? "var(--color-accent)" : "var(--color-text-secondary)")
-      .attr("stroke-width", d => d.type === 'tag' ? 1.5 : 1)
-      .attr("stroke-dasharray", d => d.type === 'parent' ? "4,4" : "none");
+      .attr("stroke", (d) =>
+        d.type === "tag"
+          ? themes[colorTheme].linkTag
+          : themes[colorTheme].linkDefault,
+      )
+      .attr("stroke-width", (d) => (d.type === "tag" ? 1.5 : 1))
+      .attr("stroke-dasharray", (d) => (d.type === "parent" ? "4,4" : "none"));
 
-    const nodeG = g.append("g")
+    const nodeG = g
+      .append("g")
       .selectAll("g")
       .data(graphData.nodes)
       .join("g")
-      .call(d3.drag<SVGGElement, GraphNode>()
-        .on("start", function(event, d) {
-          if (!event.active) simulation.alphaTarget(0.1).restart();
-          d.fx = d.x;
-          d.fy = d.y;
-        })
-        .on("drag", function(event, d) {
-          d.fx = event.x;
-          d.fy = event.y;
-        })
-        .on("end", function(event, d) {
-          if (!event.active) simulation.alphaTarget(0.01);
-          d.fx = null;
-          d.fy = null;
-        }));
+      .call(
+        d3
+          .drag<SVGGElement, GraphNode>()
+          .on("start", function (event, d) {
+            if (!event.active) simulation.alphaTarget(0.1).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+          })
+          .on("drag", function (event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+          })
+          .on("end", function (event, d) {
+            if (!event.active) simulation.alphaTarget(0.01);
+            d.fx = null;
+            d.fy = null;
+          }),
+      );
 
     // Draw Nodes (Circles)
-    nodeG.append("circle")
-      .attr("r", d => d.val)
-      .attr("fill", d => {
-        if (d.type === 'workspace') return "var(--color-text-primary)";
-        if (d.type === 'collection') return "var(--color-text-secondary)";
-        if (d.type === 'tag') return "var(--color-accent)";
-        return "rgba(59, 130, 246, 0.4)";
+    nodeG
+      .append("circle")
+      .attr("r", (d) => d.val)
+      .attr("fill", (d) => {
+        if (d.type === "workspace") return themes[colorTheme].workspace;
+        if (d.type === "collection") return themes[colorTheme].collection;
+        if (d.type === "tag") return themes[colorTheme].tag;
+        return themes[colorTheme].note;
       })
       .attr("stroke", "none")
       .attr("stroke-width", 0)
       .attr("cursor", "pointer")
-      .style("filter", d => d.type === 'workspace' ? "none" : "drop-shadow(0px 4px 6px rgba(0, 0, 0, 0.1))")
+      .style("filter", (d) =>
+        d.type === "workspace"
+          ? "none"
+          : "drop-shadow(0px 4px 6px rgba(0, 0, 0, 0.1))",
+      )
       .on("click", (event, d) => {
-        if (d.type === 'note' && d.noteRef) {
-          onNavigateToNote(d.noteRef.id, d.noteRef.collectionId, d.noteRef.workspaceId);
+        if (d.type === "note" && d.noteRef) {
+          onNavigateToNote(
+            d.noteRef.id,
+            d.noteRef.collectionId,
+            d.noteRef.workspaceId,
+          );
         }
       });
 
     // Draw Labels
-    nodeG.append("text")
-      .text(d => d.label)
-      .attr("y", d => d.val + 15)
+    nodeG
+      .append("text")
+      .text((d) => d.label)
+      .attr("y", (d) => d.val + 15)
       .attr("text-anchor", "middle")
-      .attr("font-size", d => {
-        if (d.type === 'workspace') return "14px";
-        if (d.type === 'collection' || d.type === 'tag') return "12px";
+      .attr("font-size", (d) => {
+        if (d.type === "workspace") return "14px";
+        if (d.type === "collection" || d.type === "tag") return "12px";
         return "10px";
       })
-      .attr("font-weight", d => d.type === 'tag' ? "bold" : "normal")
-      .attr("fill", d => d.type === 'tag' ? "var(--color-accent)" : "var(--color-text-primary)")
+      .attr("font-weight", (d) => (d.type === "tag" ? "bold" : "normal"))
+      .attr("fill", (d) =>
+        d.type === "tag"
+          ? themes[colorTheme].tag
+          : themes[colorTheme].workspace,
+      )
       .attr("pointer-events", "none")
-      .style("text-shadow", "0 1px 3px var(--color-background), 0 -1px 3px var(--color-background), 1px 0 3px var(--color-background), -1px 0 3px var(--color-background)");
+      .style(
+        "text-shadow",
+        "0 1px 3px var(--color-background), 0 -1px 3px var(--color-background), 1px 0 3px var(--color-background), -1px 0 3px var(--color-background)",
+      );
 
     simulation.on("tick", () => {
       link
-        .attr("x1", d => (d.source as GraphNode).x!)
-        .attr("y1", d => (d.source as GraphNode).y!)
-        .attr("x2", d => (d.target as GraphNode).x!)
-        .attr("y2", d => (d.target as GraphNode).y!);
+        .attr("x1", (d) => (d.source as GraphNode).x!)
+        .attr("y1", (d) => (d.source as GraphNode).y!)
+        .attr("x2", (d) => (d.target as GraphNode).x!)
+        .attr("y2", (d) => (d.target as GraphNode).y!);
 
-      nodeG
-        .attr("transform", d => `translate(${d.x},${d.y})`);
+      nodeG.attr("transform", (d) => `translate(${d.x},${d.y})`);
     });
 
     // Cleanup
     return () => {
       simulation.stop();
     };
-  }, [graphData, onNavigateToNote]);
+  }, [graphData, onNavigateToNote, colorTheme]);
 
   const handleExportSVG = () => {
     if (!svgRef.current) return;
@@ -266,14 +371,21 @@ export const BrainMap: React.FC<BrainMapProps> = ({ activeWorkspaceId, onNavigat
     const serializer = new XMLSerializer();
     let source = serializer.serializeToString(svgClone);
     if (!source.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)) {
-        source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+      source = source.replace(
+        /^<svg/,
+        '<svg xmlns="http://www.w3.org/2000/svg"',
+      );
     }
     if (!source.match(/^<svg[^>]+"http\:\/\/www\.w3\.org\/1999\/xlink"/)) {
-        source = source.replace(/^<svg/, '<svg xmlns:xlink="http://www.w3.org/1999/xlink"');
+      source = source.replace(
+        /^<svg/,
+        '<svg xmlns:xlink="http://www.w3.org/1999/xlink"',
+      );
     }
     source = '<?xml version="1.0" standalone="no"?>\r\n' + source;
-    const url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(source);
-    
+    const url =
+      "data:image/svg+xml;charset=utf-8," + encodeURIComponent(source);
+
     const element = document.createElement("a");
     element.href = url;
     element.download = "brain-map.svg";
@@ -293,45 +405,90 @@ export const BrainMap: React.FC<BrainMapProps> = ({ activeWorkspaceId, onNavigat
     const width = containerRef.current.clientWidth;
     const height = containerRef.current.clientHeight;
     const svg = d3.select(svgRef.current);
-    svg.transition().duration(750).call(zoomRef.current.transform, d3.zoomIdentity.translate(width / 2, height / 2).scale(1));
+    svg
+      .transition()
+      .duration(750)
+      .call(
+        zoomRef.current.transform,
+        d3.zoomIdentity.translate(width / 2, height / 2).scale(1),
+      );
   };
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background overflow-hidden relative">
       <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-surface/80 backdrop-blur-sm p-2 rounded-lg border border-border shadow-sm">
         <Network size={20} className="text-accent" />
-        <span className="font-semibold text-text-primary text-sm">Neurolink System</span>
+        <span className="font-semibold text-text-primary text-sm">
+          Neurolink System
+        </span>
       </div>
 
       <div className="absolute top-4 right-4 z-10 flex items-center gap-1 bg-surface/80 backdrop-blur-sm p-1 rounded-lg border border-border shadow-sm">
-        <button className="p-2 hover:bg-surface border-border rounded-md text-text-muted hover:text-text-primary transition-colors" onClick={() => handleZoom(1.2)} title="Zoom In">
+        <button
+          className="p-2 hover:bg-surface border-border rounded-md text-text-muted hover:text-text-primary transition-colors"
+          onClick={() => {
+            const keys = Object.keys(themes) as (keyof typeof themes)[];
+            const nextIndex = (keys.indexOf(colorTheme) + 1) % keys.length;
+            setColorTheme(keys[nextIndex]);
+          }}
+          title="Cycle Color Theme"
+        >
+          <Palette size={16} />
+        </button>
+        <div className="w-px h-4 bg-border mx-1"></div>
+        <button
+          className="p-2 hover:bg-surface border-border rounded-md text-text-muted hover:text-text-primary transition-colors"
+          onClick={() => handleZoom(1.2)}
+          title="Zoom In"
+        >
           <ZoomIn size={16} />
         </button>
-        <button className="p-2 hover:bg-surface border-border rounded-md text-text-muted hover:text-text-primary transition-colors" onClick={() => handleZoom(0.8)} title="Zoom Out">
+        <button
+          className="p-2 hover:bg-surface border-border rounded-md text-text-muted hover:text-text-primary transition-colors"
+          onClick={() => handleZoom(0.8)}
+          title="Zoom Out"
+        >
           <ZoomOut size={16} />
         </button>
         <div className="w-px h-4 bg-border mx-1"></div>
-        <button className="p-2 hover:bg-surface border-border rounded-md text-text-muted hover:text-text-primary transition-colors" onClick={handleReset} title="Reset View">
+        <button
+          className="p-2 hover:bg-surface border-border rounded-md text-text-muted hover:text-text-primary transition-colors"
+          onClick={handleReset}
+          title="Reset View"
+        >
           <Maximize size={16} />
         </button>
         <div className="w-px h-4 bg-border mx-1"></div>
-        <button className="p-2 hover:bg-surface border-border rounded-md text-text-muted hover:text-text-primary transition-colors" onClick={handleExportSVG} title="Export SVG">
+        <button
+          className="p-2 hover:bg-surface border-border rounded-md text-text-muted hover:text-text-primary transition-colors"
+          onClick={handleExportSVG}
+          title="Export SVG"
+        >
           <Download size={16} />
         </button>
         <div className="w-px h-4 bg-border mx-1"></div>
-        <button title="Exit Brain Map" className="p-2 hover:bg-red-500/10 hover:text-red-500 border-border rounded-md text-text-muted transition-colors" onClick={onClose}>
+        <button
+          title="Exit Brain Map"
+          className="p-2 hover:bg-red-500/10 hover:text-red-500 border-border rounded-md text-text-muted transition-colors"
+          onClick={onClose}
+        >
           <X size={16} />
         </button>
       </div>
 
       <div ref={containerRef} className="flex-1 w-full h-full cursor-crosshair">
-        <svg ref={svgRef} className="w-full h-full" style={{ outline: 'none' }} />
+        <svg
+          ref={svgRef}
+          className="w-full h-full"
+          style={{ outline: "none" }}
+        />
       </div>
 
       {graphData.nodes.length <= 1 && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <p className="text-text-muted text-sm bg-surface p-4 rounded-lg border border-border shadow-xl mx-4 text-center">
-             No notes or features found. Create holders, folders, and notes with hashtags to build the universe brain map.
+            No notes or features found. Create holders, folders, and notes with
+            hashtags to build the universe brain map.
           </p>
         </div>
       )}

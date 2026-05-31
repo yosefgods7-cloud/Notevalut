@@ -8,20 +8,21 @@ interface ExportModalProps {
   isOpen: boolean;
   onClose: () => void;
   activeCollectionId: string | null;
+  activeNoteId?: string | null;
 }
 
-export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, activeCollectionId }) => {
+export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, activeCollectionId, activeNoteId }) => {
   const { data } = useStorage();
-  const [scope, setScope] = useState<'all' | 'collection' | 'selected'>('all');
+  const [scope, setScope] = useState<'all' | 'collection' | 'note'>(activeNoteId ? 'note' : 'all');
   const [format, setFormat] = useState<'json' | 'markdown' | 'pdf' | 'text'>('markdown');
   const [isExporting, setIsExporting] = useState(false);
   
   if (!isOpen) return null;
 
-  // Simplified: For now we'll just allow exporting ALL or CURRENT COLLECTION
-  // Multi-select requires NoteList integration which we can skip for brevity if 'all' is sufficient
-  
   const getSelectedIds = () => {
+    if (scope === 'note' && activeNoteId) {
+       return [activeNoteId];
+    }
     if (scope === 'collection' && activeCollectionId) {
       return data.notes.filter(n => n.collectionId === activeCollectionId).map(n => n.id);
     }
@@ -48,7 +49,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, activ
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm p-4 print:hidden">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70] backdrop-blur-sm p-4 print:hidden">
       <div className="bg-surface border border-border w-full max-w-md rounded-xl shadow-2xl p-6 flex flex-col">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold">Export Notes</h2>
@@ -61,12 +62,16 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, activ
             <h3 className="text-sm font-semibold text-text-muted uppercase mb-3">Selection</h3>
             <div className="space-y-2 text-sm">
               <label className="flex items-center gap-3 cursor-pointer">
-                <input type="radio" name="scope" checked={scope === 'all'} onChange={() => setScope('all')} className="accent-accent w-4 h-4" />
-                <span>All {data.notes.length} notes</span>
+                <input type="radio" name="scope" checked={scope === 'note'} onChange={() => setScope('note')} disabled={!activeNoteId} className="accent-accent w-4 h-4" />
+                <span className={cn(!activeNoteId && "opacity-50")}>Current note</span>
               </label>
               <label className="flex items-center gap-3 cursor-pointer">
                 <input type="radio" name="scope" checked={scope === 'collection'} onChange={() => setScope('collection')} disabled={!activeCollectionId} className="accent-accent w-4 h-4" />
                 <span className={cn(!activeCollectionId && "opacity-50")}>Current collection</span>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input type="radio" name="scope" checked={scope === 'all'} onChange={() => setScope('all')} className="accent-accent w-4 h-4" />
+                <span>All {data.notes.length} notes</span>
               </label>
             </div>
           </div>

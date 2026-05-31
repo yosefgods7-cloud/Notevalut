@@ -37,7 +37,7 @@ export interface NoteAttachment {
 
 export interface NoteChart {
   id: string;
-  type: 'bar' | 'line' | 'pie' | 'area' | 'radar';
+  type: "bar" | "line" | "pie" | "area" | "radar";
   title: string;
   data: any[];
   config: {
@@ -64,7 +64,6 @@ export interface Note {
   charts?: NoteChart[];
 }
 
-
 export interface AutoCategorizeRule {
   tag: string;
   workspaceId: string;
@@ -78,14 +77,30 @@ export interface PluginSettings {
   };
 }
 
+export interface DriveBackupSettings {
+  enabled: boolean;
+  frequency: "daily" | "weekly" | "monthly" | "3days" | "90days";
+  lastBackupDate?: string;
+  nextBackupDate?: string;
+  fileId?: string;
+}
+
 export interface Settings {
-  theme: 'dark' | 'light' | 'system';
-  fontSize: 'small' | 'medium' | 'large' | 'ultralarge';
+  theme: "dark" | "light" | "system";
+  fontSize: "small" | "medium" | "large" | "ultralarge";
   defaultWorkspace: string;
   smartPaste: boolean;
   geminiApiKey?: string;
   plugins?: PluginSettings;
   toolbarItems?: string[];
+  driveBackup?: DriveBackupSettings;
+  lastCloudSyncDate?: string;
+}
+
+export interface NoteTemplate {
+  id: string;
+  name: string;
+  content: string;
 }
 
 export interface NoteVaultData {
@@ -95,26 +110,50 @@ export interface NoteVaultData {
   notes: Note[];
   tags: string[];
   settings: Settings;
+  templates?: NoteTemplate[];
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  theme: 'dark',
-  fontSize: 'medium',
-  defaultWorkspace: '',
+  theme: "dark",
+  fontSize: "medium",
+  defaultWorkspace: "",
   smartPaste: true,
   plugins: {
     autoCategorize: {
       enabled: false,
-      rules: []
-    }
+      rules: [],
+    },
+  },
+  driveBackup: {
+    enabled: false,
+    frequency: "daily",
   },
   toolbarItems: [
-    'undo', 'redo', '|', 
-    'h1', 'h2', 'h3', '|', 
-    'bold', 'italic', 'underline', 'link', 'blockquote', '|', 
-    'bulletList', 'orderedList', 'taskList', '|', 
-    'code', 'codeBlock', '|', 
-    'table', 'hr', '|', 
-    'attachment', 'chart', 'image'
-  ]
+    "undo",
+    "redo",
+    "|",
+    "h1",
+    "h2",
+    "h3",
+    "|",
+    "bold",
+    "italic",
+    "underline",
+    "link",
+    "blockquote",
+    "|",
+    "bulletList",
+    "orderedList",
+    "taskList",
+    "|",
+    "code",
+    "codeBlock",
+    "|",
+    "table",
+    "hr",
+    "|",
+    "attachment",
+    "chart",
+    "image",
+  ],
 };
