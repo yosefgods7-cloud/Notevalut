@@ -14,6 +14,7 @@ import { Table } from "@tiptap/extension-table";
 import TableRow from "@tiptap/extension-table-row";
 import TableHeader from "@tiptap/extension-table-header";
 import TableCell from "@tiptap/extension-table-cell";
+import TextAlign from "@tiptap/extension-text-align";
 import CharacterCount from "@tiptap/extension-character-count";
 import Placeholder from "@tiptap/extension-placeholder";
 import ImageResize from "tiptap-extension-resize-image";
@@ -633,6 +634,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
       TableRow,
       TableHeader,
       TableCell,
+      TextAlign.configure({ types: ['heading', 'paragraph', 'tableCell', 'tableHeader'] }),
       CharacterCount,
       ImageResize,
       TiptapTextStyle.extend({ inclusive: false }),
