@@ -27,6 +27,7 @@ import { NoteHistoryModal } from "./NoteHistoryModal";
 import { ImageCropModal } from "./ImageCropModal";
 import { ChartBuilderModal } from "./ChartBuilderModal";
 import { TableControls } from "./TableControls";
+import { appPrompt } from "./GlobalDialogs";
 import {
   Bold,
   Italic,
@@ -847,9 +848,9 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
     showToast("✓ Exported as JSON");
   }, [note, showToast]);
 
-  const handleSaveAsTemplate = useCallback(() => {
+  const handleSaveAsTemplate = useCallback(async () => {
     if (!editor || !note) return;
-    const name = window.prompt(
+    const name = await appPrompt(
       "Enter a name for this template:",
       note.title || "My Template",
     );

@@ -28,6 +28,7 @@ import {
 import { cn } from "../lib/utils";
 import { Settings as SettingsType } from "../types";
 import { uploadToDrive } from "../lib/drive";
+import { appPrompt, appConfirm } from "./GlobalDialogs";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -145,14 +146,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
     // Default JSON backup restore
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const imported = JSON.parse(event.target?.result as string);
         if (!imported.workspaces || !imported.notes) {
           throw new Error("Invalid backup file structure");
         }
 
-        const confirmMerge = window.confirm(
+        const confirmMerge = await appConfirm(
           "Merge with existing data? (Cancel to replace everything)",
         );
         importData(imported, confirmMerge);
@@ -295,10 +296,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <h4 className="text-xs font-semibold text-text-muted uppercase mb-3 flex items-center justify-between">
                       <span>Holders</span>
                       <button
-                        onClick={() => {
-                          const name = prompt("New Holder Name:");
+                        onClick={async () => {
+                          const name = await appPrompt("New Holder Name:");
                           if (name) {
-                            const icon = prompt("New Holder Icon/Emoji:", "🧠");
+                            const icon = await appPrompt("New Holder Icon/Emoji:", "🧠");
                             const newWs = addWorkspace(name, icon || "🧠");
                             if (data.settings.driveBackup?.enabled && accessToken) {
                               const newData = {
@@ -333,13 +334,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           </div>
                           <div className="flex items-center gap-1">
                             <button
-                              onClick={() => {
-                                const newName = prompt(
+                              onClick={async () => {
+                                const newName = await appPrompt(
                                   "Update Holder Name:",
                                   w.name,
                                 );
                                 if (newName === null) return;
-                                const newIcon = prompt(
+                                const newIcon = await appPrompt(
                                   "Update Holder Icon:",
                                   w.icon,
                                 );
@@ -377,9 +378,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               <span className="text-xs font-medium">Edit</span>
                             </button>
                             <button
-                              onClick={() => {
+                              onClick={async () => {
                                 if (
-                                  window.confirm(
+                                  await appConfirm(
                                     `Are you sure you want to completely delete the holder "${w.name}" and ALL its folders and notes? This cannot be undone.`,
                                   )
                                 ) {
@@ -423,16 +424,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <h4 className="text-xs font-semibold text-text-muted uppercase mb-3 flex items-center justify-between">
                       <span>Folders</span>
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           // Pick a random workspace if there are none, though not likely. Best to offer a select if we wanted, but prompt is simple.
                           const ws = data.workspaces[0];
                           if (!ws) {
                             alert("Create a holder first.");
                             return;
                           }
-                          const name = prompt("New Folder Name:");
+                          const name = await appPrompt("New Folder Name:");
                           if (name) {
-                            const icon = prompt("New Folder Icon/Emoji:", "📁");
+                            const icon = await appPrompt("New Folder Icon/Emoji:", "📁");
                             // Find active workspace if possible, else use first.
                             const newCol = addCollection(ws.id, name, icon || "📁");
                             if (data.settings.driveBackup?.enabled && accessToken) {
@@ -477,13 +478,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
                               <button
-                                onClick={() => {
-                                  const newName = prompt(
+                                onClick={async () => {
+                                  const newName = await appPrompt(
                                     "Update Folder Name:",
                                     c.name,
                                   );
                                   if (newName === null) return;
-                                  const newIcon = prompt(
+                                  const newIcon = await appPrompt(
                                     "Update Folder Icon:",
                                     c.icon,
                                   );
@@ -519,9 +520,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                 </span>
                               </button>
                               <button
-                                onClick={() => {
+                                onClick={async () => {
                                   if (
-                                    window.confirm(
+                                    await appConfirm(
                                       `Are you sure you want to completely delete the folder "${c.name}" and ALL its notes? This cannot be undone.`
                                     )
                                   ) {

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Clock, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import { get } from 'idb-keyval';
+import { appConfirm } from './GlobalDialogs';
 
 interface NoteHistoryModalProps {
   isOpen: boolean;
@@ -58,8 +59,8 @@ export const NoteHistoryModal: React.FC<NoteHistoryModalProps> = ({ isOpen, onCl
                   <div className="text-xs text-text-muted">{version.wordCount} words</div>
                 </div>
                 <button
-                  onClick={() => {
-                    if (confirm('Restore this version? Current changes will be overwritten.')) {
+                  onClick={async () => {
+                    if (await appConfirm('Restore this version? Current changes will be overwritten.')) {
                       onRestore(version.content);
                       onClose();
                     }

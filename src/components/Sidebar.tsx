@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { uploadToDrive } from '../lib/drive';
 import { cn } from '../lib/utils';
 import { Plus, Tag, Settings as SettingsIcon, Download, Upload, Star, Undo2, Network, Menu, Folder, Pencil, Trash2, MoreHorizontal, ArrowUp, ArrowDown, Calendar } from 'lucide-react';
+import { appPrompt, appConfirm } from './GlobalDialogs';
 
 interface SidebarProps {
   activeWorkspaceId: string;
@@ -37,8 +38,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const activeWorkspace = data.workspaces.find(w => w.id === activeWorkspaceId);
   const collections = data.collections.filter(c => c.workspaceId === activeWorkspaceId);
 
-  const handleCreateCollection = () => {
-    const name = prompt('Collection Name:');
+  const handleCreateCollection = async () => {
+    const name = await appPrompt('Collection Name:');
     if (name && activeWorkspaceId) {
       const newCol = addCollection(activeWorkspaceId, name, '📁');
       setActiveCollectionId(newCol.id);
@@ -59,13 +60,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  const handleEditWorkspace = (e: React.MouseEvent, id: string) => {
+  const handleEditWorkspace = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     const ws = data.workspaces.find(w => w.id === id);
     if (!ws) return;
-    const name = prompt('Update Holder Name:', ws.name);
+    const name = await appPrompt('Update Holder Name:', ws.name);
     if (name === null) return;
-    const icon = prompt('Update Holder Icon/Emoji:', ws.icon);
+    const icon = await appPrompt('Update Holder Icon/Emoji:', ws.icon);
     if (name || icon) {
       updateWorkspace(id, { name: name || ws.name, icon: icon || ws.icon });
       syncDrive({
@@ -75,10 +76,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  const handleDeleteWorkspace = (e: React.MouseEvent, id: string) => {
+  const handleDeleteWorkspace = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     const ws = data.workspaces.find(w => w.id === id);
-    if (window.confirm(`Are you sure you want to completely delete the holder "${ws?.name}" and ALL its folders and notes? This cannot be undone.`)) {
+    if (await appConfirm(`Are you sure you want to completely delete the holder "${ws?.name}" and ALL its folders and notes? This cannot be undone.`)) {
       deleteWorkspace(id);
       syncDrive({
         ...data,
@@ -93,13 +94,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  const handleEditCollection = (e: React.MouseEvent, id: string) => {
+  const handleEditCollection = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     const col = data.collections.find(c => c.id === id);
     if (!col) return;
-    const name = prompt('Update Folder Name:', col.name);
+    const name = await appPrompt('Update Folder Name:', col.name);
     if (name === null) return;
-    const icon = prompt('Update Folder Icon/Emoji:', col.icon);
+    const icon = await appPrompt('Update Folder Icon/Emoji:', col.icon);
     if (name || icon) {
       updateCollection(id, { name: name || col.name, icon: icon || col.icon });
       syncDrive({
@@ -109,10 +110,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  const handleDeleteCollection = (e: React.MouseEvent, id: string) => {
+  const handleDeleteCollection = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     const col = data.collections.find(c => c.id === id);
-    if (window.confirm(`Are you sure you want to completely delete the folder "${col?.name}" and ALL its notes? This cannot be undone.`)) {
+    if (await appConfirm(`Are you sure you want to completely delete the folder "${col?.name}" and ALL its notes? This cannot be undone.`)) {
       deleteCollection(id);
       syncDrive({
         ...data,
@@ -268,8 +269,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 ))}
                 <div className="border-t border-border mt-1 pt-1">
                   <button
-                    onClick={() => {
-                      const name = prompt('Main Holder Name:');
+                    onClick={async () => {
+                      const name = await appPrompt('Main Holder Name:');
                       if (name) {
                         const newWorkspace = addWorkspace(name, '🧠');
                         setActiveWorkspaceId(newWorkspace.id);

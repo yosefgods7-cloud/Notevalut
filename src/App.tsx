@@ -2,6 +2,7 @@ import React, { Component, ErrorInfo } from 'react';
 import { StorageProvider } from './context/StorageContext';
 import { AuthProvider } from './context/AuthContext';
 import { MainLayout } from './components/MainLayout';
+import { GlobalDialogs } from './components/GlobalDialogs';
 
 class ErrorBoundary extends Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null}> {
   constructor(props: {children: React.ReactNode}) {
@@ -37,6 +38,7 @@ export default function App() {
       <AuthProvider>
         <StorageProvider>
           <MainLayout />
+          <GlobalDialogs />
         </StorageProvider>
       </AuthProvider>
     </ErrorBoundary>
