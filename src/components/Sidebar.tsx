@@ -42,6 +42,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (name && activeWorkspaceId) {
       const newCol = addCollection(activeWorkspaceId, name, '📁');
       setActiveCollectionId(newCol.id);
+      syncDrive({
+        ...data,
+        collections: [...data.collections, newCol]
+      });
     }
   };
 
@@ -271,6 +275,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         setActiveWorkspaceId(newWorkspace.id);
                         setActiveCollectionId(null);
                         setIsWorkspaceOpen(false);
+                        syncDrive({
+                          ...data,
+                          workspaces: [...data.workspaces, newWorkspace]
+                        });
                       }
                     }}
                     className="w-full flex items-center gap-2 px-4 py-2 hover:bg-surface-hover text-sm text-text-primary"

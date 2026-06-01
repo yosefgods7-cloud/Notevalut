@@ -24,6 +24,8 @@ export const NoteList: React.FC<NoteListProps> = ({
   const [noteToDelete, setNoteToDelete] = useState<string | null>(null);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
 
+  const [sortOption, setSortOption] = useState<'updated' | 'created' | 'alphabetical'>('updated');
+
   const notes = activeCollectionId === 'starred' 
     ? data.notes.filter(n => n.workspaceId === activeWorkspaceId && n.starred)
     : data.notes.filter(n => n.collectionId === activeCollectionId);
@@ -36,7 +38,13 @@ export const NoteList: React.FC<NoteListProps> = ({
 
   const sortedNotes = [...filteredNotes].sort((a, b) => {
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    if (sortOption === 'updated') {
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    } else if (sortOption === 'created') {
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    } else {
+      return a.title.localeCompare(b.title);
+    }
   });
 
   const handleCreateNote = () => {
@@ -86,7 +94,7 @@ export const NoteList: React.FC<NoteListProps> = ({
 
   return (
     <div className="w-[300px] border-r border-border bg-surface flex flex-col h-full shrink-0">
-      <div className="p-4 border-b border-border space-y-4 tracking-tight">
+      <div className="p-4 border-b border-border space-y-3 tracking-tight">
         <div className="relative">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
           <input
@@ -96,6 +104,17 @@ export const NoteList: React.FC<NoteListProps> = ({
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-surface border border-border rounded-md py-1.5 pl-9 pr-3 text-sm focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all text-text-primary placeholder:text-text-muted"
           />
+        </div>
+        <div className="flex items-center gap-2">
+          <select 
+            value={sortOption} 
+            onChange={(e) => setSortOption(e.target.value as any)}
+            className="text-xs bg-surface border border-border rounded px-2 py-1.5 outline-none text-text-secondary flex-1"
+          >
+            <option value="updated">Last Updated</option>
+            <option value="created">Created Date</option>
+            <option value="alphabetical">Alphabetical</option>
+          </select>
         </div>
         <button
           onClick={handleCreateNote}

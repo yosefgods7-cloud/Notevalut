@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useStorage } from '../context/StorageContext';
 import { ReviewNote, ReviewNoteType } from '../types';
 import { cn } from '../lib/utils';
-import { Calendar, Trash2, Plus, ArrowLeft } from 'lucide-react';
+import { Calendar, Trash2, Plus, ArrowLeft, Download } from 'lucide-react';
 
 export const ReviewArea: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const { data, addReviewNote, updateReviewNote, deleteReviewNote } = useStorage();
@@ -12,6 +12,33 @@ export const ReviewArea: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const reviewNotes = data.reviewNotes || [];
   const filteredNotes = reviewNotes.filter((rn) => rn.type === activeTab).sort((a, b) => new Date(b.periodStart).getTime() - new Date(a.periodStart).getTime());
   const selectedReview = selectedReviewId ? reviewNotes.find(rn => rn.id === selectedReviewId) : null;
+
+  const handleExportMarkdown = () => {
+    if (!selectedReview) return;
+    const content = `# ${selectedReview.title}\n
+## Top Lessons
+${selectedReview.topLessons || 'None'}
+
+## Key Sources
+${selectedReview.keySources || 'None'}
+
+## Ideas to Revisit
+${selectedReview.ideasToRevisit || 'None'}
+
+## Actions to Take
+${selectedReview.actionsToTake || 'None'}
+
+## Summary / Free Notes
+${selectedReview.content || 'None'}
+`;
+    const blob = new Blob([content], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedReview.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const handleCreateReview = () => {
     const now = new Date();
@@ -90,6 +117,14 @@ export const ReviewArea: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             onChange={(e) => handleUpdate('title', e.target.value)} 
             className="bg-transparent text-xl font-semibold text-text-primary outline-none flex-1"
           />
+          <button 
+            onClick={handleExportMarkdown} 
+            className="flex items-center gap-2 px-3 py-1.5 hover:bg-surface-hover text-text-secondary rounded-md text-sm transition-colors"
+            title="Export as Markdown"
+          >
+            <Download size={16} />
+            <span>Export</span>
+          </button>
         </div>
         <div className="p-8 max-w-4xl mx-auto w-full space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -692,6 +692,11 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
           [prevData, ...prevHist].slice(0, 20),
         );
         safeStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
+        // Also save to indexedDB
+        set(STORAGE_KEY, JSON.stringify(newData)).catch((e) => {
+          console.warn("IndexedDB set failed", e);
+        });
+
         return newData;
       });
 
