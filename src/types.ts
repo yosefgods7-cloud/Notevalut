@@ -103,6 +103,25 @@ export interface NoteTemplate {
   content: string;
 }
 
+export type ReviewNoteType = "weekly" | "monthly" | "yearly";
+
+export interface ReviewNote {
+  id: string;
+  type: ReviewNoteType;
+  periodStart: string; // ISO date
+  periodEnd: string;   // ISO date
+  title: string;
+  content: string;
+  topLessons: string;
+  keySources: string;
+  ideasToRevisit: string;
+  actionsToTake: string;
+  summary: string;
+  linkedNoteIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface NoteVaultData {
   version: number;
   workspaces: Workspace[];
@@ -111,6 +130,7 @@ export interface NoteVaultData {
   tags: string[];
   settings: Settings;
   templates?: NoteTemplate[];
+  reviewNotes?: ReviewNote[];
 }
 
 export const DEFAULT_SETTINGS: Settings = {

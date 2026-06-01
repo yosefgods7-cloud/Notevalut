@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useStorage } from '../context/StorageContext';
+import { useAuth } from '../context/AuthContext';
+import { uploadToDrive } from '../lib/drive';
 import { cn } from '../lib/utils';
-import { Plus, Tag, Settings as SettingsIcon, Download, Upload, Star, Undo2, Network, Menu, Folder, Pencil, Trash2, MoreHorizontal, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Tag, Settings as SettingsIcon, Download, Upload, Star, Undo2, Network, Menu, Folder, Pencil, Trash2, MoreHorizontal, ArrowUp, ArrowDown, Calendar } from 'lucide-react';
 
 interface SidebarProps {
   activeWorkspaceId: string;
@@ -13,15 +15,19 @@ interface SidebarProps {
   onOpenSettings: () => void;
   onToggleBrainMap: () => void;
   isBrainMapActive: boolean;
+  onToggleReviews: () => void;
+  isReviewsActive: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   activeWorkspaceId, setActiveWorkspaceId,
   activeCollectionId, setActiveCollectionId,
   onOpenExport, onOpenImport, onOpenSettings,
-  onToggleBrainMap, isBrainMapActive
+  onToggleBrainMap, isBrainMapActive,
+  onToggleReviews, isReviewsActive
 }) => {
   const { data, saveData, addCollection, updateCollection, deleteCollection, addWorkspace, updateWorkspace, deleteWorkspace, undo, canUndo } = useStorage();
+  const { accessToken } = useAuth();
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
@@ -39,6 +45,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
+  const syncDrive = async (updatedData: any) => {
+    if (accessToken && data.settings.driveBackup?.enabled) {
+      try {
+        await uploadToDrive(accessToken, updatedData, data.settings.driveBackup.fileId);
+      } catch (e) {
+        console.error("Failed to sync to Drive", e);
+      }
+    }
+  };
+
   const handleEditWorkspace = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     const ws = data.workspaces.find(w => w.id === id);
@@ -48,6 +64,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const icon = prompt('Update Holder Icon/Emoji:', ws.icon);
     if (name || icon) {
       updateWorkspace(id, { name: name || ws.name, icon: icon || ws.icon });
+      syncDrive({
+        ...data,
+        workspaces: data.workspaces.map(w => w.id === id ? { ...w, name: name || w.name, icon: icon || w.icon } : w)
+      });
     }
   };
 
@@ -56,6 +76,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const ws = data.workspaces.find(w => w.id === id);
     if (window.confirm(`Are you sure you want to completely delete the holder "${ws?.name}" and ALL its folders and notes? This cannot be undone.`)) {
       deleteWorkspace(id);
+      syncDrive({
+        ...data,
+        workspaces: data.workspaces.filter((w) => w.id !== id),
+        collections: data.collections.filter((c) => c.workspaceId !== id),
+        notes: data.notes.filter((n) => n.workspaceId !== id),
+      });
       if (activeWorkspaceId === id) {
          setActiveWorkspaceId(data.workspaces[0]?.id || '');
          setActiveCollectionId(null);
@@ -72,6 +98,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const icon = prompt('Update Folder Icon/Emoji:', col.icon);
     if (name || icon) {
       updateCollection(id, { name: name || col.name, icon: icon || col.icon });
+      syncDrive({
+        ...data,
+        collections: data.collections.map(c => c.id === id ? { ...c, name: name || c.name, icon: icon || c.icon } : c)
+      });
     }
   };
 
@@ -80,6 +110,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const col = data.collections.find(c => c.id === id);
     if (window.confirm(`Are you sure you want to completely delete the folder "${col?.name}" and ALL its notes? This cannot be undone.`)) {
       deleteCollection(id);
+      syncDrive({
+        ...data,
+        collections: data.collections.filter(c => c.id !== id),
+        notes: data.notes.filter(n => n.collectionId !== id)
+      });
       if (activeCollectionId === id) {
          setActiveCollectionId(null);
       }
@@ -103,6 +138,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     newWorkspaces.forEach((w, i) => w.order = i);
 
     saveData({ ...data, workspaces: newWorkspaces });
+    syncDrive({ ...data, workspaces: newWorkspaces });
   };
 
   const handleMoveCollection = (e: React.MouseEvent, id: string, direction: 'up' | 'down') => {
@@ -141,6 +177,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     ];
 
     saveData({ ...data, collections: finalList });
+    syncDrive({ ...data, collections: finalList });
   };
 
   return (
@@ -269,11 +306,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       <div className="flex-1 overflow-y-auto py-4 px-2 no-print">
-        <div className="mb-6">
+        <div className="mb-6 space-y-2">
           <button
             onClick={onToggleBrainMap}
             className={cn(
-              "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors mb-4 border border-transparent shadow-sm",
+              "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors border border-transparent shadow-sm",
               isBrainMapActive 
                 ? "bg-accent text-white shadow-accent/20" 
                 : "bg-surface/50 text-text-primary hover:border-border hover:bg-surface-hover"
@@ -281,6 +318,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <Network size={16} className={cn(isBrainMapActive ? "text-white" : "text-accent")} />
             <span>Brain Mapping</span>
+          </button>
+          
+          <button
+            onClick={onToggleReviews}
+            className={cn(
+              "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors border border-transparent shadow-sm",
+              isReviewsActive 
+                ? "bg-accent text-white shadow-accent/20" 
+                : "bg-surface/50 text-text-primary hover:border-border hover:bg-surface-hover"
+            )}
+          >
+            <Calendar size={16} className={cn(isReviewsActive ? "text-white" : "text-accent")} />
+            <span>Periodic Reviews</span>
           </button>
         </div>
 

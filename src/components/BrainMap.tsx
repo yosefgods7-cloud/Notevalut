@@ -83,21 +83,31 @@ export const BrainMap: React.FC<BrainMapProps> = ({
     },
   };
 
+  const [showAllHolders, setShowAllHolders] = useState<boolean>(true);
+
   // Compute Graph Data
   const graphData = useMemo(() => {
     const nodes: GraphNode[] = [];
     const links: GraphLink[] = [];
 
-    // Add central "Universe" node to connect all workspaces
-    nodes.push({
-      id: "universe",
-      type: "tag", // reuse styling
-      label: "My Data",
-      val: 5,
-    });
+    // Add central "Universe" node to connect workspaces (only if showing all)
+    if (showAllHolders) {
+      nodes.push({
+        id: "universe",
+        type: "tag", // reuse styling
+        label: "My Data",
+        val: 5,
+      });
+    }
 
-    // All Workspaces (Holders)
-    data.workspaces.forEach((ws) => {
+    const targetWorkspaces = showAllHolders 
+      ? data.workspaces 
+      : data.workspaces.filter(ws => ws.id === activeWorkspaceId);
+
+    const workspaceIds = new Set(targetWorkspaces.map(w => w.id));
+
+    // Workspaces (Holders)
+    targetWorkspaces.forEach((ws) => {
       nodes.push({
         id: `workspace-${ws.id}`,
         type: "workspace",
@@ -105,15 +115,20 @@ export const BrainMap: React.FC<BrainMapProps> = ({
         val: 35, // bigger circle
       });
 
-      links.push({
-        source: `workspace-${ws.id}`,
-        target: "universe",
-        type: "parent",
-      });
+      if (showAllHolders) {
+        links.push({
+          source: `workspace-${ws.id}`,
+          target: "universe",
+          type: "parent",
+        });
+      }
     });
 
-    // All Collections
-    data.collections.forEach((col) => {
+    const targetCollections = data.collections.filter(c => workspaceIds.has(c.workspaceId));
+    const collectionIds = new Set(targetCollections.map(c => c.id));
+
+    // Collections
+    targetCollections.forEach((col) => {
       nodes.push({
         id: `collection-${col.id}`,
         type: "collection",
@@ -129,10 +144,11 @@ export const BrainMap: React.FC<BrainMapProps> = ({
       });
     });
 
-    // All Notes
+    // Notes
     const tagSet = new Set<string>();
+    const targetNotes = data.notes.filter(n => collectionIds.has(n.collectionId) || workspaceIds.has(n.workspaceId));
 
-    data.notes.forEach((note) => {
+    targetNotes.forEach((note) => {
       nodes.push({
         id: `note-${note.id}`,
         type: "note",
@@ -162,7 +178,7 @@ export const BrainMap: React.FC<BrainMapProps> = ({
     });
 
     // Links for tags
-    data.notes.forEach((note) => {
+    targetNotes.forEach((note) => {
       note.tags.forEach((tag) => {
         links.push({
           source: `note-${note.id}`,
@@ -173,7 +189,7 @@ export const BrainMap: React.FC<BrainMapProps> = ({
     });
 
     return { nodes, links };
-  }, [data]);
+  }, [data, activeWorkspaceId, showAllHolders]);
 
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
 
@@ -236,9 +252,8 @@ export const BrainMap: React.FC<BrainMapProps> = ({
       .force("x", d3.forceX().strength(0.03))
       .force("y", d3.forceY().strength(0.03));
 
-    // Apply very gentle rotation instead of random shaking
-    simulation.force("float", () => {
-      const alpha = simulation.alpha();
+    // Apply slow circular rotation movement
+    simulation.force("rotate", () => {
       graphData.nodes.forEach((node) => {
         if (
           node.fx == null &&
@@ -250,14 +265,15 @@ export const BrainMap: React.FC<BrainMapProps> = ({
         ) {
           // Slow continuous rotation around center like a universe
           const dist = Math.sqrt(node.x * node.x + node.y * node.y) || 1;
-          node.vx += (-node.y / dist) * alpha * 1.5;
-          node.vy += (node.x / dist) * alpha * 1.5;
+          const speed = 0.08;
+          node.vx += (-node.y / dist) * speed;
+          node.vy += (node.x / dist) * speed;
         }
       });
     });
 
     // Keep simulation running gently so elements drift continuously
-    simulation.alphaTarget(0.05);
+    simulation.alphaTarget(0.01);
 
     // Draw Links
     const link = g
@@ -416,11 +432,19 @@ export const BrainMap: React.FC<BrainMapProps> = ({
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background overflow-hidden relative">
-      <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-surface/80 backdrop-blur-sm p-2 rounded-lg border border-border shadow-sm">
-        <Network size={20} className="text-accent" />
-        <span className="font-semibold text-text-primary text-sm">
-          Neurolink System
-        </span>
+      <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
+        <div className="flex items-center gap-2 bg-surface/80 backdrop-blur-sm p-2 rounded-lg border border-border shadow-sm">
+          <Network size={20} className="text-accent" />
+          <span className="font-semibold text-text-primary text-sm">
+            Neurolink System
+          </span>
+        </div>
+        <button
+          onClick={() => setShowAllHolders(!showAllHolders)}
+          className="flex items-center justify-center bg-surface/80 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-border shadow-sm text-xs font-medium text-text-primary hover:bg-surface transition-colors"
+        >
+          {showAllHolders ? "Viewing All Holders" : "Viewing Current Holder"}
+        </button>
       </div>
 
       <div className="absolute top-4 right-4 z-10 flex items-center gap-1 bg-surface/80 backdrop-blur-sm p-1 rounded-lg border border-border shadow-sm">

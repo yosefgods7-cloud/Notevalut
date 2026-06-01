@@ -175,6 +175,8 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
   const [isHistoryOpen, setHistoryOpen] = useState(false);
   const [isProcessingImage, setIsProcessingImage] = useState(false);
   const [imageToDelete, setImageToDelete] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeletingInfo, setIsDeletingInfo] = useState(false);
   const [imageToCrop, setImageToCrop] = useState<{
     id: string;
     base64: string;
@@ -961,19 +963,48 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
       if ((e.metaKey || e.ctrlKey) && e.key === "s") {
         e.preventDefault();
         if (editor) {
+          const content = editor.getHTML();
+          const wordCount = editor.storage.characterCount.words();
           updateNote(noteId, {
-            content: editor.getHTML(),
-            wordCount: editor.storage.characterCount.words(),
+            content,
+            wordCount,
           });
           setSavedStatus("saved");
           showToast("✓ Saved correctly");
+          if (accessToken && data.settings.driveBackup?.enabled) {
+            try {
+              const updatedData = {
+                ...data,
+                notes: data.notes.map((n) =>
+                  n.id === noteId ? { ...n, content, wordCount } : n
+                ),
+              };
+              uploadToDrive(accessToken, updatedData, data.settings.driveBackup.fileId);
+            } catch (e) {
+              console.error("Failed to sync to Drive", e);
+            }
+          }
         }
       }
     };
 
+    const handleBeforeUnload = () => {
+      if (editor && savedStatus === "saving") {
+        updateNote(noteId, {
+          content: editor.getHTML(),
+          wordCount: editor.storage.characterCount.words(),
+        });
+      }
+    };
+
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [editor, noteId, updateNote, showToast, settings.smartPaste]);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      handleBeforeUnload(); // Save on unmount
+    };
+  }, [editor, noteId, updateNote, showToast, settings.smartPaste, savedStatus, accessToken, data]);
 
   const handleSmartPasteClick = async () => {
     try {
@@ -2006,35 +2037,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
             </div>
 
             <button
-              onClick={async () => {
-                if (
-                  window.confirm(
-                    "Are you sure you want to permanently delete this note from local storage, Firebase, and Google Drive?",
-                  )
-                ) {
-                  deleteNote(noteId);
-                  onDeleteNote?.();
-
-                  if (data.settings.driveBackup?.enabled && accessToken) {
-                    try {
-                      const newData = {
-                        ...data,
-                        notes: data.notes.filter((n) => n.id !== noteId),
-                      };
-                      await uploadToDrive(
-                        accessToken,
-                        newData,
-                        data.settings.driveBackup.fileId,
-                      );
-                      showToast("✓ Deleted and removed from Drive backup");
-                    } catch (e) {
-                      console.error("Failed to sync deletion to Drive", e);
-                    }
-                  } else {
-                    showToast("✓ Deleted successfully");
-                  }
-                }
-              }}
+              onClick={() => setShowDeleteConfirm(true)}
               className="flex items-center justify-center px-2 py-1 text-sm bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-md font-medium transition-colors h-8 w-8"
               title="Total Deletion"
             >
@@ -2124,6 +2127,63 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
                 }}
                 className="px-4 py-2 text-sm font-medium bg-red-500/90 hover:bg-red-600 text-white rounded-md transition-colors shadow-sm"
               >
+                Delete Permanently
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Note Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-surface border border-border rounded-xl shadow-2xl p-6 max-w-sm w-full animate-in fade-in zoom-in duration-200">
+            <h3 className="text-lg font-semibold text-text-primary mb-2 flex items-center gap-2">
+              <Trash2 className="text-red-400" size={20} /> Delete Note?
+            </h3>
+            <p className="text-sm text-text-muted mb-6">
+              Are you sure you want to permanently delete this note from local storage, Firebase, and Google Drive? This action cannot be undone.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isDeletingInfo}
+                className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  setIsDeletingInfo(true);
+                  deleteNote(noteId);
+                  
+                  if (data.settings.driveBackup?.enabled && accessToken) {
+                    try {
+                      const newData = {
+                        ...data,
+                        notes: data.notes.filter((n) => n.id !== noteId),
+                      };
+                      await uploadToDrive(
+                        accessToken,
+                        newData,
+                        data.settings.driveBackup.fileId,
+                      );
+                      showToast("✓ Deleted and removed from Drive backup");
+                    } catch (e) {
+                      console.error("Failed to sync deletion to Drive", e);
+                    }
+                  } else {
+                    showToast("✓ Deleted successfully");
+                  }
+                  
+                  setIsDeletingInfo(false);
+                  setShowDeleteConfirm(false);
+                  onDeleteNote?.();
+                }}
+                disabled={isDeletingInfo}
+                className="px-4 py-2 text-sm font-medium bg-red-500/90 hover:bg-red-600 text-white rounded-md transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
+              >
+                {isDeletingInfo && <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin"></div>}
                 Delete Permanently
               </button>
             </div>

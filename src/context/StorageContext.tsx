@@ -14,6 +14,8 @@ import {
   Settings,
   DEFAULT_SETTINGS,
   NoteTemplate,
+  ReviewNote,
+  ReviewNoteType,
 } from "../types";
 import { generateId } from "../lib/utils";
 import { useAuth } from "./AuthContext";
@@ -40,6 +42,7 @@ const DEFAULT_DATA: NoteVaultData = {
   tags: [],
   settings: DEFAULT_SETTINGS,
   templates: [],
+  reviewNotes: [],
 };
 
 // Safe wrapper to prevent DOMExceptions in strict iframes (e.g., Safari/Incognito)
@@ -94,6 +97,10 @@ interface StorageContextType {
   // Templates
   addTemplate: (name: string, content: string) => NoteTemplate;
   deleteTemplate: (id: string) => void;
+  // Review Notes
+  addReviewNote: (reviewNote: Omit<ReviewNote, "id" | "createdAt" | "updatedAt">) => ReviewNote;
+  updateReviewNote: (id: string, updates: Partial<ReviewNote>) => void;
+  deleteReviewNote: (id: string) => void;
   // Global actions
   clearAllData: () => void;
   importData: (importedData: NoteVaultData, merge: boolean) => void;
@@ -207,6 +214,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
             tags: parsed.tags || [],
             settings: { ...DEFAULT_SETTINGS, ...(parsed.settings || {}) },
             templates: parsed.templates || [],
+            reviewNotes: parsed.reviewNotes || [],
           };
           setData(migratedData);
           setIsInitialized(true);
@@ -329,6 +337,15 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
           { merge: true },
         );
       });
+      if (data.reviewNotes) {
+        data.reviewNotes.forEach((rn) => {
+          batch.set(
+            doc(db, `users/${user.uid}/reviewNotes/${rn.id}`),
+            { ...rn, userId: user.uid },
+            { merge: true },
+          );
+        });
+      }
 
       await batch.commit();
 
@@ -368,6 +385,9 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
       const notesSnap = await getDocs(
         collection(db, `users/${user.uid}/notes`),
       );
+      const reviewNotesSnap = await getDocs(
+        collection(db, `users/${user.uid}/reviewNotes`),
+      );
 
       const cloudSettings = settingsSnap.docs[0]?.data();
       const workspaces = workspacesSnap.docs.map((d) => d.data() as Workspace);
@@ -375,6 +395,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
         (d) => d.data() as Collection,
       );
       const notes = notesSnap.docs.map((d) => d.data() as Note);
+      const reviewNotes = reviewNotesSnap.docs.map((d) => d.data() as ReviewNote);
 
       if (workspaces.length === 0 && notes.length === 0) {
         showToast("No cloud data found. Uploading local data...");
@@ -400,6 +421,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
         workspaces: mergeArrays(data.workspaces, workspaces),
         collections: mergeArrays(data.collections, collections),
         notes: mergeArrays(data.notes, notes),
+        reviewNotes: mergeArrays((data.reviewNotes || []), reviewNotes),
       };
 
       saveData(mergedData);
@@ -754,6 +776,66 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
       });
     },
     [data, saveData],
+  );
+
+  // --- Review Notes ---
+  const addReviewNote = useCallback(
+    (reviewNoteValue: Omit<ReviewNote, "id" | "createdAt" | "updatedAt">) => {
+      const now = new Date().toISOString();
+      const newReviewNote: ReviewNote = {
+        ...reviewNoteValue,
+        id: generateId(),
+        createdAt: now,
+        updatedAt: now,
+      };
+      saveData({
+        ...data,
+        reviewNotes: [newReviewNote, ...(data.reviewNotes || [])],
+      });
+      if (user) {
+        setDoc(
+          doc(db, `users/${user.uid}/reviewNotes/${newReviewNote.id}`),
+          { ...newReviewNote, userId: user.uid },
+          { merge: true }
+        ).catch((e) => console.error(e));
+      }
+      return newReviewNote;
+    },
+    [data, saveData, user]
+  );
+
+  const updateReviewNote = useCallback(
+    (id: string, updates: Partial<ReviewNote>) => {
+      saveData({
+        ...data,
+        reviewNotes: (data.reviewNotes || []).map((rn) =>
+          rn.id === id ? { ...rn, ...updates, updatedAt: new Date().toISOString() } : rn
+        ),
+      });
+      if (user) {
+        const finalUpdates = { ...updates, updatedAt: new Date().toISOString() };
+        setDoc(doc(db, `users/${user.uid}/reviewNotes/${id}`), finalUpdates, { merge: true })
+          .catch((e) => console.error(e));
+      }
+    },
+    [data, saveData, user]
+  );
+
+  const deleteReviewNote = useCallback(
+    async (id: string) => {
+      saveData({
+        ...data,
+        reviewNotes: (data.reviewNotes || []).filter((n) => n.id !== id),
+      });
+      if (user) {
+        try {
+          await deleteDoc(doc(db, `users/${user.uid}/reviewNotes/${id}`));
+        } catch (e) {
+          console.error("Failed to delete review note", e);
+        }
+      }
+    },
+    [data, saveData, user]
   );
 
   const clearAllData = useCallback(async () => {
