@@ -28,6 +28,7 @@ import { ImageCropModal } from "./ImageCropModal";
 import { ChartBuilderModal } from "./ChartBuilderModal";
 import { TableControls } from "./TableControls";
 import { TaskDashboard } from "./TaskDashboard";
+import { SmartSearchPanel } from "./SmartSearchPanel";
 import { appPrompt } from "./GlobalDialogs";
 import {
   Bold,
@@ -76,6 +77,7 @@ import {
   Link as LinkIcon,
   Mic,
   MicOff,
+  Network,
 } from "lucide-react";
 import { cn, generateId } from "../lib/utils";
 import { format } from "date-fns";
@@ -197,6 +199,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
   const pdfContainerRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isDictating, setIsDictating] = useState(false);
+  const [isSmartSearchOpen, setIsSmartSearchOpen] = useState(false);
   const recognitionRef = useRef<any>(null);
 
   const [aiSummary, setAiSummary] = useState<{
@@ -2275,6 +2278,15 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
         </div>
       )}
 
+      {/* Smart Search Floating Action Button */}
+      <button
+        onClick={() => setIsSmartSearchOpen(true)}
+        className="fixed bottom-[8.5rem] right-40 w-14 h-14 bg-surface hover:bg-surface-hover text-text-primary border border-border shadow-[0_8px_30px_rgba(0,0,0,0.1)] rounded-full flex items-center justify-center z-40 transition-transform hover:scale-105 active:scale-95 no-print"
+        title="Smart Search / Brain Map"
+      >
+        <Network size={20} className="text-xl" />
+      </button>
+
       {/* Read/Edit Floating Action Button */}
       <button
         onClick={() => setIsEditing(!isEditing)}
@@ -2299,6 +2311,13 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
           onSave={handleSaveChart}
         />
       )}
+
+      <SmartSearchPanel 
+        isOpen={isSmartSearchOpen}
+        onClose={() => setIsSmartSearchOpen(false)}
+        noteId={noteId}
+        onNavigateToNote={onNavigateToNote}
+      />
     </div>
   );
 };

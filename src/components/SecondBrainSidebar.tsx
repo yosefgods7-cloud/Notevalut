@@ -95,7 +95,7 @@ export const SecondBrainSidebar: React.FC = () => {
                     {msg.role === 'ai' ? (
                       <div 
                         className="markdown-body text-sm bg-transparent !text-inherit prose-p:my-1 prose-headings:my-2 prose-ul:my-1 text-text-primary"
-                        dangerouslySetInnerHTML={{ __html: marked(msg.content) }}
+                        dangerouslySetInnerHTML={{ __html: marked(msg.content) as string }}
                       />
                     ) : (
                       msg.content
