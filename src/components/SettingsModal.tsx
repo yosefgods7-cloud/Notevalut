@@ -30,6 +30,8 @@ import { Settings as SettingsType } from "../types";
 import { uploadToDrive } from "../lib/drive";
 import { appPrompt, appConfirm } from "./GlobalDialogs";
 
+import { AISearchScopeSettings } from "./AISearchScopeSettings";
+
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -1111,6 +1113,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       Required for the Second Brain features. You can get a free API key from Google AI Studio. Stored securely and locally in your browser.
                     </p>
                   </div>
+                  
+                  {/* Search Scope */}
+                  <AISearchScopeSettings localSettings={localSettings} setLocalSettings={setLocalSettings} />
                   
                   {/* API Usage Metrics */}
                   <div className="flex flex-col gap-2 bg-surface p-4 rounded-xl border border-border mt-4">

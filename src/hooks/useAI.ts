@@ -1,7 +1,25 @@
 import { useStorage } from '../context/StorageContext';
 import { useCallback, useState } from 'react';
 import { fetchEmbedding, fetchAIAnswer, cosineSimilarity, generateContentHash } from '../lib/ai';
-import { Note } from '../types';
+import { Note, AiSearchScope } from '../types';
+
+export function isNoteInAiScope(note: Note, scope?: AiSearchScope): boolean {
+  if (!scope) return true;
+  
+  // If nothing is selected, arguably all notes are included according to instructions
+  const hasWorkspace = scope.workspaceIds.length > 0;
+  const hasCollection = scope.collectionIds.length > 0;
+  const hasNote = scope.noteIds.length > 0;
+
+  if (!hasWorkspace && !hasCollection && !hasNote) return true;
+
+  if (hasNote && scope.noteIds.includes(note.id)) return true;
+  if (hasCollection && scope.collectionIds.includes(note.collectionId)) return true;
+  if (hasWorkspace && scope.workspaceIds.includes(note.workspaceId)) return true;
+  
+  // If we have some filters active, but this note didn't match any, exclude it.
+  return false;
+}
 
 export function useAI() {
   const { data, updateSettings, updateNote } = useStorage();
@@ -71,7 +89,7 @@ export function useAI() {
     incrementRateLimit('embedding');
 
     const scoredNotes = data.notes
-      .filter(n => n.embedding && n.embedding.length > 0)
+      .filter(n => isNoteInAiScope(n, data.settings.aiScope) && n.embedding && n.embedding.length > 0)
       .map(n => ({
         note: n,
         score: cosineSimilarity(queryEmbedding, n.embedding!)

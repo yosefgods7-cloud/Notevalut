@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useStorage } from '../context/StorageContext';
-import { useAI } from '../hooks/useAI';
+import { useAI, isNoteInAiScope } from '../hooks/useAI';
 
 export const BackgroundAIProcessor: React.FC = () => {
   const { data } = useStorage();
@@ -22,7 +22,7 @@ export const BackgroundAIProcessor: React.FC = () => {
       
       try {
         let processedCount = 0;
-        const notes = dataRef.current.notes;
+        const notes = dataRef.current.notes.filter(n => isNoteInAiScope(n, dataRef.current.settings.aiScope));
         for (const note of notes) {
           if (processedCount >= 3) break;
           // Very quick check to avoid even hashing if there's no note change since last load, 

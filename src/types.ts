@@ -87,12 +87,19 @@ export interface DriveBackupSettings {
   fileId?: string;
 }
 
+export interface AiSearchScope {
+  workspaceIds: string[];
+  collectionIds: string[];
+  noteIds: string[];
+}
+
 export interface Settings {
   theme: "dark" | "light" | "system";
   fontSize: "small" | "medium" | "large" | "ultralarge";
   defaultWorkspace: string;
   smartPaste: boolean;
   geminiApiKey?: string;
+  aiScope?: AiSearchScope;
   plugins?: PluginSettings;
   toolbarItems?: string[];
   driveBackup?: DriveBackupSettings;
