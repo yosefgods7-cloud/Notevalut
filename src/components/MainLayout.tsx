@@ -152,7 +152,27 @@ export const MainLayout: React.FC = () => {
     } else {
       root.classList.add(data.settings.theme);
     }
-  }, [data.settings.theme]);
+    
+    // Default variables that can be customized
+    const cssVars = [
+      "--bg", "--surface", "--surface-hover", "--surface-active",
+      "--border", "--border-strong", "--accent", "--accent-hover",
+      "--accent-transparent", "--text-primary", "--text-secondary",
+      "--text-muted", "--doc-text", "--doc-h1", "--doc-h2", "--doc-h3"
+    ];
+    
+    // Clear previously custom styles
+    cssVars.forEach(v => root.style.removeProperty(v));
+    
+    // Apply custom colors if they exist
+    if (data.settings.customColors) {
+      Object.entries(data.settings.customColors).forEach(([key, val]) => {
+        if (val) {
+          root.style.setProperty(key, val);
+        }
+      });
+    }
+  }, [data.settings.theme, data.settings.customColors]);
 
   // Set initial collection if none selected but workspace has collections
   useEffect(() => {
@@ -594,7 +614,7 @@ export const MainLayout: React.FC = () => {
             setActiveNoteId(newNote.id);
           }
         }}
-        className="fixed bottom-[4.5rem] right-8 w-14 h-14 bg-accent hover:bg-accent-hover text-white rounded-full shadow-[0_8px_30px_rgba(124,106,247,0.3)] flex items-center justify-center z-40 transition-transform hover:scale-105 active:scale-95 no-print"
+        className="fixed bottom-[8.5rem] right-8 w-14 h-14 bg-accent hover:bg-accent-hover text-white rounded-full shadow-[0_8px_30px_rgba(124,106,247,0.3)] flex items-center justify-center z-40 transition-transform hover:scale-105 active:scale-95 no-print"
         title="Quick Capture"
       >
         <svg

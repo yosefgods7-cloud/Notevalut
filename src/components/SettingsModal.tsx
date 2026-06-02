@@ -584,7 +584,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <option value="system">System</option>
                     </select>
                   </div>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between bg-surface border border-border p-3 rounded-xl hover:border-accent transition-colors">
                     <span className="text-sm">Note Output Font Size</span>
                     <select
                       value={localSettings.fontSize}
@@ -601,6 +601,69 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <option value="large">Large</option>
                       <option value="ultralarge">Ultra Large</option>
                     </select>
+                  </div>
+                  
+                  {/* Custom Colors */}
+                  <div className="border border-border rounded-xl p-4 mt-6 bg-surface">
+                    <h4 className="font-semibold text-sm mb-4">Custom Theme Colors</h4>
+                    <p className="text-xs text-text-muted mb-4">Set specific colors to override the selected theme. Leave empty to use theme defaults.</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {[
+                        { key: "--bg", label: "Background" },
+                        { key: "--surface", label: "Nav/Cards Background" },
+                        { key: "--surface-hover", label: "Surface Hover" },
+                        { key: "--border", label: "Border/Boxed" },
+                        { key: "--text-primary", label: "Base & Bold Texts" },
+                        { key: "--text-muted", label: "Muted Text" },
+                        { key: "--accent", label: "Accent/Underline/Charts" },
+                        { key: "--doc-h1", label: "Editor Headlines" },
+                      ].map(colorVar => (
+                        <div key={colorVar.key} className="flex flex-col gap-1.5">
+                          <label className="text-xs font-medium">{colorVar.label} <span className="text-text-muted/50">({colorVar.key})</span></label>
+                          <div className="flex gap-2 items-center">
+                            <input
+                              type="color"
+                              className="w-8 h-8 rounded border-0 p-0 cursor-pointer bg-transparent"
+                              value={localSettings.customColors?.[colorVar.key] || "#000000"}
+                              onChange={(e) => setLocalSettings(s => ({
+                                ...s,
+                                customColors: {
+                                  ...(s.customColors || {}),
+                                  [colorVar.key]: e.target.value
+                                }
+                              }))}
+                              title={`Pick ${colorVar.label} Color`}
+                            />
+                            <input
+                              type="text"
+                              placeholder="e.g. #000000 or rgb(...)"
+                              className="flex-1 bg-background border border-border rounded-md px-2 py-1 text-xs focus:outline-none focus:border-accent"
+                              value={localSettings.customColors?.[colorVar.key] || ""}
+                              onChange={(e) => setLocalSettings(s => ({
+                                ...s,
+                                customColors: {
+                                  ...(s.customColors || {}),
+                                  [colorVar.key]: e.target.value
+                                }
+                              }))}
+                            />
+                            {localSettings.customColors?.[colorVar.key] && (
+                               <button 
+                                 title="Clear color override"
+                                 onClick={() => setLocalSettings(s => {
+                                   const newColors = { ...(s.customColors || {}) };
+                                   delete newColors[colorVar.key];
+                                   return { ...s, customColors: newColors };
+                                 })}
+                                 className="text-text-muted hover:text-red-500 p-1 font-bold text-lg leading-none flex items-center justify-center w-6 h-6 rounded-full hover:bg-red-500/10"
+                               >
+                                 &times;
+                               </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -924,6 +987,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         "codeBlock",
                         "table",
                         "hr",
+                        "dictate",
                         "attachment",
                         "chart",
                         "image",
@@ -953,6 +1017,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             "codeBlock",
                             "table",
                             "hr",
+                            "dictate",
                             "attachment",
                             "chart",
                             "image",

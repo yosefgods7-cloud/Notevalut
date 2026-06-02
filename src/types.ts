@@ -95,6 +95,7 @@ export interface Settings {
   toolbarItems?: string[];
   driveBackup?: DriveBackupSettings;
   lastCloudSyncDate?: string;
+  customColors?: Record<string, string>;
 }
 
 export interface NoteTemplate {
@@ -138,6 +139,7 @@ export const DEFAULT_SETTINGS: Settings = {
   fontSize: "medium",
   defaultWorkspace: "",
   smartPaste: true,
+  customColors: {},
   plugins: {
     autoCategorize: {
       enabled: false,
@@ -172,6 +174,7 @@ export const DEFAULT_SETTINGS: Settings = {
     "table",
     "hr",
     "|",
+    "dictate",
     "attachment",
     "chart",
     "image",

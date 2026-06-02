@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'motion/react';
 import { useStorage } from '../context/StorageContext';
 import { cn } from '../lib/utils';
 import { Search, Plus, Pin, Trash2, Clock, Star } from 'lucide-react';
@@ -146,8 +147,12 @@ export const NoteList: React.FC<NoteListProps> = ({
             {searchQuery ? "No notes found." : "No notes yet. Click 'New Note' to start."}
           </div>
         ) : (
-          sortedNotes.map(note => (
-            <div
+          sortedNotes.map((note, idx) => (
+            <motion.div
+              layoutId={note.id}
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2, delay: Math.min(idx * 0.05, 0.5) }}
               key={note.id}
               onClick={() => {
                 if (isBulkMode) {
@@ -251,7 +256,7 @@ export const NoteList: React.FC<NoteListProps> = ({
                   <Trash2 size={12} />
                 </button>
               </div>
-            </div>
+            </motion.div>
           ))
         )}
       </div>

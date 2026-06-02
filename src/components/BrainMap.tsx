@@ -233,46 +233,29 @@ export const BrainMap: React.FC<BrainMapProps> = ({
           .forceLink<GraphNode, GraphLink>(graphData.links)
           .id((d) => d.id)
           .distance((d) => {
-            if (d.type === "tag") return 240;
-            if (d.type === "parent") return 180;
+            if (d.type === "tag") return 300;
+            if (d.type === "parent") return 220;
             return 140;
-          }),
+          })
+          .strength(1),
       )
-      .force("charge", d3.forceManyBody().strength(-500))
+      .force("charge", d3.forceManyBody().strength(-2000).distanceMax(3000))
       .force(
         "collide",
         d3
           .forceCollide()
           .radius((d) =>
-            typeof d !== "number" ? (d as GraphNode).val + 40 : 40,
+            typeof d !== "number" ? (d as GraphNode).val + 60 : 60,
           )
-          .iterations(3),
+          .iterations(4)
+          .strength(1),
       )
       .force("center", d3.forceCenter(0, 0))
-      .force("x", d3.forceX().strength(0.03))
-      .force("y", d3.forceY().strength(0.03));
+      .force("x", d3.forceX().strength(0.01))
+      .force("y", d3.forceY().strength(0.01));
 
-    // Apply slow circular rotation movement
-    simulation.force("rotate", () => {
-      graphData.nodes.forEach((node) => {
-        if (
-          node.fx == null &&
-          node.fy == null &&
-          node.x !== undefined &&
-          node.y !== undefined &&
-          node.vx !== undefined &&
-          node.vy !== undefined
-        ) {
-          // Slow continuous rotation around center like a universe
-          const dist = Math.sqrt(node.x * node.x + node.y * node.y) || 1;
-          const speed = 0.08;
-          node.vx += (-node.y / dist) * speed;
-          node.vy += (node.x / dist) * speed;
-        }
-      });
-    });
-
-    // Keep simulation running gently so elements drift continuously
+    // Keep simulation running gently so elements drift continuously if desired
+    // Or we can let it settle. Let's let it settle.
     simulation.alphaTarget(0.01);
 
     // Draw Links

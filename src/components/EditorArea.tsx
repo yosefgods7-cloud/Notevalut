@@ -27,6 +27,7 @@ import { NoteHistoryModal } from "./NoteHistoryModal";
 import { ImageCropModal } from "./ImageCropModal";
 import { ChartBuilderModal } from "./ChartBuilderModal";
 import { TableControls } from "./TableControls";
+import { TaskDashboard } from "./TaskDashboard";
 import { appPrompt } from "./GlobalDialogs";
 import {
   Bold,
@@ -73,6 +74,8 @@ import {
   Volume2,
   VolumeX,
   Link as LinkIcon,
+  Mic,
+  MicOff,
 } from "lucide-react";
 import { cn, generateId } from "../lib/utils";
 import { format } from "date-fns";
@@ -193,6 +196,9 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const pdfContainerRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isDictating, setIsDictating] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
   const [aiSummary, setAiSummary] = useState<{
     loading: boolean;
     text: string | null;
@@ -745,6 +751,68 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
   });
 
   useEffect(() => {
+    // Only init if supported
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
+
+      recognition.onstart = () => {
+        setIsDictating(true);
+      };
+
+      recognition.onresult = (event: any) => {
+        let finalTranscript = "";
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript;
+          }
+        }
+
+        if (finalTranscript && editor) {
+          editor.commands.insertContent(finalTranscript + " ");
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        if (event.error === 'not-allowed') {
+          showToast("Microphone access denied. Please allow microphone permissions.");
+        } else {
+          showToast(`Speech recognition error: ${event.error}`);
+        }
+        setIsDictating(false);
+      };
+
+      recognition.onend = () => {
+        setIsDictating(false);
+      };
+
+      recognitionRef.current = recognition;
+    }
+  }, [editor, showToast]);
+
+  const toggleDictation = useCallback(() => {
+    if (!recognitionRef.current) {
+      alert("Speech recognition is not supported in your browser.");
+      return;
+    }
+
+    if (isDictating) {
+      recognitionRef.current.stop();
+    } else {
+      try {
+        recognitionRef.current.start();
+      } catch (err) {
+        console.warn("Could not start speech recognition:", err);
+      }
+    }
+  }, [isDictating]);
+
+  useEffect(() => {
     if (editor) {
       editor.setEditable(isEditing);
     }
@@ -1082,11 +1150,12 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background overflow-hidden relative">
-      <div className="flex-1 overflow-y-auto no-scrollbar relative flex justify-center pb-32 pt-8 print:pt-0">
-        <div
-          className="w-full max-w-[720px] px-8 print:px-0"
-          ref={pdfContainerRef}
-        >
+      <div className="flex-1 flex flex-row overflow-hidden w-full h-full">
+        <div className="flex-1 overflow-y-auto no-scrollbar relative flex justify-center pb-32 pt-8 print:pt-0">
+          <div
+            className="w-full max-w-[720px] px-8 print:px-0"
+            ref={pdfContainerRef}
+          >
           {/* Note Metadata Header */}
           <div className="mb-8 p-6 bg-surface border border-border rounded-xl">
             <input
@@ -1653,6 +1722,8 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
           )}
         </div>
       </div>
+      <TaskDashboard editor={editor} />
+      </div>
 
       {/* Bottom Toolbar replacing Footer Info */}
       <div className="flex flex-col border-t border-border bg-background shrink-0 no-print safe-area-bottom sticky bottom-0 z-[60] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] w-full max-w-[100%]">
@@ -1897,6 +1968,16 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
                             editor.chain().focus().setHorizontalRule().run()
                           }
                           icon={<Minus size={16} />}
+                        />
+                      );
+                    case "dictate":
+                      return (
+                        <ToolbarButton
+                          key={item}
+                          onClick={toggleDictation}
+                          active={isDictating}
+                          icon={isDictating ? <Mic size={16} className="text-red-500 animate-pulse" /> : <MicOff size={16} />}
+                          title="Voice to Text"
                         />
                       );
                     case "attachment":
@@ -2197,7 +2278,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
       {/* Read/Edit Floating Action Button */}
       <button
         onClick={() => setIsEditing(!isEditing)}
-        className="fixed bottom-[4.5rem] right-24 w-14 h-14 bg-surface hover:bg-surface-hover text-text-primary border border-border shadow-[0_8px_30px_rgba(0,0,0,0.1)] rounded-full flex items-center justify-center z-40 transition-transform hover:scale-105 active:scale-95 no-print"
+        className="fixed bottom-[8.5rem] right-24 w-14 h-14 bg-surface hover:bg-surface-hover text-text-primary border border-border shadow-[0_8px_30px_rgba(0,0,0,0.1)] rounded-full flex items-center justify-center z-40 transition-transform hover:scale-105 active:scale-95 no-print"
         title={isEditing ? "Switch to Reading Mode" : "Switch to Editing Mode"}
       >
         {isEditing ? <BookOpen size={20} /> : <Pen size={20} />}
