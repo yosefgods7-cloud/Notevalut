@@ -62,6 +62,8 @@ export interface Note {
   images?: NoteImage[];
   attachments?: NoteAttachment[];
   charts?: NoteChart[];
+  contentHash?: string;
+  embedding?: number[];
 }
 
 export interface AutoCategorizeRule {
@@ -96,6 +98,11 @@ export interface Settings {
   driveBackup?: DriveBackupSettings;
   lastCloudSyncDate?: string;
   customColors?: Record<string, string>;
+  apiUsage?: {
+    date: string;
+    embeddingCount: number;
+    answerCount: number;
+  };
 }
 
 export interface NoteTemplate {

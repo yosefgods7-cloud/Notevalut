@@ -24,6 +24,8 @@ import { ImportModal } from "./ImportModal";
 import { SettingsModal } from "./SettingsModal";
 import { BrainMap } from "./BrainMap";
 import { ReviewArea } from "./ReviewArea";
+import { BackgroundAIProcessor } from "./BackgroundAIProcessor";
+import { SecondBrainSidebar } from "./SecondBrainSidebar";
 
 export const MainLayout: React.FC = () => {
   const { data, addNote, updateSettings } = useStorage();
@@ -632,6 +634,9 @@ export const MainLayout: React.FC = () => {
           <line x1="5" y1="12" x2="19" y2="12"></line>
         </svg>
       </button>
+
+      <BackgroundAIProcessor />
+      <SecondBrainSidebar />
     </div>
   );
 };

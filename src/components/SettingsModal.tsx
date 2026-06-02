@@ -1084,12 +1084,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           geminiApiKey: e.target.value,
                         }))
                       }
-                      placeholder="Paste your API key here..."
+                      placeholder="AI Studio Free API Key..."
                       className="bg-surface border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-blue-500 w-full"
                     />
-                    <p className="text-xs text-text-muted leading-relaxed">
-                      The app uses the free tier Gemini API by default. Add your
-                      own key to customize or bypass rate limits.
+                    <div className="flex items-center gap-2 mt-2">
+                       <button
+                         type="button"
+                         onClick={async () => {
+                           if (!localSettings.geminiApiKey) return;
+                           const { fetchEmbedding } = await import('../lib/ai');
+                           const el = document.getElementById("apiKeyMessage");
+                           if (el) el.textContent = "Verifying...";
+                           const res = await fetchEmbedding("test", localSettings.geminiApiKey);
+                           if (el) {
+                             if (res) el.textContent = "✅ Valid API Key";
+                             else el.textContent = "❌ Invalid API Key format or network error";
+                           }
+                         }}
+                         className="px-3 py-1.5 text-xs bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 rounded font-medium transition-colors border border-blue-500/20"
+                       >
+                         Verify Key
+                       </button>
+                       <span id="apiKeyMessage" className="text-xs font-mono text-text-muted"></span>
+                    </div>
+                    <p className="text-xs text-text-muted leading-relaxed mt-1">
+                      Required for the Second Brain features. You can get a free API key from Google AI Studio. Stored securely and locally in your browser.
                     </p>
                   </div>
                 </div>
