@@ -1111,6 +1111,40 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       Required for the Second Brain features. You can get a free API key from Google AI Studio. Stored securely and locally in your browser.
                     </p>
                   </div>
+                  
+                  {/* API Usage Metrics */}
+                  <div className="flex flex-col gap-2 bg-surface p-4 rounded-xl border border-border mt-4">
+                    <h4 className="text-sm font-medium">Daily API Usage</h4>
+                    <p className="text-xs text-text-muted mb-2">Monitor your Gemini API usage for second brain and AI features. Free tier limits apply.</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-background rounded-lg p-3 border border-border">
+                        <div className="text-xs text-text-muted mb-1">Embedding Calls</div>
+                        <div className="flex items-end gap-2">
+                          <span className="text-lg font-bold">{data.settings.apiUsage?.date === new Date().toISOString().split('T')[0] ? data.settings.apiUsage?.embeddingCount || 0 : 0}</span>
+                          <span className="text-xs text-text-muted mb-1">/ 1400</span>
+                        </div>
+                        <div className="w-full bg-surface-active h-1.5 rounded-full mt-2 overflow-hidden">
+                          <div 
+                            className="bg-blue-500 h-full rounded-full transition-all" 
+                            style={{ width: `${Math.min(((data.settings.apiUsage?.date === new Date().toISOString().split('T')[0] ? data.settings.apiUsage?.embeddingCount || 0 : 0) / 1400) * 100, 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div className="bg-background rounded-lg p-3 border border-border">
+                        <div className="text-xs text-text-muted mb-1">AI Chat Calls</div>
+                        <div className="flex items-end gap-2">
+                          <span className="text-lg font-bold">{data.settings.apiUsage?.date === new Date().toISOString().split('T')[0] ? data.settings.apiUsage?.answerCount || 0 : 0}</span>
+                          <span className="text-xs text-text-muted mb-1">/ 1400</span>
+                        </div>
+                        <div className="w-full bg-surface-active h-1.5 rounded-full mt-2 overflow-hidden">
+                          <div 
+                            className="bg-purple-500 h-full rounded-full transition-all" 
+                            style={{ width: `${Math.min(((data.settings.apiUsage?.date === new Date().toISOString().split('T')[0] ? data.settings.apiUsage?.answerCount || 0 : 0) / 1400) * 100, 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
