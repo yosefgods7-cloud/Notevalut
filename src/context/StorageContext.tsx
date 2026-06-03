@@ -5,7 +5,9 @@ import React, {
   useState,
   useCallback,
   useMemo,
+  useRef,
 } from "react";
+import { useFirebaseConnection } from './FirebaseConnectionManager';
 import {
   NoteVaultData,
   Workspace,
@@ -106,6 +108,8 @@ interface StorageContextType {
   importData: (importedData: NoteVaultData, merge: boolean) => Promise<void>;
   syncToCloud: () => Promise<void>;
   syncFromCloud: () => Promise<void>;
+  loadAllNotes: () => void;
+  areAllNotesLoaded: boolean;
   isSyncing: boolean;
   undo: () => void;
   canUndo: boolean;
@@ -128,8 +132,24 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const { user } = useAuth();
+  const { cloudNotes } = useFirebaseConnection();
   const [history, setHistory] = useState<NoteVaultData[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
+
+  useEffect(() => {
+    // Realtime merge cloudNotes
+    if (cloudNotes.length > 0 && isInitialized) {
+      setData((prev) => {
+        const localIds = new Set(prev.notes.map(n => n.id));
+        const newNotes = cloudNotes.filter(cn => !localIds.has(cn.id));
+        if (newNotes.length === 0) return prev;
+        return {
+           ...prev,
+           notes: [...prev.notes, ...newNotes]
+        };
+      });
+    }
+  }, [cloudNotes, isInitialized]);
 
   const [data, setData] = useState<NoteVaultData>(() => ({
     ...DEFAULT_DATA,
@@ -152,21 +172,45 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
     setTimeout(() => setToast(null), 2500);
   }, []);
 
+  const hiddenNotesRef = useRef<Note[]>([]);
+  const [areAllNotesLoaded, setAreAllNotesLoaded] = useState(false);
+
   const saveData = useCallback(
     async (newData: NoteVaultData, skipHistory = false) => {
       if (!skipHistory) {
         setHistory((prev) => [data, ...prev].slice(0, 20));
       }
       setData(newData);
+      
+      // Merge with hidden nodes before writing to storage
+      const fullData = { ...newData };
+      if (!areAllNotesLoaded && hiddenNotesRef.current.length > 0) {
+         // Create a unique set by ID, giving preference to the ones currently loaded
+         const loadedIds = new Set(newData.notes.map(n => n.id));
+         const mergedNotes = [...newData.notes, ...hiddenNotesRef.current.filter(n => !loadedIds.has(n.id))];
+         fullData.notes = mergedNotes;
+      }
+      
       try {
-        await set(STORAGE_KEY, JSON.stringify(newData));
+        await set(STORAGE_KEY, JSON.stringify(fullData));
       } catch (e) {
         console.warn("Failed to write to IndexedDB, fallback to localStorage");
-        safeStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
+        safeStorage.setItem(STORAGE_KEY, JSON.stringify(fullData));
       }
     },
-    [data],
+    [data, areAllNotesLoaded],
   );
+
+  const loadAllNotes = useCallback(() => {
+    if (areAllNotesLoaded || hiddenNotesRef.current.length === 0) return;
+    setData(prev => {
+        const loadedIds = new Set(prev.notes.map(n => n.id));
+        const mergedNotes = [...prev.notes, ...hiddenNotesRef.current.filter(n => !loadedIds.has(n.id))];
+        return { ...prev, notes: mergedNotes };
+    });
+    hiddenNotesRef.current = [];
+    setAreAllNotesLoaded(true);
+  }, [areAllNotesLoaded]);
 
   useEffect(() => {
     const initStorage = async () => {
@@ -196,6 +240,17 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
         try {
           let parsed = JSON.parse(storedData) as Partial<NoteVaultData>;
           const defaultWsId = generateId();
+          
+          let allNotes = parsed.notes || [];
+          allNotes.sort((a,b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+          
+          if (allNotes.length > 10) {
+            hiddenNotesRef.current = allNotes.slice(10);
+            allNotes = allNotes.slice(0, 10);
+          } else {
+            setAreAllNotesLoaded(true);
+          }
+
           const migratedData: NoteVaultData = {
             version: parsed.version || 1,
             workspaces: parsed.workspaces?.length
@@ -210,7 +265,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
                   },
                 ],
             collections: parsed.collections || [],
-            notes: parsed.notes || [],
+            notes: allNotes,
             tags: parsed.tags || [],
             settings: { ...DEFAULT_SETTINGS, ...(parsed.settings || {}) },
             templates: parsed.templates || [],
@@ -944,6 +999,8 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
         importData,
         syncToCloud,
         syncFromCloud,
+        loadAllNotes,
+        areAllNotesLoaded,
         isSyncing,
         undo,
         canUndo: history.length > 0,

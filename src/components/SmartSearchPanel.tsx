@@ -34,7 +34,14 @@ export const SmartSearchPanel: React.FC<SmartSearchPanelProps> = ({
   onClose,
   onNavigateToNote,
 }) => {
-  const { data } = useStorage();
+  const { data, loadAllNotes } = useStorage();
+
+  useEffect(() => {
+    if (isOpen) {
+      loadAllNotes();
+    }
+  }, [isOpen, loadAllNotes]);
+
   const currentNote = data.notes.find((n) => n.id === noteId);
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -190,6 +197,7 @@ export const SmartSearchPanel: React.FC<SmartSearchPanelProps> = ({
 
     return () => {
       simulation.stop();
+      svg.on(".zoom", null);
     };
 
   }, [isOpen, currentNote, connectedNotes, tags]);

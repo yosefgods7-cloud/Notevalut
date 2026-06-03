@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { useStorage } from '../context/StorageContext';
 import { cn } from '../lib/utils';
@@ -16,8 +16,15 @@ export const NoteList: React.FC<NoteListProps> = ({
   activeWorkspaceId, activeCollectionId,
   activeNoteId, setActiveNoteId
 }) => {
-  const { data, addNote, updateNote, deleteNote, deleteNotes } = useStorage();
+  const { data, addNote, updateNote, deleteNote, deleteNotes, loadAllNotes } = useStorage();
   const [searchQuery, setSearchQuery] = useState('');
+  
+  useEffect(() => {
+    if (searchQuery.trim().length > 0) {
+      loadAllNotes();
+    }
+  }, [searchQuery, loadAllNotes]);
+
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [selectedNotes, setSelectedNotes] = useState<string[]>([]);

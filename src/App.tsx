@@ -1,6 +1,7 @@
 import React, { Component, ErrorInfo } from 'react';
 import { StorageProvider } from './context/StorageContext';
 import { AuthProvider } from './context/AuthContext';
+import { FirebaseConnectionProvider } from './context/FirebaseConnectionManager';
 import { MainLayout } from './components/MainLayout';
 import { GlobalDialogs } from './components/GlobalDialogs';
 
@@ -21,10 +22,11 @@ class ErrorBoundary extends Component<{children: React.ReactNode}, {hasError: bo
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ padding: 20, color: 'red', background: '#fee' }}>
+        <div style={{ padding: 20, color: 'var(--color-text-primary)' }}>
           <h1>Component Error</h1>
           <pre>{this.state.error?.toString()}</pre>
           <pre>{this.state.error?.stack}</pre>
+          <button onClick={() => window.location.reload()} style={{marginTop: 10, padding: 8, background: 'var(--color-accent)'}}>Reload</button>
         </div>
       );
     }
@@ -36,10 +38,12 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <StorageProvider>
-          <MainLayout />
-          <GlobalDialogs />
-        </StorageProvider>
+        <FirebaseConnectionProvider>
+          <StorageProvider>
+            <MainLayout />
+            <GlobalDialogs />
+          </StorageProvider>
+        </FirebaseConnectionProvider>
       </AuthProvider>
     </ErrorBoundary>
   );

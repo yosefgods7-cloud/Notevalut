@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense, lazy } from "react";
 import {
   X,
   ArrowLeft,
@@ -19,13 +19,14 @@ import { cn } from "../lib/utils";
 import { Sidebar } from "./Sidebar";
 import { NoteList } from "./NoteList";
 import { EditorArea } from "./EditorArea";
-import { ExportModal } from "./ExportModal";
-import { ImportModal } from "./ImportModal";
-import { SettingsModal } from "./SettingsModal";
-import { BrainMap } from "./BrainMap";
-import { ReviewArea } from "./ReviewArea";
-import { BackgroundAIProcessor } from "./BackgroundAIProcessor";
-import { SecondBrainSidebar } from "./SecondBrainSidebar";
+
+const ExportModal = lazy(() => import("./ExportModal").then(module => ({ default: module.ExportModal })));
+const ImportModal = lazy(() => import("./ImportModal").then(module => ({ default: module.ImportModal })));
+const SettingsModal = lazy(() => import("./SettingsModal").then(module => ({ default: module.SettingsModal })));
+const BrainMap = lazy(() => import("./BrainMap").then(module => ({ default: module.BrainMap })));
+const ReviewArea = lazy(() => import("./ReviewArea").then(module => ({ default: module.ReviewArea })));
+const BackgroundAIProcessor = lazy(() => import("./BackgroundAIProcessor").then(module => ({ default: module.BackgroundAIProcessor })));
+const SecondBrainSidebar = lazy(() => import("./SecondBrainSidebar").then(module => ({ default: module.SecondBrainSidebar })));
 
 export const MainLayout: React.FC = () => {
   const { data, addNote, updateSettings } = useStorage();
@@ -450,22 +451,26 @@ export const MainLayout: React.FC = () => {
           </div>
         )}
         {activeNoteId === "brain_map" ? (
-          <BrainMap
-            activeWorkspaceId={activeWorkspaceId}
-            onNavigateToNote={(noteId, collectionId, workspaceId) => {
-              setActiveWorkspaceId(workspaceId);
-              setActiveCollectionId(collectionId);
-              setActiveNoteId(noteId);
-              if (!openTabs.includes(noteId)) {
-                setOpenTabs((prev) => [...prev, noteId]);
+          <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading Neurolink...</div>}>
+            <BrainMap
+              activeWorkspaceId={activeWorkspaceId}
+              onNavigateToNote={(noteId, collectionId, workspaceId) => {
+                setActiveWorkspaceId(workspaceId);
+                setActiveCollectionId(collectionId);
+                setActiveNoteId(noteId);
+                if (!openTabs.includes(noteId)) {
+                  setOpenTabs((prev) => [...prev, noteId]);
+                }
+              }}
+              onClose={() =>
+                handleCloseTab("brain_map", { stopPropagation: () => {} } as any)
               }
-            }}
-            onClose={() =>
-              handleCloseTab("brain_map", { stopPropagation: () => {} } as any)
-            }
-          />
+            />
+          </Suspense>
         ) : activeNoteId === "review_notes" ? (
-          <ReviewArea onClose={() => handleCloseTab("review_notes", { stopPropagation: () => {} } as any)} />
+          <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading Learn Area...</div>}>
+            <ReviewArea onClose={() => handleCloseTab("review_notes", { stopPropagation: () => {} } as any)} />
+          </Suspense>
         ) : activeNoteId?.startsWith("new-tab-") ? (
           <div className="flex-1 flex flex-col items-center justify-center p-8 bg-background h-full w-full relative z-0">
             <button
@@ -585,23 +590,34 @@ export const MainLayout: React.FC = () => {
         )}
       </div>
 
-      <ExportModal
-        isOpen={isExportOpen}
-        onClose={() => setExportOpen(false)}
-        activeCollectionId={activeCollectionId}
-        activeNoteId={activeNoteId}
-      />
-      <ImportModal
-        isOpen={isImportOpen}
-        onClose={() => setImportOpen(false)}
-        activeWorkspaceId={activeWorkspaceId}
-        activeCollectionId={activeCollectionId}
-      />
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        onOpenExport={() => setExportOpen(true)}
-      />
+      {/* Modals & Background Processes */}
+      <Suspense fallback={null}>
+        {isExportOpen && (
+          <ExportModal
+            isOpen={isExportOpen}
+            onClose={() => setExportOpen(false)}
+            activeCollectionId={activeCollectionId}
+            activeNoteId={activeNoteId}
+          />
+        )}
+        {isImportOpen && (
+          <ImportModal
+            isOpen={isImportOpen}
+            onClose={() => setImportOpen(false)}
+            activeWorkspaceId={activeWorkspaceId}
+            activeCollectionId={activeCollectionId}
+          />
+        )}
+        {isSettingsOpen && (
+          <SettingsModal
+            isOpen={isSettingsOpen}
+            onClose={() => setSettingsOpen(false)}
+            onOpenExport={() => setExportOpen(true)}
+          />
+        )}
+        <BackgroundAIProcessor />
+        <SecondBrainSidebar />
+      </Suspense>
 
       {/* Quick Capture Floating Action Button */}
       <button

@@ -41,7 +41,12 @@ export const BrainMap: React.FC<BrainMapProps> = ({
   onNavigateToNote,
   onClose,
 }) => {
-  const { data } = useStorage();
+  const { data, loadAllNotes } = useStorage();
+
+  useEffect(() => {
+    loadAllNotes();
+  }, [loadAllNotes]);
+
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [colorTheme, setColorTheme] = useState<
@@ -361,6 +366,7 @@ export const BrainMap: React.FC<BrainMapProps> = ({
     // Cleanup
     return () => {
       simulation.stop();
+      svg.on(".zoom", null);
     };
   }, [graphData, onNavigateToNote, colorTheme]);
 

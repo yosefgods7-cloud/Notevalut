@@ -28,8 +28,10 @@ import { ImageCropModal } from "./ImageCropModal";
 import { ChartBuilderModal } from "./ChartBuilderModal";
 import { TableControls } from "./TableControls";
 import { TaskDashboard } from "./TaskDashboard";
-import { SmartSearchPanel } from "./SmartSearchPanel";
 import { appPrompt } from "./GlobalDialogs";
+import { lazy, Suspense } from 'react';
+
+const SmartSearchPanel = lazy(() => import('./SmartSearchPanel').then(m => ({ default: m.SmartSearchPanel })));
 import {
   Bold,
   Italic,
@@ -795,6 +797,17 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
       };
 
       recognitionRef.current = recognition;
+
+      return () => {
+        try {
+          recognition.stop();
+        } catch(e) {}
+        recognition.onstart = null;
+        recognition.onresult = null;
+        recognition.onerror = null;
+        recognition.onend = null;
+        recognitionRef.current = null;
+      };
     }
   }, [editor, showToast]);
 
@@ -2312,12 +2325,16 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
         />
       )}
 
-      <SmartSearchPanel 
-        isOpen={isSmartSearchOpen}
-        onClose={() => setIsSmartSearchOpen(false)}
-        noteId={noteId}
-        onNavigateToNote={onNavigateToNote}
-      />
+      <Suspense fallback={null}>
+        {isSmartSearchOpen && (
+          <SmartSearchPanel 
+            isOpen={isSmartSearchOpen}
+            onClose={() => setIsSmartSearchOpen(false)}
+            noteId={noteId}
+            onNavigateToNote={onNavigateToNote}
+          />
+        )}
+      </Suspense>
     </div>
   );
 };
