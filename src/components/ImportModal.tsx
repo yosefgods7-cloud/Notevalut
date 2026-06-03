@@ -27,9 +27,9 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, activ
       if (file.name.endsWith('.json')) {
         const parsed = await parseJSONImport(file);
         if (confirm(`Found ${parsed.notes.length} notes. Merge into current vault (OK) or Replace everything (Cancel)?`)) {
-          importData(parsed, true);
+          await importData(parsed, true);
         } else {
-          importData(parsed, false);
+          await importData(parsed, false);
         }
       } else if (file.name.endsWith('.md')) {
         if (!activeWorkspaceId || !activeCollectionId) {

@@ -46,7 +46,7 @@ export const SmartSearchPanel: React.FC<SmartSearchPanelProps> = ({
     const content = currentNote.content || "";
     
     // Exact titles
-    const currentTitle = currentNote.title.trim().toLowerCase();
+    const currentTitle = (currentNote.title || "Untitled").trim().toLowerCase();
 
     // Extract links from current note
     const outgoingLinks = Array.from(content.matchAll(wikilinkRegex)).map(m => m[1].trim().toLowerCase());
@@ -57,7 +57,7 @@ export const SmartSearchPanel: React.FC<SmartSearchPanelProps> = ({
       if (note.id === currentNote.id) return;
 
       let isConnected = false;
-      const noteTitle = note.title.trim().toLowerCase();
+      const noteTitle = (note.title || "Untitled").trim().toLowerCase();
 
       // Shares tags
       const noteTags = note.tags || [];

@@ -158,8 +158,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         const confirmMerge = await appConfirm(
           "Merge with existing data? (Cancel to replace everything)",
         );
-        importData(imported, confirmMerge);
-        showToast("Data imported successfully");
+        await importData(imported, confirmMerge);
         onClose();
       } catch (err) {
         console.error(err);

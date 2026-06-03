@@ -103,7 +103,7 @@ interface StorageContextType {
   deleteReviewNote: (id: string) => void;
   // Global actions
   clearAllData: () => void;
-  importData: (importedData: NoteVaultData, merge: boolean) => void;
+  importData: (importedData: NoteVaultData, merge: boolean) => Promise<void>;
   syncToCloud: () => Promise<void>;
   syncFromCloud: () => Promise<void>;
   isSyncing: boolean;
@@ -303,9 +303,10 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
         lastCloudSyncDate: timestamp,
       };
 
-      const batch = writeBatch(db);
+      // We'll write workspaces, collections, settings, review notes in a single initial batch
+      const initialBatch = writeBatch(db);
 
-      batch.set(
+      initialBatch.set(
         doc(db, `users/${user.uid}/settings/default`),
         {
           userId: user.uid,
@@ -317,29 +318,22 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
       );
 
       data.workspaces.forEach((w) => {
-        batch.set(
+        initialBatch.set(
           doc(db, `users/${user.uid}/workspaces/${w.id}`),
           { ...w, userId: user.uid },
           { merge: true },
         );
       });
       data.collections.forEach((c) => {
-        batch.set(
+        initialBatch.set(
           doc(db, `users/${user.uid}/collections/${c.id}`),
           { ...c, userId: user.uid },
           { merge: true },
         );
       });
-      data.notes.forEach((n) => {
-        batch.set(
-          doc(db, `users/${user.uid}/notes/${n.id}`),
-          { ...n, userId: user.uid },
-          { merge: true },
-        );
-      });
       if (data.reviewNotes) {
         data.reviewNotes.forEach((rn) => {
-          batch.set(
+          initialBatch.set(
             doc(db, `users/${user.uid}/reviewNotes/${rn.id}`),
             { ...rn, userId: user.uid },
             { merge: true },
@@ -347,7 +341,34 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
         });
       }
 
-      await batch.commit();
+      await initialBatch.commit();
+      
+      // Batched sync for notes (groups of 10)
+      const totalNotes = data.notes.length;
+      let syncedCount = 0;
+      
+      const batchSize = 10;
+      for (let i = 0; i < totalNotes; i += batchSize) {
+        const notesBatch = data.notes.slice(i, i + batchSize);
+        const fbBatch = writeBatch(db);
+        
+        notesBatch.forEach((n) => {
+          fbBatch.set(
+            doc(db, `users/${user.uid}/notes/${n.id}`),
+            { ...n, userId: user.uid },
+            { merge: true },
+          );
+        });
+        
+        await fbBatch.commit();
+        syncedCount += notesBatch.length;
+        
+        // Short delay between batches
+        if (i + batchSize < totalNotes) {
+          showToast(`Syncing notes: ${syncedCount} / ${totalNotes}...`);
+          await new Promise(res => setTimeout(res, 200));
+        }
+      }
 
       // Update local state to reflect the new sync date without fully pushing to history
       setData((prev) => {
@@ -852,20 +873,48 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   const importData = useCallback(
-    (importedData: NoteVaultData, merge: boolean) => {
+    async (importedData: NoteVaultData, merge: boolean) => {
       if (merge) {
+        showToast("Checking for existing notes...");
+        let currentNotes = data.notes;
+        
+        // Fetch from Firebase to ensure zero duplicates against cloud if logged in
+        if (user) {
+          try {
+            const notesSnap = await getDocs(collection(db, `users/${user.uid}/notes`));
+            const cloudNotes = notesSnap.docs.map((d) => d.data() as Note);
+            currentNotes = [...currentNotes, ...cloudNotes];
+          } catch(e) {
+            console.error("Could not fetch cloud notes during import", e);
+          }
+        }
+        
+        // Unique identifier sets to avoid duplicates
+        const existingNoteIdentifiers = new Set(currentNotes.map(n => `${(n.title || "Untitled").trim().toLowerCase()}-${n.createdAt}`));
+        
+        const newNotes = importedData.notes.filter(n => {
+          const idMatch = currentNotes.find(e => e.id === n.id);
+          const metaMatch = existingNoteIdentifiers.has(`${(n.title || "Untitled").trim().toLowerCase()}-${n.createdAt}`);
+          return !idMatch && !metaMatch;
+        });
+        
+        const newWorkspaces = importedData.workspaces.filter(w => !data.workspaces.find(e => e.id === w.id));
+        const newCollections = importedData.collections.filter(c => !data.collections.find(e => e.id === c.id));
+        
         saveData({
           ...data,
-          workspaces: [...data.workspaces, ...importedData.workspaces],
-          collections: [...data.collections, ...importedData.collections],
-          notes: [...data.notes, ...importedData.notes],
+          workspaces: [...data.workspaces, ...newWorkspaces],
+          collections: [...data.collections, ...newCollections],
+          notes: [...data.notes, ...newNotes],
           tags: Array.from(new Set([...data.tags, ...importedData.tags])),
         });
+        showToast(`Imported ${newNotes.length} new notes (skipped duplicates).`);
       } else {
         saveData(importedData);
+        showToast("Restored backup successfully.");
       }
     },
-    [data, saveData],
+    [data, saveData, user],
   );
 
   if (!isInitialized) return null;
