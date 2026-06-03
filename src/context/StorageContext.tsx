@@ -103,6 +103,9 @@ interface StorageContextType {
   addReviewNote: (reviewNote: Omit<ReviewNote, "id" | "createdAt" | "updatedAt">) => ReviewNote;
   updateReviewNote: (id: string, updates: Partial<ReviewNote>) => void;
   deleteReviewNote: (id: string) => void;
+  // Tags
+  renameTag: (oldTag: string, newTag: string) => void;
+  deleteTag: (tag: string) => void;
   // Global actions
   clearAllData: () => void;
   importData: (importedData: NoteVaultData, merge: boolean) => Promise<void>;
@@ -919,6 +922,111 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
     [data, saveData, user]
   );
 
+  const renameTag = useCallback(
+    (oldTag: string, newTag: string) => {
+      const normalizedNewTag = newTag.toLowerCase().replace(/^#+/, "").trim();
+      const newNotes = data.notes.map((note) => {
+        if (note.tags?.includes(oldTag)) {
+          return {
+            ...note,
+            tags: Array.from(new Set(note.tags.map((t) => (t === oldTag ? normalizedNewTag : t)))),
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return note;
+      });
+
+      const allTags = new Set<string>();
+      newNotes.forEach((n) => {
+        if (n.tags) n.tags.forEach((t) => allTags.add(t));
+      });
+
+      const newData = {
+        ...data,
+        notes: newNotes,
+        tags: Array.from(allTags),
+      };
+
+      saveData(newData);
+
+      if (user) {
+        try {
+          const batch = writeBatch(db);
+          let batchCount = 0;
+          newNotes.forEach((note) => {
+            const oldNote = data.notes.find((n) => n.id === note.id);
+            if (oldNote?.tags?.includes(oldTag)) {
+              batch.set(
+                doc(db, `users/${user.uid}/notes/${note.id}`),
+                { tags: note.tags, updatedAt: note.updatedAt },
+                { merge: true }
+              );
+              batchCount++;
+            }
+          });
+          if (batchCount > 0) {
+            batch.commit().catch(console.error);
+          }
+        } catch (e) {
+          console.error("Firebase bulk update failed", e);
+        }
+      }
+    },
+    [data, saveData, user]
+  );
+
+  const deleteTag = useCallback(
+    (tagToRemove: string) => {
+      const newNotes = data.notes.map((note) => {
+        if (note.tags?.includes(tagToRemove)) {
+          return {
+            ...note,
+            tags: note.tags.filter((t) => t !== tagToRemove),
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return note;
+      });
+
+      const allTags = new Set<string>();
+      newNotes.forEach((n) => {
+        if (n.tags) n.tags.forEach((t) => allTags.add(t));
+      });
+
+      const newData = {
+        ...data,
+        notes: newNotes,
+        tags: Array.from(allTags),
+      };
+
+      saveData(newData);
+
+      if (user) {
+        try {
+          const batch = writeBatch(db);
+          let batchCount = 0;
+          newNotes.forEach((note) => {
+            const oldNote = data.notes.find((n) => n.id === note.id);
+            if (oldNote?.tags?.includes(tagToRemove)) {
+              batch.set(
+                doc(db, `users/${user.uid}/notes/${note.id}`),
+                { tags: note.tags, updatedAt: note.updatedAt },
+                { merge: true }
+              );
+              batchCount++;
+            }
+          });
+          if (batchCount > 0) {
+            batch.commit().catch(console.error);
+          }
+        } catch (e) {
+          console.error("Firebase bulk update failed", e);
+        }
+      }
+    },
+    [data, saveData, user]
+  );
+
   const clearAllData = useCallback(async () => {
     safeStorage.removeItem(STORAGE_KEY);
     try {
@@ -995,6 +1103,8 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
         addReviewNote,
         updateReviewNote,
         deleteReviewNote,
+        renameTag,
+        deleteTag,
         clearAllData,
         importData,
         syncToCloud,

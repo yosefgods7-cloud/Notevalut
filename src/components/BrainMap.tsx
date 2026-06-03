@@ -89,6 +89,9 @@ export const BrainMap: React.FC<BrainMapProps> = ({
   };
 
   const [showAllHolders, setShowAllHolders] = useState<boolean>(true);
+  const [activeFilterTag, setActiveFilterTag] = useState<string | null>(null);
+  const [activeFilterFolder, setActiveFilterFolder] = useState<string | null>(null);
+  const [activeFilterDate, setActiveFilterDate] = useState<string | null>(null);
 
   // Compute Graph Data
   const graphData = useMemo(() => {
@@ -111,8 +114,34 @@ export const BrainMap: React.FC<BrainMapProps> = ({
 
     const workspaceIds = new Set(targetWorkspaces.map(w => w.id));
 
+    const targetCollections = data.collections.filter(c => workspaceIds.has(c.workspaceId));
+    const collectionIds = new Set(targetCollections.map(c => c.id));
+
+    // Notes
+    const tagSet = new Set<string>();
+    let targetNotes = data.notes.filter(n => collectionIds.has(n.collectionId) || workspaceIds.has(n.workspaceId));
+    
+    // Compute available attributes for filters before applying filters
+    const availableTags = Array.from(new Set(targetNotes.flatMap(n => n.tags)));
+    const availableFolders = Array.from(new Set(targetNotes.map(n => n.collectionId)));
+    const availableDates = Array.from(new Set(targetNotes.map(n => new Date(n.createdAt).toLocaleDateString())));
+
+    // Apply Filter
+    targetNotes = targetNotes.filter(n => {
+      if (activeFilterTag && !n.tags.includes(activeFilterTag)) return false;
+      if (activeFilterFolder && n.collectionId !== activeFilterFolder) return false;
+      if (activeFilterDate && new Date(n.createdAt).toLocaleDateString() !== activeFilterDate) return false;
+      return true;
+    });
+
+    const activeCollectionIds = new Set(targetNotes.map(n => n.collectionId));
+    const activeWorkspaceIds = new Set(targetCollections.filter(c => activeCollectionIds.has(c.id)).map(c => c.workspaceId));
+
     // Workspaces (Holders)
     targetWorkspaces.forEach((ws) => {
+      if (activeFilterFolder || activeFilterTag || activeFilterDate) {
+        if (!activeWorkspaceIds.has(ws.id)) return;
+      }
       nodes.push({
         id: `workspace-${ws.id}`,
         type: "workspace",
@@ -129,11 +158,13 @@ export const BrainMap: React.FC<BrainMapProps> = ({
       }
     });
 
-    const targetCollections = data.collections.filter(c => workspaceIds.has(c.workspaceId));
-    const collectionIds = new Set(targetCollections.map(c => c.id));
 
     // Collections
     targetCollections.forEach((col) => {
+      if (activeFilterFolder || activeFilterTag || activeFilterDate) {
+        if (!activeCollectionIds.has(col.id)) return;
+      }
+
       nodes.push({
         id: `collection-${col.id}`,
         type: "collection",
@@ -148,10 +179,6 @@ export const BrainMap: React.FC<BrainMapProps> = ({
         type: "parent",
       });
     });
-
-    // Notes
-    const tagSet = new Set<string>();
-    const targetNotes = data.notes.filter(n => collectionIds.has(n.collectionId) || workspaceIds.has(n.workspaceId));
 
     targetNotes.forEach((note) => {
       nodes.push({
@@ -193,8 +220,8 @@ export const BrainMap: React.FC<BrainMapProps> = ({
       });
     });
 
-    return { nodes, links };
-  }, [data, activeWorkspaceId, showAllHolders]);
+    return { nodes, links, availableTags, availableFolders, availableDates };
+  }, [data, activeWorkspaceId, showAllHolders, activeFilterTag, activeFilterFolder, activeFilterDate]);
 
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
 
@@ -260,8 +287,7 @@ export const BrainMap: React.FC<BrainMapProps> = ({
       .force("y", d3.forceY().strength(0.01));
 
     // Keep simulation running gently so elements drift continuously if desired
-    // Or we can let it settle. Let's let it settle.
-    simulation.alphaTarget(0.01);
+    simulation.alphaMin(0.01).alphaTarget(0.02);
 
     // Draw Links
     const link = g
@@ -354,6 +380,17 @@ export const BrainMap: React.FC<BrainMapProps> = ({
       );
 
     simulation.on("tick", () => {
+      // Add slight circular drift
+      graphData.nodes.forEach((d) => {
+        if (!d.x || !d.y) return;
+        const dist = Math.sqrt(d.x * d.x + d.y * d.y);
+        if (dist > 0) {
+          const angle = Math.atan2(d.y, d.x) + 0.002;
+          d.x = Math.cos(angle) * dist;
+          d.y = Math.sin(angle) * dist;
+        }
+      });
+
       link
         .attr("x1", (d) => (d.source as GraphNode).x!)
         .attr("y1", (d) => (d.source as GraphNode).y!)
@@ -421,19 +458,64 @@ export const BrainMap: React.FC<BrainMapProps> = ({
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background overflow-hidden relative">
-      <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
-        <div className="flex items-center gap-2 bg-surface/80 backdrop-blur-sm p-2 rounded-lg border border-border shadow-sm">
+      <div className="absolute top-4 left-4 z-10 flex flex-col gap-2 pointer-events-none">
+        <div className="flex items-center gap-2 bg-surface/80 backdrop-blur-sm p-2 rounded-lg border border-border shadow-sm pointer-events-auto">
           <Network size={20} className="text-accent" />
           <span className="font-semibold text-text-primary text-sm">
-            Neurolink System
+            Graph View
           </span>
         </div>
         <button
           onClick={() => setShowAllHolders(!showAllHolders)}
-          className="flex items-center justify-center bg-surface/80 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-border shadow-sm text-xs font-medium text-text-primary hover:bg-surface transition-colors"
+          className="flex items-center justify-center bg-surface/80 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-border shadow-sm text-xs font-medium text-text-primary hover:bg-surface transition-colors pointer-events-auto"
         >
           {showAllHolders ? "Viewing All Holders" : "Viewing Current Holder"}
         </button>
+
+        <div className="flex flex-col gap-1 max-w-[200px] pointer-events-auto mt-2 max-h-[300px] overflow-y-auto hidden-scrollbar">
+          {graphData.availableTags.length > 0 && <span className="text-[10px] font-bold text-text-muted mt-2 mb-1">TAGS</span>}
+          <div className="flex flex-wrap gap-1">
+             {graphData.availableTags.map(tag => (
+                <button
+                  key={tag}
+                  onClick={() => setActiveFilterTag(activeFilterTag === tag ? null : tag)}
+                  className={`px-1.5 py-0.5 rounded text-[10px] ${activeFilterTag === tag ? "bg-accent text-white" : "bg-surface text-text-secondary hover:bg-surface-hover border border-border"}`}
+                >
+                  #{tag}
+                </button>
+             ))}
+          </div>
+
+          {graphData.availableFolders.length > 0 && <span className="text-[10px] font-bold text-text-muted mt-2 mb-1">FOLDERS</span>}
+          <div className="flex flex-wrap gap-1">
+             {graphData.availableFolders.map(folderId => {
+                const col = data.collections.find(c => c.id === folderId);
+                if (!col) return null;
+                return (
+                   <button
+                     key={folderId}
+                     onClick={() => setActiveFilterFolder(activeFilterFolder === folderId ? null : folderId)}
+                     className={`px-1.5 py-0.5 rounded text-[10px] ${activeFilterFolder === folderId ? "bg-accent text-white" : "bg-surface text-text-secondary hover:bg-surface-hover border border-border"}`}
+                   >
+                     📁 {col.name}
+                   </button>
+                )
+             })}
+          </div>
+
+          {graphData.availableDates.length > 0 && <span className="text-[10px] font-bold text-text-muted mt-2 mb-1">DATES</span>}
+          <div className="flex flex-wrap gap-1">
+             {graphData.availableDates.map(date => (
+                <button
+                  key={date}
+                  onClick={() => setActiveFilterDate(activeFilterDate === date ? null : date)}
+                  className={`px-1.5 py-0.5 rounded text-[10px] ${activeFilterDate === date ? "bg-accent text-white" : "bg-surface text-text-secondary hover:bg-surface-hover border border-border"}`}
+                >
+                  📅 {date}
+                </button>
+             ))}
+          </div>
+        </div>
       </div>
 
       <div className="absolute top-4 right-4 z-10 flex items-center gap-1 bg-surface/80 backdrop-blur-sm p-1 rounded-lg border border-border shadow-sm">

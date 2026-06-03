@@ -25,6 +25,7 @@ const ImportModal = lazy(() => import("./ImportModal").then(module => ({ default
 const SettingsModal = lazy(() => import("./SettingsModal").then(module => ({ default: module.SettingsModal })));
 const BrainMap = lazy(() => import("./BrainMap").then(module => ({ default: module.BrainMap })));
 const ReviewArea = lazy(() => import("./ReviewArea").then(module => ({ default: module.ReviewArea })));
+const TagManagerModal = lazy(() => import("./TagManagerModal").then(module => ({ default: module.TagManagerModal })));
 const BackgroundAIProcessor = lazy(() => import("./BackgroundAIProcessor").then(module => ({ default: module.BackgroundAIProcessor })));
 const SecondBrainSidebar = lazy(() => import("./SecondBrainSidebar").then(module => ({ default: module.SecondBrainSidebar })));
 
@@ -134,8 +135,10 @@ export const MainLayout: React.FC = () => {
   const [isExportOpen, setExportOpen] = useState(false);
   const [isImportOpen, setImportOpen] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
+  const [isTagManagerOpen, setIsTagManagerOpen] = useState(false);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isFocusMode, setIsFocusMode] = useState(false);
 
   // Auto-collapse sidebar on very small screens
   useEffect(() => {
@@ -216,6 +219,7 @@ export const MainLayout: React.FC = () => {
         if (isExportOpen) setExportOpen(false);
         if (isImportOpen) setImportOpen(false);
         if (isSettingsOpen) setSettingsOpen(false);
+        if (isTagManagerOpen) setIsTagManagerOpen(false);
       }
     };
 
@@ -228,6 +232,7 @@ export const MainLayout: React.FC = () => {
     isExportOpen,
     isImportOpen,
     isSettingsOpen,
+    isTagManagerOpen,
   ]);
 
   useEffect(() => {
@@ -283,6 +288,7 @@ export const MainLayout: React.FC = () => {
           onOpenExport={() => setExportOpen(true)}
           onOpenImport={() => setImportOpen(true)}
           onOpenSettings={() => setSettingsOpen(true)}
+          onOpenTagManager={() => setIsTagManagerOpen(true)}
           onToggleBrainMap={() => {
             if (!openTabs.includes("brain_map")) {
               setOpenTabs((prev) => [...prev, "brain_map"]);
@@ -316,8 +322,8 @@ export const MainLayout: React.FC = () => {
         )}
       </div>
 
-      <div className="flex-1 flex flex-col min-w-0 h-full relative pl-20">
-        {openTabs.length > 0 && (
+      <div className={cn("flex-1 flex flex-col min-w-0 h-full relative transition-[padding] duration-300", isFocusMode ? "pl-0" : "pl-20")}>
+        {!isFocusMode && openTabs.length > 0 && (
           <div className="flex items-center w-full overflow-x-auto bg-surface border-b border-border h-12 no-print px-2 select-none shrink-0 no-scrollbar relative z-10 shadow-sm border-t">
             <button
               onClick={() => {
@@ -451,7 +457,7 @@ export const MainLayout: React.FC = () => {
           </div>
         )}
         {activeNoteId === "brain_map" ? (
-          <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading Neurolink...</div>}>
+          <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading Graph View...</div>}>
             <BrainMap
               activeWorkspaceId={activeWorkspaceId}
               onNavigateToNote={(noteId, collectionId, workspaceId) => {
@@ -551,7 +557,19 @@ export const MainLayout: React.FC = () => {
           <EditorArea
             noteId={activeNoteId}
             isSidebarOpen={isSidebarOpen}
-            onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+            onToggleSidebar={() => {
+              const newSidebarOpen = !isSidebarOpen;
+              setIsSidebarOpen(newSidebarOpen);
+              if (newSidebarOpen && isFocusMode) {
+                setIsFocusMode(false);
+              }
+            }}
+            isFocusMode={isFocusMode}
+            onToggleFocusMode={() => {
+              const newMode = !isFocusMode;
+              setIsFocusMode(newMode);
+              if (newMode) setIsSidebarOpen(false);
+            }}
             onOpenExport={() => setExportOpen(true)}
             onDeleteNote={() =>
               handleCloseTab(activeNoteId, { stopPropagation: () => {} } as any)
@@ -614,6 +632,9 @@ export const MainLayout: React.FC = () => {
             onClose={() => setSettingsOpen(false)}
             onOpenExport={() => setExportOpen(true)}
           />
+        )}
+        {isTagManagerOpen && (
+          <TagManagerModal onClose={() => setIsTagManagerOpen(false)} />
         )}
         <BackgroundAIProcessor />
         <SecondBrainSidebar />

@@ -18,6 +18,7 @@ interface SidebarProps {
   isBrainMapActive: boolean;
   onToggleReviews: () => void;
   isReviewsActive: boolean;
+  onOpenTagManager: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -25,7 +26,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeCollectionId, setActiveCollectionId,
   onOpenExport, onOpenImport, onOpenSettings,
   onToggleBrainMap, isBrainMapActive,
-  onToggleReviews, isReviewsActive
+  onToggleReviews, isReviewsActive,
+  onOpenTagManager
 }) => {
   const { data, saveData, addCollection, updateCollection, deleteCollection, addWorkspace, updateWorkspace, deleteWorkspace, undo, canUndo } = useStorage();
   const { accessToken } = useAuth();
@@ -326,7 +328,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
           >
             <Network size={16} className={cn(isBrainMapActive ? "text-white" : "text-accent")} />
-            <span>Brain Mapping</span>
+            <span>Graph View</span>
           </button>
           
           <button
@@ -340,6 +342,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <Calendar size={16} className={cn(isReviewsActive ? "text-white" : "text-accent")} />
             <span>Periodic Reviews</span>
+          </button>
+
+          <button
+            onClick={onOpenTagManager}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors border border-transparent shadow-sm bg-surface/50 text-text-primary hover:border-border hover:bg-surface-hover"
+          >
+            <Tag size={16} className="text-accent" />
+            <span>Tag Manager</span>
           </button>
         </div>
 

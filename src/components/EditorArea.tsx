@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useStorage } from "../context/StorageContext";
 import { useAuth } from "../context/AuthContext";
 import { uploadToDrive } from "../lib/drive";
@@ -80,6 +80,8 @@ import {
   Mic,
   MicOff,
   Network,
+  Maximize,
+  Minimize
 } from "lucide-react";
 import { cn, generateId } from "../lib/utils";
 import { format } from "date-fns";
@@ -142,6 +144,8 @@ interface EditorAreaProps {
   noteId: string;
   isSidebarOpen?: boolean;
   onToggleSidebar?: () => void;
+  isFocusMode?: boolean;
+  onToggleFocusMode?: () => void;
   onNavigateToNote?: (
     noteId: string,
     collectionId: string,
@@ -156,6 +160,8 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
   noteId,
   isSidebarOpen,
   onToggleSidebar,
+  isFocusMode,
+  onToggleFocusMode,
   onNavigateToNote,
   onOpenSettings,
   onOpenExport,
@@ -180,6 +186,29 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
   const [summary, setSummary] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
+  const [selectedTagIndex, setSelectedTagIndex] = useState(0);
+  const [isTagInputFocused, setIsTagInputFocused] = useState(false);
+
+  const tagFrequencies = useMemo(() => {
+    const freqs: Record<string, number> = {};
+    data.notes.forEach(n => {
+      n.tags?.forEach(t => {
+        freqs[t] = (freqs[t] || 0) + 1;
+      });
+    });
+    return Object.entries(freqs).sort((a, b) => b[1] - a[1]).map(e => e[0]);
+  }, [data.notes]);
+
+  const tagSuggestions = useMemo(() => {
+    if (!tagInput.trim()) return [];
+    const search = tagInput.toLowerCase().replace(/^#+/, "");
+    return tagFrequencies.filter(t => t.toLowerCase().includes(search) && !tags.includes(t));
+  }, [tagInput, tagFrequencies, tags]);
+
+  useEffect(() => {
+    setSelectedTagIndex(0);
+  }, [tagSuggestions]);
+
   const [savedStatus, setSavedStatus] = useState<"saved" | "saving">("saved");
   const [isHistoryOpen, setHistoryOpen] = useState(false);
   const [isProcessingImage, setIsProcessingImage] = useState(false);
@@ -1151,9 +1180,28 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
   const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      addTagsFromInput(tagInput);
+      if (tagSuggestions.length > 0) {
+        addTagsFromInput(tagSuggestions[selectedTagIndex] || tagSuggestions[0]);
+      } else {
+        addTagsFromInput(tagInput);
+      }
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSelectedTagIndex(prev => Math.min(prev + 1, Math.max(tagSuggestions.length - 1, 0)));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSelectedTagIndex(prev => Math.max(prev - 1, 0));
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setTagInput("");
     }
   };
+
+  useEffect(() => {
+    if (isFocusMode) {
+      setIsSmartSearchOpen(false);
+    }
+  }, [isFocusMode]);
 
   const removeTag = (tagToRemove: string) => {
     let currentTags = tags ? [...tags] : [];
@@ -1265,15 +1313,47 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
                   </span>
                 ))}
                 {isEditing && (
-                  <input
-                    type="text"
-                    value={tagInput}
-                    onChange={(e) => setTagInput(e.target.value)}
-                    onKeyDown={handleAddTag}
-                    onBlur={() => addTagsFromInput(tagInput)}
-                    placeholder="+ Add tag..."
-                    className="bg-transparent border-none outline-none text-text-muted placeholder:text-surface-active text-xs w-24"
-                  />
+                  <div className="relative flex items-center h-full">
+                    <input
+                      type="text"
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      onKeyDown={handleAddTag}
+                      onFocus={() => setIsTagInputFocused(true)}
+                      onBlur={() => {
+                        setIsTagInputFocused(false);
+                        addTagsFromInput(tagInput);
+                      }}
+                      placeholder="+ Add tag..."
+                      className="bg-transparent border-none outline-none text-text-muted placeholder:text-surface-active text-xs w-24"
+                    />
+                    {isTagInputFocused && tagSuggestions.length > 0 && (
+                      <div className="absolute top-full left-0 mt-1 max-h-48 overflow-y-auto w-48 bg-surface-header border border-border rounded-md shadow-xl z-50">
+                        {tagSuggestions.map((tag, idx) => (
+                           <button
+                             key={tag}
+                             onMouseDown={(e) => {
+                               e.preventDefault(); // prevent blur
+                               addTagsFromInput(tag);
+                             }}
+                             onTouchStart={(e) => {
+                               e.preventDefault();
+                               addTagsFromInput(tag);
+                             }}
+                             onMouseEnter={() => setSelectedTagIndex(idx)}
+                             className={cn(
+                               "w-full text-left px-3 py-1.5 text-xs transition-colors truncate",
+                               idx === selectedTagIndex 
+                                 ? "bg-accent/20 text-accent" 
+                                 : "text-text-primary hover:bg-surface"
+                             )}
+                           >
+                              #{tag}
+                           </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -1765,6 +1845,15 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
               <line x1="3" y1="18" x2="21" y2="18"></line>
             </svg>
           </button>
+          {onToggleFocusMode && (
+            <button
+              onClick={onToggleFocusMode}
+              className={cn("p-1.5 rounded-md transition-colors shrink-0", isFocusMode ? "bg-accent/20 text-accent" : "bg-surface hover:bg-surface-hover text-text-secondary")}
+              title={isFocusMode ? "Exit Focus Mode" : "Enter Focus Mode"}
+            >
+              {isFocusMode ? <Minimize size={18} /> : <Maximize size={18} />}
+            </button>
+          )}
           <div className="w-px h-4 bg-border mx-1 shrink-0"></div>
 
           <div className="flex items-center space-x-1 shrink-0">
@@ -2057,6 +2146,12 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
               <span>
                 {editor?.storage?.characterCount?.words() || 0}{" "}
                 <span className="hidden lg:inline">words</span>
+              </span>
+              <span className="text-border mx-1">|</span>
+              <span>
+                {(editor?.storage?.characterCount?.words() || 0) < 200
+                  ? "less than 1 min read"
+                  : `${Math.round((editor?.storage?.characterCount?.words() || 0) / 200)} min read`}
               </span>
             </div>
             <div className="text-xs text-text-muted select-none w-16 text-left">

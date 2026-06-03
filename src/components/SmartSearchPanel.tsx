@@ -45,6 +45,11 @@ export const SmartSearchPanel: React.FC<SmartSearchPanelProps> = ({
   const currentNote = data.notes.find((n) => n.id === noteId);
   const svgRef = useRef<SVGSVGElement>(null);
 
+  const [activeFilterTag, setActiveFilterTag] = useState<string | null>(null);
+  const [activeFilterFolder, setActiveFilterFolder] = useState<string | null>(null);
+  const [activeFilterDate, setActiveFilterDate] = useState<string | null>(null);
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+
   // Determine Connections
   const { connectedNotes, tags, links } = useMemo(() => {
     if (!currentNote) return { connectedNotes: [], tags: [], links: [] };
@@ -58,31 +63,32 @@ export const SmartSearchPanel: React.FC<SmartSearchPanelProps> = ({
     // Extract links from current note
     const outgoingLinks = Array.from(content.matchAll(wikilinkRegex)).map(m => m[1].trim().toLowerCase());
 
-    const connected = new Set<Note>();
+    const connected: { note: Note; sharedTags: string[]; isWikilink: boolean }[] = [];
     
     data.notes.forEach(note => {
       if (note.id === currentNote.id) return;
 
-      let isConnected = false;
+      let hasWikilink = false;
       const noteTitle = (note.title || "Untitled").trim().toLowerCase();
 
       // Shares tags
       const noteTags = note.tags || [];
       const sharedTags = currentTags.filter(t => noteTags.includes(t));
-      if (sharedTags.length > 0) isConnected = true;
 
       // Has outgoing wikilink from currentnote to this note
-      if (outgoingLinks.includes(noteTitle)) isConnected = true;
+      if (outgoingLinks.includes(noteTitle)) hasWikilink = true;
 
       // Has incoming wikilink from this note to currentNote
       const noteContent = note.content || "";
       const noteOutgoingLinks = Array.from(noteContent.matchAll(wikilinkRegex)).map(m => m[1].trim().toLowerCase());
-      if (currentTitle && noteOutgoingLinks.includes(currentTitle)) isConnected = true;
+      if (currentTitle && noteOutgoingLinks.includes(currentTitle)) hasWikilink = true;
 
-      if (isConnected) connected.add(note);
+      if (sharedTags.length > 0 || hasWikilink) {
+        connected.push({ note, sharedTags, isWikilink: hasWikilink });
+      }
     });
 
-    return { connectedNotes: Array.from(connected), tags: currentTags, links: outgoingLinks };
+    return { connectedNotes: connected, tags: currentTags, links: outgoingLinks };
   }, [currentNote, data.notes]);
 
   // Mini Brain Map
@@ -106,17 +112,24 @@ export const SmartSearchPanel: React.FC<SmartSearchPanelProps> = ({
       d3Links.push({ source: currentNote.id, target: `tag-${tag}`, type: 'tag' });
     });
 
-    connectedNotes.forEach(note => {
+    // Apply filters before building the graph and list
+    const filteredConnectedNotes = connectedNotes.filter(({ note, sharedTags }) => {
+      if (activeFilterTag && !sharedTags.includes(activeFilterTag)) return false;
+      if (activeFilterFolder && note.collectionId !== activeFilterFolder) return false;
+      if (activeFilterDate && new Date(note.createdAt).toLocaleDateString() !== activeFilterDate) return false;
+      return true;
+    });
+
+    filteredConnectedNotes.forEach(({ note, sharedTags, isWikilink }) => {
       nodes.push({ id: note.id, label: note.title || "Untitled", isCurrent: false, type: 'note' });
-      
-      const noteTags = note.tags || [];
-      const sharedTags = tags.filter(t => noteTags.includes(t));
       
       if (sharedTags.length > 0) {
         sharedTags.forEach(tag => {
            d3Links.push({ source: note.id, target: `tag-${tag}`, type: 'tag' });
         });
-      } else {
+      }
+      
+      if (isWikilink || sharedTags.length === 0) { // Fallback to wikilink style if connected
          // Linked via wikilink
          d3Links.push({ source: currentNote.id, target: note.id, type: 'wikilink' });
       }
@@ -146,6 +159,7 @@ export const SmartSearchPanel: React.FC<SmartSearchPanelProps> = ({
       .selectAll("g")
       .data(nodes)
       .join("g")
+      .attr("class", "mini-node")
       .call(
         d3.drag<any, MiniGraphNode>()
           .on("start", (event, d) => {
@@ -200,7 +214,31 @@ export const SmartSearchPanel: React.FC<SmartSearchPanelProps> = ({
       svg.on(".zoom", null);
     };
 
-  }, [isOpen, currentNote, connectedNotes, tags]);
+  }, [isOpen, currentNote, connectedNotes, tags, activeFilterTag, activeFilterFolder, activeFilterDate]);
+
+  useEffect(() => {
+    if (!svgRef.current) return;
+    const svg = d3.select(svgRef.current);
+    const nodes = svg.selectAll<SVGGElement, MiniGraphNode>(".mini-node");
+    
+    nodes.select("circle").transition().duration(200)
+      .attr("r", d => d.id === hoveredNodeId ? 12 : (d.isCurrent ? 10 : (d.type === 'tag' ? 6 : 8)))
+      .attr("fill", d => d.id === hoveredNodeId ? "var(--color-accent)" : (d.isCurrent ? "var(--color-accent)" : (d.type === 'tag' ? "transparent" : "var(--color-surface-hover)")))
+      .attr("stroke", d => d.id === hoveredNodeId ? "var(--color-accent)" : (d.type === 'tag' ? "var(--color-accent)" : "var(--color-border)"));
+
+    nodes.select("text").transition().duration(200)
+      .style("opacity", d => (d.id === hoveredNodeId || d.isCurrent) ? 1 : 0.7)
+      .style("font-weight", d => d.id === hoveredNodeId ? "bold" : "normal");
+  }, [hoveredNodeId]);
+
+  const filteredConnectedNotes = useMemo(() => {
+    return connectedNotes.filter(({ note, sharedTags }) => {
+      if (activeFilterTag && !sharedTags.includes(activeFilterTag)) return false;
+      if (activeFilterFolder && note.collectionId !== activeFilterFolder) return false;
+      if (activeFilterDate && new Date(note.createdAt).toLocaleDateString() !== activeFilterDate) return false;
+      return true;
+    });
+  }, [connectedNotes, activeFilterTag, activeFilterFolder, activeFilterDate]);
 
 
   return (
@@ -231,25 +269,65 @@ export const SmartSearchPanel: React.FC<SmartSearchPanelProps> = ({
 
             {/* Content List */}
             <div className="p-4 space-y-6 text-sm">
+              
+              <div className="space-y-2">
+                <h4 className="text-xs tracking-wider text-text-muted uppercase font-semibold">Filter Connections</h4>
+                <div className="flex flex-wrap gap-2">
+                   {/* Unique Tags */}
+                   {Array.from(new Set(connectedNotes.flatMap(n => n.sharedTags))).map(tag => (
+                      <button 
+                         key={tag}
+                         onClick={() => setActiveFilterTag(activeFilterTag === tag ? null : tag)}
+                         className={cn("px-2 py-1 rounded text-xs transition-colors", activeFilterTag === tag ? "bg-accent text-white" : "bg-surface-active text-text-secondary hover:bg-surface-hover")}
+                      >
+                         #{tag}
+                      </button>
+                   ))}
+                   {/* Unique Folders */}
+                   {Array.from(new Set(connectedNotes.map(n => n.note.collectionId))).map(colId => {
+                      const col = data.collections.find(c => c.id === colId);
+                      if (!col) return null;
+                      return (
+                         <button 
+                            key={colId}
+                            onClick={() => setActiveFilterFolder(activeFilterFolder === colId ? null : colId)}
+                            className={cn("px-2 py-1 rounded text-xs transition-colors", activeFilterFolder === colId ? "bg-accent text-white" : "bg-surface-active text-text-secondary hover:bg-surface-hover")}
+                         >
+                            📁 {col.name}
+                         </button>
+                      )
+                   })}
+                   {/* Unique Dates */}
+                   {Array.from(new Set(connectedNotes.map(n => new Date(n.note.createdAt).toLocaleDateString()))).map(date => (
+                      <button 
+                         key={date}
+                         onClick={() => setActiveFilterDate(activeFilterDate === date ? null : date)}
+                         className={cn("px-2 py-1 rounded text-xs transition-colors", activeFilterDate === date ? "bg-accent text-white" : "bg-surface-active text-text-secondary hover:bg-surface-hover")}
+                      >
+                         📅 {date}
+                      </button>
+                   ))}
+                </div>
+              </div>
+
               <div>
                 <h4 className="text-xs tracking-wider text-text-muted uppercase font-semibold mb-3">Connected Notes</h4>
-                {connectedNotes.length === 0 ? (
+                {filteredConnectedNotes.length === 0 ? (
                   <p className="text-text-muted italic text-xs">No direct connections found.</p>
                 ) : (
                   <div className="space-y-2">
-                    {connectedNotes.map(n => {
-                      // Figure out connection info for rendering labels
-                      const shared = (n.tags || []).filter(t => tags.includes(t));
-                      const outgoing = currentNote?.content?.match(wikilinkRegex)?.find((m) => m === `[[${n.title}]]`);
-                      
+                    {filteredConnectedNotes.map(({ note: n, sharedTags: shared, isWikilink }) => {
                       return (
                         <div 
                           key={n.id}
                           className="p-3 bg-background border border-border rounded-lg hover:border-accent/50 cursor-pointer transition-colors group"
                           onClick={() => {
                             onNavigateToNote(n.id, n.collectionId, n.workspaceId);
+                            setHoveredNodeId(null);
                             onClose();
                           }}
+                          onMouseEnter={() => setHoveredNodeId(n.id)}
+                          onMouseLeave={() => setHoveredNodeId(null)}
                         >
                           <div className="flex items-center justify-between mb-1">
                             <span className="font-medium flex items-center gap-2 truncate group-hover:text-accent transition-colors">
@@ -264,7 +342,7 @@ export const SmartSearchPanel: React.FC<SmartSearchPanelProps> = ({
                                 <Hash size={10} /> {t}
                               </span>
                             ))}
-                            {!shared.length && (
+                            {isWikilink && (
                               <span className="text-[10px] bg-yellow-500/10 text-yellow-500 px-1.5 py-0.5 rounded-sm flex items-center gap-1">
                                 <LinkIcon size={10} /> Linked
                               </span>
