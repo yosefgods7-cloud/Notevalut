@@ -848,6 +848,128 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
                   )}
                 </div>
+
+                <div className="space-y-4 border-t border-border mt-6 pt-6">
+                  <label className="flex items-center justify-between cursor-pointer bg-surface border border-border p-3 rounded-xl hover:border-accent transition-colors">
+                    <div>
+                      <div className="text-sm font-medium">Smart Linking</div>
+                      <div className="text-xs text-text-muted mt-0.5">
+                        Suggests related notes while typing based on content
+                      </div>
+                    </div>
+                    <div className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={localSettings.plugins?.smartLinking?.enabled ?? true}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setLocalSettings((s) => ({
+                            ...s,
+                            plugins: {
+                              ...s.plugins,
+                              smartLinking: {
+                                ...(s.plugins?.smartLinking || {
+                                  maxSuggestions: 5,
+                                  triggerMode: "typing",
+                                  minWordCount: 10,
+                                  sources: { keywordMatching: true, tagOverlap: true, embeddingSimilarity: false }
+                                }),
+                                enabled: checked,
+                              },
+                            },
+                          }));
+                        }}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-surface-active border border-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2.5px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-pink-500"></div>
+                    </div>
+                  </label>
+
+                  {localSettings.plugins?.smartLinking?.enabled && (
+                    <div className="space-y-4 pl-2 pr-2">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-medium text-text-secondary mb-1">Max Suggestions</label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={20}
+                            className="bg-surface border border-border rounded px-2 py-1.5 text-sm w-full"
+                            value={localSettings.plugins.smartLinking.maxSuggestions}
+                            onChange={(e) => setLocalSettings(s => ({
+                              ...s, plugins: { ...s.plugins, smartLinking: { ...s.plugins!.smartLinking!, maxSuggestions: Number(e.target.value) } }
+                            }))}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-text-secondary mb-1">Min Word Count</label>
+                          <input
+                            type="number"
+                            min={0}
+                            className="bg-surface border border-border rounded px-2 py-1.5 text-sm w-full"
+                            value={localSettings.plugins.smartLinking.minWordCount}
+                            onChange={(e) => setLocalSettings(s => ({
+                              ...s, plugins: { ...s.plugins, smartLinking: { ...s.plugins!.smartLinking!, minWordCount: Number(e.target.value) } }
+                            }))}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-text-secondary mb-1">Trigger Mode</label>
+                        <select
+                          className="bg-surface border border-border rounded px-2 py-1.5 text-sm w-full"
+                          value={localSettings.plugins.smartLinking.triggerMode}
+                          onChange={(e) => setLocalSettings(s => ({
+                            ...s, plugins: { ...s.plugins, smartLinking: { ...s.plugins!.smartLinking!, triggerMode: e.target.value as any } }
+                          }))}
+                        >
+                          <option value="typing">While Typing</option>
+                          <option value="button">On Demand (Button)</option>
+                        </select>
+                      </div>
+
+                      <div className="pt-2">
+                        <label className="block text-xs font-medium text-text-secondary mb-2">Suggestion Sources</label>
+                        <div className="space-y-2">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={localSettings.plugins.smartLinking.sources.keywordMatching}
+                              onChange={(e) => setLocalSettings(s => ({
+                                ...s, plugins: { ...s.plugins, smartLinking: { ...s.plugins!.smartLinking!, sources: { ...s.plugins!.smartLinking!.sources, keywordMatching: e.target.checked } } }
+                              }))}
+                              className="rounded border-border text-pink-500 focus:ring-pink-500"
+                            />
+                            <span className="text-sm">Keyword Matching</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={localSettings.plugins.smartLinking.sources.tagOverlap}
+                              onChange={(e) => setLocalSettings(s => ({
+                                ...s, plugins: { ...s.plugins, smartLinking: { ...s.plugins!.smartLinking!, sources: { ...s.plugins!.smartLinking!.sources, tagOverlap: e.target.checked } } }
+                              }))}
+                              className="rounded border-border text-pink-500 focus:ring-pink-500"
+                            />
+                            <span className="text-sm">Tag Overlap</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={localSettings.plugins.smartLinking.sources.embeddingSimilarity}
+                              onChange={(e) => setLocalSettings(s => ({
+                                ...s, plugins: { ...s.plugins, smartLinking: { ...s.plugins!.smartLinking!, sources: { ...s.plugins!.smartLinking!.sources, embeddingSimilarity: e.target.checked } } }
+                              }))}
+                              className="rounded border-border text-pink-500 focus:ring-pink-500"
+                            />
+                            <span className="text-sm">Embedding Similarity (IndexedDB)</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 

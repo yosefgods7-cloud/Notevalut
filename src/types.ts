@@ -72,11 +72,24 @@ export interface AutoCategorizeRule {
   collectionId: string;
 }
 
+export interface SmartLinkingPluginSettings {
+  enabled: boolean;
+  maxSuggestions: number;
+  triggerMode: "typing" | "button";
+  minWordCount: number;
+  sources: {
+    keywordMatching: boolean;
+    tagOverlap: boolean;
+    embeddingSimilarity: boolean;
+  };
+}
+
 export interface PluginSettings {
   autoCategorize?: {
     enabled: boolean;
     rules: AutoCategorizeRule[];
   };
+  smartLinking?: SmartLinkingPluginSettings;
 }
 
 export interface DriveBackupSettings {
@@ -176,6 +189,17 @@ export const DEFAULT_SETTINGS: Settings = {
     autoCategorize: {
       enabled: false,
       rules: [],
+    },
+    smartLinking: {
+      enabled: true,
+      maxSuggestions: 5,
+      triggerMode: "typing",
+      minWordCount: 10,
+      sources: {
+        keywordMatching: true,
+        tagOverlap: true,
+        embeddingSimilarity: false,
+      },
     },
   },
   driveBackup: {

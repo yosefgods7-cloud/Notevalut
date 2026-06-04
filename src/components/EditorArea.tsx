@@ -117,6 +117,7 @@ import {
 
 import TurndownService from "turndown";
 import { marked } from "marked";
+import { cosineSimilarity } from "../lib/ai";
 
 // html2pdf is a robust library for turning DOM elements into PDFs
 // @ts-ignore
@@ -249,6 +250,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
   }>({ loading: false, text: null, open: false });
 
   const [isCalloutDropdownOpen, setCalloutDropdownOpen] = useState(false);
+  const [smartLinkingSuggestions, setSmartLinkingSuggestions] = useState<Note[]>([]);
 
   const backlinks = React.useMemo(() => {
     if (!note) return [];
@@ -671,6 +673,104 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
     smartPasteRef.current = settings.smartPaste;
   }, [settings.smartPaste]);
 
+  const updateSmartLinkingSuggestions = useCallback(
+    (text: string) => {
+      const slSettings = data.settings.plugins?.smartLinking || {
+        enabled: true,
+        maxSuggestions: 5,
+        triggerMode: "typing",
+        minWordCount: 10,
+        sources: {
+          keywordMatching: true,
+          tagOverlap: true,
+          embeddingSimilarity: false,
+        },
+      };
+
+      if (!slSettings.enabled || !text) {
+        setSmartLinkingSuggestions([]);
+        return;
+      }
+
+      const words = text
+        .toLowerCase()
+        .split(/\W+/)
+        .filter((w) => w.length > 3);
+      const wordCount = words.length;
+
+      if (wordCount < slSettings.minWordCount) {
+        setSmartLinkingSuggestions([]);
+        return;
+      }
+
+      // Top words
+      const wordFreq: Record<string, number> = {};
+      words.forEach((w) => (wordFreq[w] = (wordFreq[w] || 0) + 1));
+      const topWords = Object.keys(wordFreq)
+        .sort((a, b) => wordFreq[b] - wordFreq[a])
+        .slice(0, 10);
+
+      const scoredNotes = data.notes
+        .filter((n) => n.id !== note?.id)
+        .map((n) => {
+          let score = 0;
+          let matchedSignals = 0;
+
+          // Tag overlap
+          if (slSettings.sources.tagOverlap && tags.length > 0) {
+            const overlap = n.tags.filter((t) => tags.includes(t)).length;
+            if (overlap > 0) {
+              score += overlap * 2;
+              matchedSignals++;
+            }
+          }
+
+          // Keyword matching
+          if (slSettings.sources.keywordMatching) {
+            let keywordScore = 0;
+            const noteTitleLower = n.title.toLowerCase();
+            const noteContentLower = n.content.toLowerCase();
+            const noteTagsStr = n.tags.join(" ").toLowerCase();
+
+            topWords.forEach((w) => {
+              if (noteTitleLower.includes(w)) keywordScore += 2;
+              if (noteTagsStr.includes(w)) keywordScore += 1;
+              const contentMatches = noteContentLower.split(w).length - 1;
+              keywordScore += Math.min(contentMatches * 0.5, 3);
+            });
+
+            if (keywordScore > 0) {
+              score += keywordScore;
+              matchedSignals++;
+            }
+          }
+
+          // Embedding similarity
+          if (
+            slSettings.sources.embeddingSimilarity &&
+            note?.embedding &&
+            n.embedding
+          ) {
+            const sim = cosineSimilarity(note.embedding, n.embedding);
+            if (sim > 0.75) {
+              score += Math.max(0, (sim - 0.75) * 20);
+              matchedSignals++;
+            }
+          }
+
+          return { note: n, score, matchedSignals };
+        });
+
+      const filtered = scoredNotes
+        .filter((n) => n.score > 0)
+        .sort((a, b) => b.score - a.score);
+      setSmartLinkingSuggestions(
+        filtered.slice(0, slSettings.maxSuggestions).map((n) => n.note)
+      );
+    },
+    [data.settings.plugins?.smartLinking, data.notes, note?.id, note?.embedding, tags]
+  );
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -793,6 +893,9 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
         editor.getHTML(),
         editor.storage.characterCount.words(),
       );
+      if (data.settings.plugins?.smartLinking?.triggerMode === "typing") {
+        updateSmartLinkingSuggestions(editor.getText());
+      }
     },
   });
 
@@ -1235,8 +1338,44 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
           border-radius: 0.2EM;
         }
       `}</style>
-      <div className="flex-1 flex flex-row overflow-hidden w-full h-full">
+      <div className="flex-1 flex flex-row overflow-hidden w-full h-full relative">
         <div className="flex-1 overflow-y-auto no-scrollbar relative flex justify-center pb-32 pt-8 print:pt-0">
+          {smartLinkingSuggestions.length > 0 && (
+            <div className="fixed sm:absolute bottom-20 right-4 sm:bottom-auto sm:top-8 sm:right-6 w-64 bg-surface border border-border shadow-[0_4px_30px_rgba(0,0,0,0.5)] shadow-pink-500/10 rounded-xl z-[100] flex flex-col overflow-hidden animate-in fade-in slide-in-from-right-4 ring-1 ring-white/5">
+              <div className="bg-surface-active/80 backdrop-blur px-3 py-2 border-b border-border text-xs font-semibold flex items-center justify-between text-text-primary">
+                <span className="flex items-center gap-1.5 text-pink-400">
+                  <Network size={14} className="opacity-80" /> Related Notes
+                </span>
+                <button
+                  onClick={() => setSmartLinkingSuggestions([])}
+                  className="hover:text-text-primary text-text-muted p-1 rounded-sm hover:bg-surface transition-colors"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+              <div className="max-h-64 overflow-y-auto flex flex-col p-1">
+                {smartLinkingSuggestions.map((sn) => (
+                  <button
+                    key={sn.id}
+                    className="w-full text-left px-2 py-1.5 border border-transparent hover:border-white/10 rounded-lg text-sm hover:bg-surface-active transition-all flex flex-col gap-0.5 group"
+                    onClick={() => {
+                      editor?.chain().focus().insertContent(`[[${sn.title}]] `).run();
+                      setSmartLinkingSuggestions([]);
+                    }}
+                  >
+                    <div className="font-medium text-text-secondary group-hover:text-white truncate">
+                      {sn.title}
+                    </div>
+                    {sn.tags.length > 0 && (
+                      <div className="text-[10px] text-pink-400/70 truncate uppercase font-semibold tracking-wider">
+                        {sn.tags.slice(0, 3).join(" • ")}
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div
             className="w-full max-w-[720px] px-8 print:px-0"
             ref={pdfContainerRef}
@@ -2243,6 +2382,16 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
                 className="hidden"
               />
             </label>
+
+            {data.settings.plugins?.smartLinking?.enabled && data.settings.plugins?.smartLinking?.triggerMode === "button" && (
+              <button
+                onClick={() => updateSmartLinkingSuggestions(editor.getText())}
+                className="flex items-center justify-center px-2 py-1 text-sm bg-surface-active text-text-primary hover:bg-border rounded-md font-medium transition-colors h-8 w-8"
+                title="Find Related Notes"
+              >
+                <Network size={14} />
+              </button>
+            )}
 
             <div className="relative group/templates">
               <button
