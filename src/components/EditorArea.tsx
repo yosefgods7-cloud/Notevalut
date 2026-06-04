@@ -494,7 +494,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
   };
 
   const renderChartPreview = (chart: NoteChart) => {
-    const COLORS = [
+    const COLORS = chart.config.colors || [
       "#8884d8",
       "#82ca9d",
       "#ffc658",

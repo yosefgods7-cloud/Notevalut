@@ -43,6 +43,7 @@ export interface NoteChart {
   config: {
     xAxisKey: string;
     dataKeys: string[];
+    colors?: string[];
   };
 }
 

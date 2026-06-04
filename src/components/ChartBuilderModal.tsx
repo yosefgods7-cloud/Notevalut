@@ -14,11 +14,28 @@ interface ChartBuilderModalProps {
   initialChart?: NoteChart;
 }
 
-const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#00c49f', '#ffbb28', '#ff8042'];
+const CHART_THEMES: Record<string, string[]> = {
+  default: ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#00c49f', '#ffbb28', '#ff8042'],
+  ocean: ['#0077b6', '#0096c7', '#00b4d8', '#48cae4', '#90e0ef', '#ade8f4', '#caf0f8'],
+  forest: ['#2d6a4f', '#40916c', '#52b788', '#74c69d', '#95d5b2', '#b7e4c7', '#d8f3dc'],
+  sunset: ['#f94144', '#f3722c', '#f8961e', '#f9844a', '#f9c74f', '#90be6d', '#43aa8b'],
+  monochrome: ['#374151', '#4b5563', '#6b7280', '#9ca3af', '#d1d5db', '#e5e7eb'],
+  cyberpunk: ['#ff003c', '#00f0ff', '#fcee0a', '#b700ff', '#00ff15']
+};
 
 export function ChartBuilderModal({ onClose, onSave, initialChart }: ChartBuilderModalProps) {
   const [title, setTitle] = useState(initialChart?.title || 'New Chart');
   const [type, setType] = useState<NoteChart['type']>(initialChart?.type || 'bar');
+  const [chartTheme, setChartTheme] = useState<string>(initialChart?.config?.colors ? 'custom' : 'default');
+  const [customColors, setCustomColors] = useState<string[]>(initialChart?.config?.colors || CHART_THEMES.default);
+
+  const handleThemeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const theme = e.target.value;
+    setChartTheme(theme);
+    if (theme !== 'custom' && CHART_THEMES[theme]) {
+      setCustomColors(CHART_THEMES[theme]);
+    }
+  };
 
   const [xAxisName, setXAxisName] = useState(initialChart?.config?.xAxisKey || 'Category');
   
@@ -79,7 +96,8 @@ export function ChartBuilderModal({ onClose, onSave, initialChart }: ChartBuilde
       data: parsedData,
       config: {
         xAxisKey: xAxisName,
-        dataKeys
+        dataKeys,
+        colors: chartTheme === 'custom' ? customColors : CHART_THEMES[chartTheme]
       }
     });
   };
@@ -129,7 +147,7 @@ export function ChartBuilderModal({ onClose, onSave, initialChart }: ChartBuilde
               <Tooltip contentStyle={{ backgroundColor: '#1e1e1e', borderColor: '#333' }} />
               <Legend />
               {dataKeys.map((key, i) => (
-                <Bar key={key} dataKey={key} fill={COLORS[i % COLORS.length]} />
+                <Bar key={key} dataKey={key} fill={customColors[i % customColors.length]} />
               ))}
             </BarChart>
           </ResponsiveContainer>
@@ -144,7 +162,7 @@ export function ChartBuilderModal({ onClose, onSave, initialChart }: ChartBuilde
               <Tooltip contentStyle={{ backgroundColor: '#1e1e1e', borderColor: '#333' }} />
               <Legend />
               {dataKeys.map((key, i) => (
-                <Line key={key} type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} />
+                <Line key={key} type="monotone" dataKey={key} stroke={customColors[i % customColors.length]} />
               ))}
             </RechartsLineChart>
           </ResponsiveContainer>
@@ -164,10 +182,10 @@ export function ChartBuilderModal({ onClose, onSave, initialChart }: ChartBuilde
                   cx="50%" 
                   cy="50%" 
                   outerRadius={100 - (i * 20)} 
-                  fill={COLORS[i % COLORS.length]}
+                  fill={customColors[i % customColors.length]}
                 >
                   {parsedData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[(index + i) % COLORS.length]} />
+                    <Cell key={`cell-${index}`} fill={customColors[(index + i) % customColors.length]} />
                   ))}
                 </Pie>
               ))}
@@ -184,7 +202,7 @@ export function ChartBuilderModal({ onClose, onSave, initialChart }: ChartBuilde
               <Tooltip contentStyle={{ backgroundColor: '#1e1e1e', borderColor: '#333' }} />
               <Legend />
               {dataKeys.map((key, i) => (
-                <Area key={key} type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} fill={COLORS[i % COLORS.length]} fillOpacity={0.3} />
+                <Area key={key} type="monotone" dataKey={key} stroke={customColors[i % customColors.length]} fill={customColors[i % customColors.length]} fillOpacity={0.3} />
               ))}
             </RechartsAreaChart>
           </ResponsiveContainer>
@@ -199,7 +217,7 @@ export function ChartBuilderModal({ onClose, onSave, initialChart }: ChartBuilde
               <Tooltip contentStyle={{ backgroundColor: '#1e1e1e', borderColor: '#333' }} />
               <Legend />
               {dataKeys.map((key, i) => (
-                <Radar key={key} name={key} dataKey={key} stroke={COLORS[i % COLORS.length]} fill={COLORS[i % COLORS.length]} fillOpacity={0.6} />
+                <Radar key={key} name={key} dataKey={key} stroke={customColors[i % customColors.length]} fill={customColors[i % customColors.length]} fillOpacity={0.6} />
               ))}
             </RechartsRadarChart>
           </ResponsiveContainer>
@@ -258,6 +276,23 @@ export function ChartBuilderModal({ onClose, onSave, initialChart }: ChartBuilde
               </div>
             </div>
 
+            <div>
+              <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Chart Theme</label>
+              <select 
+                value={chartTheme} 
+                onChange={handleThemeChange}
+                className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent"
+              >
+                <option value="default">Default</option>
+                <option value="ocean">Ocean</option>
+                <option value="forest">Forest</option>
+                <option value="sunset">Sunset</option>
+                <option value="monochrome">Monochrome</option>
+                <option value="cyberpunk">Cyberpunk</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+
             <div className="flex flex-col flex-1 min-h-0">
               <label className="block text-xs font-semibold text-text-muted uppercase mb-1.5">Data</label>
               <div className="flex-1 flex flex-col border border-border rounded-md overflow-hidden bg-background">
@@ -272,15 +307,32 @@ export function ChartBuilderModal({ onClose, onSave, initialChart }: ChartBuilde
                     />
                   </div>
                   
-                  {seriesList.map(s => (
-                    <div key={s.id} className="w-[100px] flex items-center gap-1 shrink-0">
+                  {seriesList.map((s, idx) => (
+                    <div key={s.id} className="w-[120px] flex items-center gap-1 shrink-0 bg-background border border-border rounded px-1 group">
+                      <input 
+                        type="color"
+                        value={customColors[idx % customColors.length] || '#000000'}
+                        onChange={e => {
+                          const newColors = [...customColors];
+                          if (idx >= newColors.length) {
+                             // Extend array up to idx
+                             while(newColors.length <= idx) {
+                               newColors.push(customColors[newColors.length % customColors.length]);
+                             }
+                          }
+                          newColors[idx] = e.target.value;
+                          setCustomColors(newColors);
+                          setChartTheme('custom');
+                        }}
+                        className="w-5 h-5 rounded cursor-pointer border-none bg-transparent p-0 flex-shrink-0"
+                      />
                       <input 
                         value={s.name}
                         onChange={e => handleSeriesNameChange(s.id, e.target.value)}
                         placeholder="Series Name"
-                        className="w-full bg-background border border-border rounded px-2 py-1 text-xs text-text-primary focus:outline-none focus:border-accent font-semibold"
+                        className="w-full bg-transparent border-none py-1 text-xs text-text-primary focus:outline-none font-semibold px-1"
                       />
-                      <button onClick={() => removeSeries(s.id)} className="text-text-muted hover:text-red-400 p-0.5">
+                      <button onClick={() => removeSeries(s.id)} className="text-text-muted hover:text-red-400 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                         <X size={12}/>
                       </button>
                     </div>
