@@ -16,6 +16,7 @@
     "@tiptap/extension-bold": "^3.23.6",
     "@tiptap/extension-character-count": "^3.22.5",
     "@tiptap/extension-color": "^3.22.5",
+    "@tiptap/extension-highlight": "^3.22.5",
     "@tiptap/extension-image": "^3.22.5",
     "@tiptap/extension-italic": "^3.23.6",
     "@tiptap/extension-placeholder": "^3.22.5",

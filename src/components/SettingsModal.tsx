@@ -882,6 +882,96 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </label>
 
                   <div className="border-t border-border pt-4">
+                    <div className="text-sm font-medium mb-1">Highlight Colors</div>
+                    <div className="text-xs text-text-muted mb-4">
+                      Customize the background color for ==highlighted text==.
+                    </div>
+                    <div className="flex gap-2">
+                      {[
+                        { name: "Yellow", value: "#facc15" },
+                        { name: "Green", value: "#4ade80" },
+                        { name: "Blue", value: "#60a5fa" },
+                        { name: "Pink", value: "#f472b6" },
+                        { name: "Orange", value: "#fb923c" }
+                      ].map(color => (
+                        <button
+                          key={color.value}
+                          onClick={() => setLocalSettings(s => ({ ...s, highlightColor: color.value }))}
+                          className={`w-8 h-8 rounded-full border-2 ${localSettings.highlightColor === color.value ? 'border-primary' : 'border-transparent'}`}
+                          style={{ backgroundColor: color.value }}
+                          title={color.name}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-border pt-4">
+                    <div className="text-sm font-medium mb-1">Callout Styles</div>
+                    <div className="text-xs text-text-muted mb-4">
+                      Customize colors and icons for each callout type.
+                    </div>
+                    <div className="space-y-3">
+                      {Object.keys(localSettings.calloutStyles || DEFAULT_SETTINGS.calloutStyles || {}).map(type => {
+                        const style = (localSettings.calloutStyles || DEFAULT_SETTINGS.calloutStyles || {})[type];
+                        return (
+                          <div key={type} className="flex items-center gap-3">
+                            <div className="w-24 text-sm font-semibold">{type}</div>
+                            <input 
+                              type="color" 
+                              value={style?.color || "#000000"} 
+                              onChange={(e) => setLocalSettings(s => ({
+                                ...s,
+                                calloutStyles: {
+                                  ...(s.calloutStyles || DEFAULT_SETTINGS.calloutStyles || {}),
+                                  [type]: { ...((s.calloutStyles || DEFAULT_SETTINGS.calloutStyles || {})[type] || { icon: "Info", color: "#000" }), color: e.target.value }
+                                }
+                              }))}
+                              className="w-8 h-8 rounded shrink-0 border border-border bg-transparent p-0 overflow-hidden cursor-pointer"
+                            />
+                            <select
+                              value={style?.icon || "Info"}
+                              onChange={(e) => setLocalSettings(s => ({
+                                ...s,
+                                calloutStyles: {
+                                  ...(s.calloutStyles || DEFAULT_SETTINGS.calloutStyles || {}),
+                                  [type]: { ...((s.calloutStyles || DEFAULT_SETTINGS.calloutStyles || {})[type] || { color: "#000", icon: "Info" }), icon: e.target.value }
+                                }
+                              }))}
+                              className="flex-1 bg-surface-active border border-border rounded px-2 py-1.5 text-sm"
+                            >
+                              <option value="Info">Info</option>
+                              <option value="BookOpen">BookOpen</option>
+                              <option value="AlertCircle">AlertCircle</option>
+                              <option value="HelpCircle">HelpCircle</option>
+                              <option value="AlertTriangle">AlertTriangle</option>
+                              <option value="Lightbulb">Lightbulb</option>
+                              <option value="Star">Star</option>
+                              <option value="Zap">Zap</option>
+                              <option value="Flag">Flag</option>
+                            </select>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-border pt-4">
+                    <div className="text-sm font-medium mb-1">Default Callout</div>
+                    <div className="text-xs text-text-muted mb-2">
+                      Select which callout type is used by default when clicking the Callout button.
+                    </div>
+                    <select
+                      value={localSettings.defaultCallout || "NOTE"}
+                      onChange={e => setLocalSettings(s => ({ ...s, defaultCallout: e.target.value }))}
+                      className="w-full bg-surface-active border border-border rounded px-3 py-2 text-sm"
+                    >
+                      {Object.keys(localSettings.calloutStyles || DEFAULT_SETTINGS.calloutStyles || {}).map(type => (
+                         <option key={type} value={type}>{type}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="border-t border-border pt-4">
                     <div className="text-sm font-medium mb-1">
                       Bottom Bar Button Configuration
                     </div>

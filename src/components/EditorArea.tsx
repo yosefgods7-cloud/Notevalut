@@ -20,6 +20,8 @@ import Placeholder from "@tiptap/extension-placeholder";
 import ImageResize from "tiptap-extension-resize-image";
 import { Color } from "@tiptap/extension-color";
 import { TextStyle as TiptapTextStyle } from "@tiptap/extension-text-style";
+import Highlight from "@tiptap/extension-highlight";
+import { CalloutBlockquote } from "../lib/CalloutExtension";
 import { FontSize } from "../lib/FontSize";
 import { WikiLink } from "../lib/WikiLink";
 import { cleanAIPaste } from "../lib/paste-cleaner";
@@ -81,7 +83,9 @@ import {
   MicOff,
   Network,
   Maximize,
-  Minimize
+  Minimize,
+  Highlighter,
+  MessageSquareWarning
 } from "lucide-react";
 import { cn, generateId } from "../lib/utils";
 import { format } from "date-fns";
@@ -123,6 +127,11 @@ const turndownService = new TurndownService();
 turndownService.addRule("strikethrough", {
   filter: ["del", "s", "strike"],
   replacement: (content) => `~~${content}~~`,
+});
+
+turndownService.addRule("highlight", {
+  filter: ["mark"],
+  replacement: (content) => `==${content}==`,
 });
 
 let aiClient: GoogleGenAI | null = null;
@@ -238,6 +247,8 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
     text: string | null;
     open: boolean;
   }>({ loading: false, text: null, open: false });
+
+  const [isCalloutDropdownOpen, setCalloutDropdownOpen] = useState(false);
 
   const backlinks = React.useMemo(() => {
     if (!note) return [];
@@ -678,6 +689,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
       TextAlign.configure({ types: ['heading', 'paragraph', 'tableCell', 'tableHeader'] }),
       CharacterCount,
       ImageResize,
+      Highlight,
       TiptapTextStyle.extend({ inclusive: false }),
       Color,
       FontSize,
@@ -982,7 +994,8 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
       reader.onload = async (event) => {
         const content = event.target?.result as string;
         if (file.name.endsWith(".md")) {
-          const html = await marked.parse(content);
+          const preprocessed = content.replace(/==([^=]+)==/g, '<mark>$1</mark>');
+          const html = await marked.parse(preprocessed);
           editor.commands.setContent(html);
           showToast("✓ Markdown imported");
         } else if (file.name.endsWith(".txt")) {
@@ -1214,6 +1227,14 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background overflow-hidden relative">
+      <style>{`
+        .ProseMirror mark {
+          background-color: ${data.settings.highlightColor || DEFAULT_SETTINGS.highlightColor};
+          color: inherit;
+          padding: 0 0.2em;
+          border-radius: 0.2EM;
+        }
+      `}</style>
       <div className="flex-1 flex flex-row overflow-hidden w-full h-full">
         <div className="flex-1 overflow-y-auto no-scrollbar relative flex justify-center pb-32 pt-8 print:pt-0">
           <div
@@ -1959,6 +1980,47 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
                           active={editor.isActive("italic")}
                           icon={<Italic size={16} />}
                         />
+                      );
+                    case "highlight":
+                      return (
+                        <ToolbarButton
+                          key={item}
+                          onClick={() => editor.chain().focus().toggleHighlight().run()}
+                          active={editor.isActive("highlight")}
+                          icon={<Highlighter size={16} />}
+                          title="Highlight (==text==)"
+                        />
+                      );
+                    case "callout":
+                      return (
+                        <div key={item} className="relative inline-flex items-center">
+                          <ToolbarButton
+                            onClick={() => {
+                               const defaultCallout = data.settings.defaultCallout || "NOTE";
+                               editor.chain().focus().insertContent(`\n> [!${defaultCallout}] \n> `).run();
+                            }}
+                            icon={<MessageSquareWarning size={16} />}
+                            title="Insert Callout"
+                          />
+                          <button 
+                            className="absolute -right-1 top-1 bottom-1 w-3 flex items-center justify-center hover:bg-surface-hover rounded" 
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setCalloutDropdownOpen(!isCalloutDropdownOpen); }}
+                           >
+                            <ChevronDown size={10} />
+                          </button>
+                          {isCalloutDropdownOpen && (
+                            <div className="absolute top-10 left-0 bg-surface border border-border rounded shadow-xl z-50 p-2 flex flex-col gap-1 w-32">
+                               {Object.keys(data.settings.calloutStyles || DEFAULT_SETTINGS.calloutStyles || {}).map(type => (
+                                 <button key={type} className="text-left text-xs font-semibold px-2 py-1.5 hover:bg-surface-active rounded transition-colors" onClick={() => {
+                                    editor.chain().focus().insertContent(`\n> [!${type}] \n> `).run();
+                                    setCalloutDropdownOpen(false);
+                                 }}>
+                                   {type}
+                                 </button>
+                               ))}
+                            </div>
+                          )}
+                        </div>
                       );
                     case "underline":
                       return (

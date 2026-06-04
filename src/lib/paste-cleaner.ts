@@ -137,7 +137,8 @@ export function cleanAIPaste(rawText: string): { html: string, stats: { disclaim
   // Parse markdown into HTML using marked synchronously
   let htmlResult = '';
   try {
-    const rawHtml = marked.parse(text);
+    const preprocessedText = text.replace(/==([^=]+)==/g, '<mark>$1</mark>');
+    const rawHtml = marked.parse(preprocessedText);
     if (typeof rawHtml === 'string') {
       htmlResult = rawHtml.replace(/<(td|th)([^>]*) align="(left|right|center|justify)"([^>]*)>/gi, '<$1$2 style="text-align: $3"$4>');
     }

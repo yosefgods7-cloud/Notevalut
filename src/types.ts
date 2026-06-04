@@ -93,6 +93,11 @@ export interface AiSearchScope {
   noteIds: string[];
 }
 
+export interface CalloutStyle {
+  color: string;
+  icon: string;
+}
+
 export interface Settings {
   theme: "dark" | "light" | "system";
   fontSize: "small" | "medium" | "large" | "ultralarge";
@@ -105,6 +110,9 @@ export interface Settings {
   driveBackup?: DriveBackupSettings;
   lastCloudSyncDate?: string;
   customColors?: Record<string, string>;
+  highlightColor?: string;
+  defaultCallout?: string;
+  calloutStyles?: Record<string, CalloutStyle>;
   apiUsage?: {
     date: string;
     embeddingCount: number;
@@ -154,6 +162,16 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultWorkspace: "",
   smartPaste: true,
   customColors: {},
+  highlightColor: "#facc15", // yellow-400
+  defaultCallout: "NOTE",
+  calloutStyles: {
+    CONCEPT: { color: "#3b82f6", icon: "BookOpen" },
+    IMPORTANT: { color: "#ef4444", icon: "AlertCircle" },
+    QUESTION: { color: "#8b5cf6", icon: "HelpCircle" },
+    WARNING: { color: "#f59e0b", icon: "AlertTriangle" },
+    IDEA: { color: "#10b981", icon: "Lightbulb" },
+    NOTE: { color: "#6b7280", icon: "Info" },
+  },
   plugins: {
     autoCategorize: {
       enabled: false,
@@ -175,8 +193,10 @@ export const DEFAULT_SETTINGS: Settings = {
     "bold",
     "italic",
     "underline",
+    "highlight",
     "link",
     "blockquote",
+    "callout",
     "|",
     "bulletList",
     "orderedList",

@@ -49,7 +49,8 @@ export async function parseMarkdownImport(file: File, targetWorkspaceId: string,
         }
       }
       
-      const contentHtml = await marked.parse(contentMd);
+      const preprocessedMd = contentMd.replace(/==([^=]+)==/g, '<mark>$1</mark>');
+      const contentHtml = await marked.parse(preprocessedMd);
       
       resolve({
         title,
