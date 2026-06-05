@@ -40,6 +40,7 @@ interface SettingsModalProps {
 
 import { AutoStructureSettingsPanel } from "./AutoStructureSettings";
 import { BrainMapSettingsPanel } from "./BrainMapSettingsPanel";
+import { DailyDigestSettingsPanel } from "./DailyDigestSettingsPanel";
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
@@ -979,6 +980,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                      collections={data.collections} 
                   />
                   <BrainMapSettingsPanel settings={localSettings} onUpdate={setLocalSettings} />
+                  <DailyDigestSettingsPanel 
+                     settings={localSettings} 
+                     onUpdate={setLocalSettings} 
+                     apiUsageCount={
+                       data.settings.apiUsage?.date === new Date().toISOString().split('T')[0] 
+                        ? (data.settings.apiUsage.embeddingCount || 0) + (data.settings.apiUsage.answerCount || 0) + (data.settings.apiUsage.digestCount || 0) + (data.settings.apiUsage.editorCount || 0) 
+                        : 0
+                     } 
+                  />
                 </div>
               </div>
             )}

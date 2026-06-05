@@ -28,6 +28,7 @@ const ReviewArea = lazy(() => import("./ReviewArea").then(module => ({ default: 
 const TagManagerModal = lazy(() => import("./TagManagerModal").then(module => ({ default: module.TagManagerModal })));
 const BackgroundAIProcessor = lazy(() => import("./BackgroundAIProcessor").then(module => ({ default: module.BackgroundAIProcessor })));
 const SecondBrainSidebar = lazy(() => import("./SecondBrainSidebar").then(module => ({ default: module.SecondBrainSidebar })));
+const DailyDigestCard = lazy(() => import("./DailyDigestCard").then(module => ({ default: module.DailyDigestCard })));
 
 export const MainLayout: React.FC = () => {
   const { data, addNote, updateSettings } = useStorage();
@@ -603,7 +604,29 @@ export const MainLayout: React.FC = () => {
                 <line x1="3" y1="18" x2="21" y2="18"></line>
               </svg>
             </button>
-            <p>Select a note or create a new one</p>
+            
+            <div className="flex flex-col items-center justify-center p-8 max-h-screen overflow-y-auto no-scrollbar w-full">
+               <Suspense fallback={null}>
+                  <DailyDigestCard 
+                     onOpenNote={(noteId) => {
+                        const note = data.notes.find(n => n.id === noteId);
+                        if (note) {
+                           setActiveWorkspaceId(note.workspaceId);
+                           setActiveCollectionId(note.collectionId);
+                           setActiveNoteId(noteId);
+                           if (!openTabs.includes(noteId)) {
+                             setOpenTabs((prev) => [...prev, noteId]);
+                           }
+                        }
+                     }}
+                  />
+               </Suspense>
+               
+               {!data.settings.plugins?.dailyDigest?.enabled && (
+                  <p className="mt-8">Select a note or create a new one</p>
+               )}
+            </div>
+            
           </div>
         )}
       </div>

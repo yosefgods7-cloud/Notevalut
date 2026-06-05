@@ -28,34 +28,32 @@ export function useAI() {
 
   const checkRateLimit = (type: 'embedding' | 'answer') => {
     const today = new Date().toISOString().split('T')[0];
-    const usage = data.settings.apiUsage || { date: today, embeddingCount: 0, answerCount: 0 };
+    const usage = data.settings.apiUsage;
     
-    if (usage.date !== today) {
-      usage.date = today;
-      usage.embeddingCount = 0;
-      usage.answerCount = 0;
-    }
+    if (usage?.date !== today) return true;
     
-    if (type === 'embedding' && usage.embeddingCount >= 1400) return false;
-    if (type === 'answer' && usage.answerCount >= 1400) return false;
+    const total = (usage.embeddingCount || 0) + (usage.answerCount || 0) + (usage.digestCount || 0) + (usage.editorCount || 0);
+    if (total >= 1400) return false;
     
     return true;
   };
 
   const incrementRateLimit = (type: 'embedding' | 'answer') => {
     const today = new Date().toISOString().split('T')[0];
-    const usage = data.settings.apiUsage || { date: today, embeddingCount: 0, answerCount: 0 };
+    const u = data.settings.apiUsage;
     
-    if (usage.date !== today) {
-      usage.date = today;
-      usage.embeddingCount = 0;
-      usage.answerCount = 0;
-    }
+    const newUsage = {
+      date: today,
+      embeddingCount: u?.date === today ? (u.embeddingCount || 0) : 0,
+      answerCount: u?.date === today ? (u.answerCount || 0) : 0,
+      digestCount: u?.date === today ? (u.digestCount || 0) : 0,
+      editorCount: u?.date === today ? (u.editorCount || 0) : 0,
+    };
     
-    if (type === 'embedding') usage.embeddingCount++;
-    if (type === 'answer') usage.answerCount++;
+    if (type === 'embedding') newUsage.embeddingCount++;
+    if (type === 'answer') newUsage.answerCount++;
     
-    updateSettings({ apiUsage: usage });
+    updateSettings({ apiUsage: newUsage });
   };
 
   const generateEmbeddingForNote = useCallback(async (note: Note) => {

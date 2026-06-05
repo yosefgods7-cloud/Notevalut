@@ -120,6 +120,12 @@ export interface BrainMapSettings {
   defaultFilters: BrainMapFilters;
 }
 
+export interface DailyDigestSettings {
+  enabled: boolean;
+  minNotesRequired: number;
+  timeOfDay: string;
+}
+
 export interface PluginSettings {
   autoCategorize?: {
     enabled: boolean;
@@ -128,6 +134,7 @@ export interface PluginSettings {
   smartLinking?: SmartLinkingPluginSettings;
   autoStructure?: AutoStructureSettings;
   brainMap?: BrainMapSettings;
+  dailyDigest?: DailyDigestSettings;
 }
 
 export interface DriveBackupSettings {
@@ -168,6 +175,8 @@ export interface Settings {
     date: string;
     embeddingCount: number;
     answerCount: number;
+    digestCount: number;
+    editorCount: number;
   };
 }
 
@@ -206,6 +215,13 @@ export interface NoteVaultData {
   templates?: NoteTemplate[];
   reviewNotes?: ReviewNote[];
   brainMapLastFilters?: BrainMapFilters;
+  dailyDigest?: DailyDigest;
+}
+
+export interface DailyDigest {
+  timestamp: number;
+  summary: string;
+  includedNoteIds: string[];
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -263,6 +279,11 @@ export const DEFAULT_SETTINGS: Settings = {
         dateRange: { start: null, end: null },
         connectionTypes: { wikilinks: true, tags: true },
       },
+    },
+    dailyDigest: {
+      enabled: false,
+      minNotesRequired: 3,
+      timeOfDay: "09:00",
     },
   },
   driveBackup: {

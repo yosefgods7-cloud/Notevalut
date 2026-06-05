@@ -278,6 +278,26 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
     });
   }, [data.notes, note?.title, note?.id]);
 
+  // Helper
+  const checkAndIncrementAPI = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const u = data.settings.apiUsage;
+    const current = u?.date === today ? (u.embeddingCount || 0) + (u.answerCount || 0) + (u.digestCount || 0) + (u.editorCount || 0) : 0;
+    if (current >= 1400) {
+      throw new Error("Daily API limit reached (1400/1500 limit).");
+    }
+    
+    updateSettings({
+      apiUsage: {
+        date: today,
+        embeddingCount: u?.date === today ? (u.embeddingCount || 0) : 0,
+        answerCount: u?.date === today ? (u.answerCount || 0) : 0,
+        digestCount: u?.date === today ? (u.digestCount || 0) : 0,
+        editorCount: (u?.date === today ? (u.editorCount || 0) : 0) + 1,
+      }
+    });
+  };
+
   const handleSummarizeNote = async () => {
     if (!editor) return;
     const ai = getAiClient(data.settings?.geminiApiKey);
@@ -290,8 +310,10 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
     const textContent = editor.getText();
 
     try {
+      checkAndIncrementAPI();
+      
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-1.5-flash",
         contents: `Please summarize the following note in a concise but comprehensive way:\n\n${textContent}`,
       });
 
@@ -430,8 +452,11 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
         showToast("AI features require an API key to be set");
         return;
       }
+
+      checkAndIncrementAPI();
+
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-1.5-flash",
         contents: [
           {
             role: "user",
