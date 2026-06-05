@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Editor } from '@tiptap/react';
-import { Trash2, Copy, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, GripVertical, GripHorizontal } from 'lucide-react';
+import { Trash2, Copy, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, GripVertical, GripHorizontal, MoveLeft, MoveRight, MoveUp, MoveDown, PlusSquare } from 'lucide-react';
 
 interface TableControlsProps {
   editor: Editor | null;
@@ -244,6 +244,41 @@ export const TableControls: React.FC<TableControlsProps> = ({ editor }) => {
            });
            manualTableUpdate(json, data.pos, data.node.nodeSize);
         }
+        return;
+      }
+
+      if (action === 'move-up' || action === 'move-down' || action === 'move-left' || action === 'move-right') {
+        const json = data.node.toJSON();
+        let targetIndex = index;
+        if (action === 'move-up' || action === 'move-left') targetIndex -= 1;
+        if (action === 'move-down' || action === 'move-right') targetIndex += 1;
+
+        if (type === 'row') {
+           const rowsData = json.content || [];
+           if (targetIndex >= 0 && targetIndex < rowsData.length) {
+             const [moved] = rowsData.splice(index, 1);
+             rowsData.splice(targetIndex, 0, moved);
+             manualTableUpdate(json, data.pos, data.node.nodeSize);
+           }
+        } else if (type === 'col') {
+           const rowsData = json.content || [];
+           let canMove = false;
+           // Verify move is valid
+           if (rowsData.length > 0) {
+             const cellsCount = (rowsData[0].content || []).length;
+             if (targetIndex >= 0 && targetIndex < cellsCount) canMove = true;
+           }
+           if (canMove) {
+             rowsData.forEach((row: any) => {
+               const cells = row.content || [];
+               if (index < cells.length) {
+                 const [moved] = cells.splice(index, 1);
+                 cells.splice(targetIndex, 0, moved);
+               }
+             });
+             manualTableUpdate(json, data.pos, data.node.nodeSize);
+           }
+        }
       }
     });
   };
@@ -321,8 +356,11 @@ export const TableControls: React.FC<TableControlsProps> = ({ editor }) => {
           
           {activeMenu?.type === 'col' && activeMenu.index === c.index && (
             <div ref={menuRef} className="absolute top-6 left-1/2 -translate-x-1/2 bg-surface border border-border rounded-md shadow-xl p-1 flex flex-col gap-1 w-32 z-[60]">
-              <button onMouseDown={(e) => { e.preventDefault(); handleAction('add-before'); }} className="flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-surface-active rounded-sm w-full font-medium text-text-primary"><ArrowLeft size={12}/> Add Left</button>
-              <button onMouseDown={(e) => { e.preventDefault(); handleAction('add-after'); }} className="flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-surface-active rounded-sm w-full font-medium text-text-primary"><ArrowRight size={12}/> Add Right</button>
+              <button onMouseDown={(e) => { e.preventDefault(); handleAction('add-before'); }} className="flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-surface-active rounded-sm w-full font-medium text-text-primary"><PlusSquare size={12}/> Add Left</button>
+              <button onMouseDown={(e) => { e.preventDefault(); handleAction('add-after'); }} className="flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-surface-active rounded-sm w-full font-medium text-text-primary"><PlusSquare size={12}/> Add Right</button>
+              <div className="w-full h-px bg-border my-0.5" />
+              <button onMouseDown={(e) => { e.preventDefault(); handleAction('move-left'); }} className="flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-surface-active rounded-sm w-full font-medium text-text-primary"><MoveLeft size={12}/> Move Left</button>
+              <button onMouseDown={(e) => { e.preventDefault(); handleAction('move-right'); }} className="flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-surface-active rounded-sm w-full font-medium text-text-primary"><MoveRight size={12}/> Move Right</button>
               <div className="w-full h-px bg-border my-0.5" />
               <button onMouseDown={(e) => { e.preventDefault(); handleAction('duplicate'); }} className="flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-surface-active rounded-sm w-full text-accent font-medium"><Copy size={12}/> Duplicate</button>
               <button onMouseDown={(e) => { e.preventDefault(); handleAction('delete'); }} className="flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-surface-active text-red-500 rounded-sm w-full font-medium"><Trash2 size={12}/> Delete</button>
@@ -357,8 +395,11 @@ export const TableControls: React.FC<TableControlsProps> = ({ editor }) => {
 
           {activeMenu?.type === 'row' && activeMenu.index === r.index && (
             <div ref={menuRef} className="absolute left-6 top-1/2 -translate-y-1/2 bg-surface border border-border rounded-md shadow-xl p-1 flex flex-col gap-1 w-32 z-[60]">
-              <button onMouseDown={(e) => { e.preventDefault(); handleAction('add-before'); }} className="flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-surface-active rounded-sm w-full font-medium text-text-primary"><ArrowUp size={12}/> Add Above</button>
-              <button onMouseDown={(e) => { e.preventDefault(); handleAction('add-after'); }} className="flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-surface-active rounded-sm w-full font-medium text-text-primary"><ArrowDown size={12}/> Add Below</button>
+              <button onMouseDown={(e) => { e.preventDefault(); handleAction('add-before'); }} className="flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-surface-active rounded-sm w-full font-medium text-text-primary"><PlusSquare size={12}/> Add Above</button>
+              <button onMouseDown={(e) => { e.preventDefault(); handleAction('add-after'); }} className="flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-surface-active rounded-sm w-full font-medium text-text-primary"><PlusSquare size={12}/> Add Below</button>
+              <div className="w-full h-px bg-border my-0.5" />
+              <button onMouseDown={(e) => { e.preventDefault(); handleAction('move-up'); }} className="flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-surface-active rounded-sm w-full font-medium text-text-primary"><MoveUp size={12}/> Move Up</button>
+              <button onMouseDown={(e) => { e.preventDefault(); handleAction('move-down'); }} className="flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-surface-active rounded-sm w-full font-medium text-text-primary"><MoveDown size={12}/> Move Down</button>
               <div className="w-full h-px bg-border my-0.5" />
               <button onMouseDown={(e) => { e.preventDefault(); handleAction('duplicate'); }} className="flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-surface-active rounded-sm w-full text-accent font-medium"><Copy size={12}/> Duplicate</button>
               <button onMouseDown={(e) => { e.preventDefault(); handleAction('delete'); }} className="flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-surface-active text-red-500 rounded-sm w-full font-medium"><Trash2 size={12}/> Delete</button>

@@ -13,6 +13,7 @@ export interface Collection {
   icon: string;
   createdAt: string;
   order: number;
+  parentId?: string;
 }
 
 export interface NoteHeaderMeta {
@@ -58,6 +59,8 @@ export interface Note {
   starred?: boolean;
   createdAt: string;
   updatedAt: string;
+  isDeleted?: boolean;
+  deletedAt?: string;
   wordCount: number;
   headerMeta?: NoteHeaderMeta;
   images?: NoteImage[];
@@ -85,12 +88,27 @@ export interface SmartLinkingPluginSettings {
   };
 }
 
+export interface Template {
+  id: string;
+  name: string;
+  content: string;
+}
+
+export interface AutoStructureSettings {
+  enabled: boolean;
+  templates: Template[];
+  folderTemplates: Record<string, string>;
+  activePlaceholders: Record<string, boolean>;
+  customPlaceholders: Record<string, string>;
+}
+
 export interface PluginSettings {
   autoCategorize?: {
     enabled: boolean;
     rules: AutoCategorizeRule[];
   };
   smartLinking?: SmartLinkingPluginSettings;
+  autoStructure?: AutoStructureSettings;
 }
 
 export interface DriveBackupSettings {
@@ -202,6 +220,18 @@ export const DEFAULT_SETTINGS: Settings = {
         embeddingSimilarity: false,
       },
     },
+    autoStructure: {
+      enabled: false,
+      templates: [],
+      folderTemplates: {},
+      activePlaceholders: {
+        "{{date}}": true,
+        "{{title}}": true,
+        "{{tags}}": true,
+        "{{summary}}": true,
+      },
+      customPlaceholders: {},
+    },
   },
   driveBackup: {
     enabled: false,
@@ -222,6 +252,7 @@ export const DEFAULT_SETTINGS: Settings = {
     "link",
     "blockquote",
     "callout",
+    "foldable",
     "|",
     "bulletList",
     "orderedList",

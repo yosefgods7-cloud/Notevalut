@@ -26,7 +26,7 @@ import {
   Minus,
 } from "lucide-react";
 import { cn } from "../lib/utils";
-import { Settings as SettingsType } from "../types";
+import { Settings as SettingsType, DEFAULT_SETTINGS } from "../types";
 import { uploadToDrive } from "../lib/drive";
 import { appPrompt, appConfirm } from "./GlobalDialogs";
 
@@ -37,6 +37,8 @@ interface SettingsModalProps {
   onClose: () => void;
   onOpenExport: () => void;
 }
+
+import { AutoStructureSettingsPanel } from "./AutoStructureSettings";
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
@@ -969,6 +971,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       </div>
                     </div>
                   )}
+                  
+                  <AutoStructureSettingsPanel 
+                     settings={localSettings} 
+                     onUpdate={setLocalSettings} 
+                     collections={data.collections} 
+                  />
                 </div>
               </div>
             )}

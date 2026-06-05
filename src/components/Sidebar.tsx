@@ -372,6 +372,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span className="text-lg leading-none shrink-0"><Star size={16} className="text-yellow-500 fill-yellow-500" /></span>
                 <span className="truncate">Starred</span>
             </button>
+            <button
+                onClick={() => setActiveCollectionId('trash')}
+                className={cn(
+                  "w-full flex items-center gap-3 px-3 py-1.5 rounded-md text-sm transition-colors",
+                  activeCollectionId === 'trash' ? "bg-surface-active text-rose-400 font-medium" : "text-text-secondary hover:bg-surface-hover hover:text-rose-400"
+                )}
+              >
+                <span className="text-lg leading-none shrink-0"><Trash2 size={16} /></span>
+                <span className="truncate">Trash</span>
+            </button>
             {collections.map(c => (
               <div key={c.id} className="flex flex-col group relative">
                 <button

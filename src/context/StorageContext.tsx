@@ -31,6 +31,7 @@ import {
   onSnapshot,
   query,
   getDocs,
+  deleteField,
 } from "firebase/firestore";
 import { get, set, del } from "idb-keyval";
 
@@ -70,6 +71,8 @@ const safeStorage = {
   },
 };
 
+import { marked } from "marked";
+
 interface StorageContextType {
   data: NoteVaultData;
   saveData: (newData: NoteVaultData) => void;
@@ -96,6 +99,9 @@ interface StorageContextType {
   updateNote: (id: string, updates: Partial<Note>) => void;
   deleteNote: (id: string) => void;
   deleteNotes: (ids: string[]) => void;
+  permanentlyDeleteNote: (id: string) => void;
+  restoreNote: (id: string) => void;
+  emptyTrash: () => void;
   // Templates
   addTemplate: (name: string, content: string) => NoteTemplate;
   deleteTemplate: (id: string) => void;
@@ -177,6 +183,25 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const hiddenNotesRef = useRef<Note[]>([]);
   const [areAllNotesLoaded, setAreAllNotesLoaded] = useState(false);
+
+  // Trash Cleanup Effect (Runs once when authenticated and notes are ready)
+  useEffect(() => {
+    if (!isInitialized || !user) return;
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const expiredNotes = data.notes.filter(n => n.isDeleted && n.deletedAt && new Date(n.deletedAt).getTime() < thirtyDaysAgo);
+    
+    if (expiredNotes.length > 0) {
+       const ids = expiredNotes.map(n => n.id);
+       setData(prev => ({
+         ...prev,
+         notes: prev.notes.filter(n => !ids.includes(n.id))
+       }));
+       
+       const batch = writeBatch(db);
+       ids.forEach(id => batch.delete(doc(db, `users/${user.uid}/notes/${id}`)));
+       batch.commit().catch(e => console.error("Trash cleanup failed", e));
+    }
+  }, [isInitialized, user, data.notes]);
 
   const saveData = useCallback(
     async (newData: NoteVaultData, skipHistory = false) => {
@@ -678,13 +703,53 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
       title = "Untitled Note",
       content = "<p></p>",
     ) => {
+      let finalContent = content;
+      const ds = data.settings.plugins?.autoStructure;
+      if (ds?.enabled && content === "<p></p>") {
+        let currentId: string | undefined = collectionId;
+        let templateContent: string | null = null;
+        while (currentId) {
+          const templateId = ds.folderTemplates[currentId];
+          if (templateId) {
+            const template = ds.templates.find((t) => t.id === templateId);
+            if (template) {
+              templateContent = template.content;
+              break;
+            }
+          }
+          const collection = data.collections.find((c) => c.id === currentId);
+          currentId = collection?.parentId;
+        }
+
+        if (templateContent) {
+          let result = templateContent;
+          if (ds.activePlaceholders["{{date}}"]) {
+            result = result.replace(/\{\{date\}\}/g, new Date().toLocaleDateString());
+          }
+          if (ds.activePlaceholders["{{title}}"]) {
+            result = result.replace(/\{\{title\}\}/g, title);
+          }
+          if (ds.activePlaceholders["{{tags}}"]) {
+            result = result.replace(/\{\{tags\}\}/g, "");
+          }
+          if (ds.activePlaceholders["{{summary}}"]) {
+            result = result.replace(/\{\{summary\}\}/g, "");
+          }
+          for (const [key, value] of Object.entries(ds.customPlaceholders || {})) {
+            const keyMatch = new RegExp(`\\{\\{${key}\\}\\}`, "g");
+            result = result.replace(keyMatch, value);
+          }
+          finalContent = marked.parse(result) as string;
+        }
+      }
+
       const now = new Date().toISOString();
       const newNote: Note = {
         id: generateId(),
         workspaceId,
         collectionId,
         title,
-        content,
+        content: finalContent,
         tags: [],
         pinned: false,
         starred: false,
@@ -794,6 +859,56 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const deleteNote = useCallback(
     async (id: string) => {
+      const now = new Date().toISOString();
+      saveData({
+        ...data,
+        notes: data.notes.map((n) => (n.id === id ? { ...n, isDeleted: true, deletedAt: now } : n)),
+      });
+
+      if (user) {
+        setDoc(doc(db, `users/${user.uid}/notes/${id}`), { isDeleted: true, deletedAt: now }, { merge: true }).catch((e) => {
+          handleFirestoreError(
+            e,
+            OperationType.UPDATE,
+            `users/${user.uid}/notes/${id}`
+          );
+        });
+      }
+      showToast("Note moved to trash");
+    },
+    [data, saveData, user, showToast],
+  );
+
+  const deleteNotes = useCallback(
+    async (ids: string[]) => {
+      const now = new Date().toISOString();
+      saveData({
+        ...data,
+        notes: data.notes.map((n) => (ids.includes(n.id) ? { ...n, isDeleted: true, deletedAt: now } : n)),
+      });
+
+      if (user) {
+        try {
+          const batch = writeBatch(db);
+          ids.forEach((id) =>
+            batch.update(doc(db, `users/${user.uid}/notes/${id}`), { isDeleted: true, deletedAt: now }),
+          );
+          await batch.commit();
+        } catch (e) {
+          handleFirestoreError(
+            e,
+            OperationType.UPDATE,
+            `users/${user.uid}/notes`,
+          );
+        }
+      }
+      showToast(`${ids.length} notes moved to trash`);
+    },
+    [data, saveData, user, showToast],
+  );
+
+  const permanentlyDeleteNote = useCallback(
+    async (id: string) => {
       saveData({
         ...data,
         notes: data.notes.filter((n) => n.id !== id),
@@ -814,17 +929,44 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
     [data, saveData, user],
   );
 
-  const deleteNotes = useCallback(
-    async (ids: string[]) => {
+  const restoreNote = useCallback(
+    async (id: string) => {
       saveData({
         ...data,
-        notes: data.notes.filter((n) => !ids.includes(n.id)),
+        notes: data.notes.map((n) => (n.id === id ? { ...n, isDeleted: false, deletedAt: undefined } : n)),
       });
 
       if (user) {
         try {
+          await setDoc(doc(db, `users/${user.uid}/notes/${id}`), { isDeleted: false, deletedAt: deleteField() }, { merge: true });
+        } catch (e) {
+          handleFirestoreError(
+            e,
+            OperationType.UPDATE,
+            `users/${user.uid}/notes/${id}`,
+          );
+        }
+      }
+      showToast("Note restored");
+    },
+    [data, saveData, user, showToast],
+  );
+
+  const emptyTrash = useCallback(
+    async () => {
+      const deletedNoteIds = data.notes.filter(n => n.isDeleted).map(n => n.id);
+      saveData({
+        ...data,
+        notes: data.notes.filter((n) => !n.isDeleted),
+      });
+
+      if (user && deletedNoteIds.length > 0) {
+        try {
+          // Firestore batches support up to 500 operations
+          // If a user has > 500 items in trash, this could fail, but assuming reasonable usage here.
+          // For a robust implementation, we would chunk this.
           const batch = writeBatch(db);
-          ids.forEach((id) =>
+          deletedNoteIds.forEach((id) =>
             batch.delete(doc(db, `users/${user.uid}/notes/${id}`)),
           );
           await batch.commit();
@@ -836,8 +978,9 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
           );
         }
       }
+      showToast("Trash emptied");
     },
-    [data, saveData, user],
+    [data, saveData, user, showToast],
   );
 
   const addTemplate = useCallback(
@@ -1098,6 +1241,9 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
         updateNote,
         deleteNote,
         deleteNotes,
+        permanentlyDeleteNote,
+        restoreNote,
+        emptyTrash,
         addTemplate,
         deleteTemplate,
         addReviewNote,

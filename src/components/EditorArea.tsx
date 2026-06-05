@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { Note } from '../types';
 import { useStorage } from "../context/StorageContext";
 import { useAuth } from "../context/AuthContext";
 import { uploadToDrive } from "../lib/drive";
@@ -22,6 +23,7 @@ import { Color } from "@tiptap/extension-color";
 import { TextStyle as TiptapTextStyle } from "@tiptap/extension-text-style";
 import Highlight from "@tiptap/extension-highlight";
 import { CalloutBlockquote } from "../lib/CalloutExtension";
+import { FoldableBlock } from "../lib/FoldableExtension";
 import { FontSize } from "../lib/FontSize";
 import { WikiLink } from "../lib/WikiLink";
 import { cleanAIPaste } from "../lib/paste-cleaner";
@@ -85,7 +87,8 @@ import {
   Maximize,
   Minimize,
   Highlighter,
-  MessageSquareWarning
+  MessageSquareWarning,
+  FoldVertical
 } from "lucide-react";
 import { cn, generateId } from "../lib/utils";
 import { format } from "date-fns";
@@ -182,6 +185,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
     updateNote,
     addNote,
     deleteNote,
+    restoreNote,
     addTemplate,
     deleteTemplate,
     updateSettings,
@@ -794,12 +798,14 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
       Color,
       FontSize,
       WikiLink,
+      CalloutBlockquote,
+      FoldableBlock,
       Placeholder.configure({
         placeholder: "Start writing or paste AI text...",
       }),
     ],
     content: "",
-    editable: isEditing,
+    editable: isEditing && !note?.isDeleted,
     editorProps: {
       handleClick: (view, pos, event) => {
         const target = event.target as HTMLElement;
@@ -974,9 +980,9 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
 
   useEffect(() => {
     if (editor) {
-      editor.setEditable(isEditing);
+      editor.setEditable(isEditing && !note?.isDeleted);
     }
-  }, [isEditing, editor]);
+  }, [isEditing, editor, note?.isDeleted]);
 
   useEffect(() => {
     if (note && editor) {
@@ -987,8 +993,12 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
       setSource(note.headerMeta?.source || "");
       setSummary(note.headerMeta?.summary || "");
       setTags(note.tags || []);
+      
+      if (note.isDeleted && isEditing) {
+        setIsEditing(false);
+      }
     }
-  }, [noteId, editor]); // intentionally don't include note.content here to avoid cursor jumping
+  }, [noteId, editor, note?.isDeleted]); // intentionally don't include note.content here to avoid cursor jumping
 
   const exportToPdf = useCallback(() => {
     if (!pdfContainerRef.current || !note) return;
@@ -1380,12 +1390,26 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
             className="w-full max-w-[720px] px-8 print:px-0"
             ref={pdfContainerRef}
           >
+          {note?.isDeleted && (
+            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center justify-between text-red-400 text-sm">
+              <div className="flex items-center gap-2">
+                <Trash2 size={16} />
+                <span>This note is in the trash. It's read-only and will be permanently deleted after 30 days.</span>
+              </div>
+              <button
+                onClick={() => restoreNote(note.id)}
+                className="px-3 py-1 bg-surface rounded shadow-sm hover:text-green-400 transition-colors border border-border"
+              >
+                Restore Note
+              </button>
+            </div>
+          )}
           {/* Note Metadata Header */}
           <div className="mb-8 p-6 bg-surface border border-border rounded-xl">
             <input
               type="text"
               value={title}
-              readOnly={!isEditing}
+              readOnly={!isEditing || note?.isDeleted}
               onChange={(e) => {
                 setTitle(e.target.value);
                 handleSaveMetadata({ title: e.target.value });
@@ -2161,6 +2185,16 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
                           )}
                         </div>
                       );
+                    case "foldable":
+                      return (
+                        <ToolbarButton
+                          key={item}
+                          onClick={() => editor.chain().focus().setFoldableBlock().run()}
+                          active={editor.isActive("foldableBlock")}
+                          icon={<FoldVertical size={16} />}
+                          title="Foldable text block"
+                        />
+                      );
                     case "underline":
                       return (
                         <ToolbarButton
@@ -2607,13 +2641,15 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
       </button>
 
       {/* Read/Edit Floating Action Button */}
-      <button
-        onClick={() => setIsEditing(!isEditing)}
-        className="fixed bottom-[8.5rem] right-24 w-14 h-14 bg-surface hover:bg-surface-hover text-text-primary border border-border shadow-[0_8px_30px_rgba(0,0,0,0.1)] rounded-full flex items-center justify-center z-40 transition-transform hover:scale-105 active:scale-95 no-print"
-        title={isEditing ? "Switch to Reading Mode" : "Switch to Editing Mode"}
-      >
-        {isEditing ? <BookOpen size={20} /> : <Pen size={20} />}
-      </button>
+      {!note?.isDeleted && (
+        <button
+          onClick={() => setIsEditing(!isEditing)}
+          className="fixed bottom-[8.5rem] right-24 w-14 h-14 bg-surface hover:bg-surface-hover text-text-primary border border-border shadow-[0_8px_30px_rgba(0,0,0,0.1)] rounded-full flex items-center justify-center z-40 transition-transform hover:scale-105 active:scale-95 no-print"
+          title={isEditing ? "Switch to Reading Mode" : "Switch to Editing Mode"}
+        >
+          {isEditing ? <BookOpen size={20} /> : <Pen size={20} />}
+        </button>
+      )}
 
       {imageToCrop && (
         <ImageCropModal

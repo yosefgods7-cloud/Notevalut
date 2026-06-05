@@ -16,7 +16,7 @@ export const NoteList: React.FC<NoteListProps> = ({
   activeWorkspaceId, activeCollectionId,
   activeNoteId, setActiveNoteId
 }) => {
-  const { data, addNote, updateNote, deleteNote, deleteNotes, loadAllNotes } = useStorage();
+  const { data, addNote, updateNote, deleteNote, deleteNotes, loadAllNotes, emptyTrash, restoreNote, permanentlyDeleteNote } = useStorage();
   const [searchQuery, setSearchQuery] = useState('');
   
   useEffect(() => {
@@ -31,12 +31,15 @@ export const NoteList: React.FC<NoteListProps> = ({
   const [isBulkMode, setIsBulkMode] = useState(false);
   const [noteToDelete, setNoteToDelete] = useState<string | null>(null);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [showEmptyTrashConfirm, setShowEmptyTrashConfirm] = useState(false);
 
   const [sortOption, setSortOption] = useState<'updated' | 'created' | 'alphabetical'>('updated');
 
-  const notes = activeCollectionId === 'starred' 
-    ? data.notes.filter(n => n.workspaceId === activeWorkspaceId && n.starred)
-    : data.notes.filter(n => n.collectionId === activeCollectionId);
+  const notes = activeCollectionId === 'trash'
+    ? data.notes.filter(n => n.workspaceId === activeWorkspaceId && n.isDeleted)
+    : activeCollectionId === 'starred' 
+      ? data.notes.filter(n => n.workspaceId === activeWorkspaceId && n.starred && !n.isDeleted)
+      : data.notes.filter(n => n.collectionId === activeCollectionId && !n.isDeleted);
     
   const filteredNotes = notes.filter(n => {
     if (!searchQuery) return true;
@@ -124,13 +127,23 @@ export const NoteList: React.FC<NoteListProps> = ({
             <option value="alphabetical">Alphabetical</option>
           </select>
         </div>
-        <button
-          onClick={handleCreateNote}
-          className="w-full flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover text-white py-2 rounded-md transition-colors text-sm font-medium shadow-sm"
-        >
-          <Plus size={16} />
-          <span>New Note</span>
-        </button>
+        {activeCollectionId === 'trash' ? (
+          <button
+            onClick={() => setShowEmptyTrashConfirm(true)}
+            className="w-full flex items-center justify-center gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 py-2 rounded-md transition-colors text-sm font-medium border border-red-500/20"
+          >
+            <Trash2 size={16} />
+            <span>Empty Trash</span>
+          </button>
+        ) : (
+          <button
+            onClick={handleCreateNote}
+            className="w-full flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover text-white py-2 rounded-md transition-colors text-sm font-medium shadow-sm"
+          >
+            <Plus size={16} />
+            <span>New Note</span>
+          </button>
+        )}
       </div>
 
       {isBulkMode && (
@@ -140,7 +153,7 @@ export const NoteList: React.FC<NoteListProps> = ({
             <button 
               onClick={() => setShowBulkDeleteConfirm(true)}
               className="p-1.5 text-text-muted hover:text-red-400 hover:bg-surface rounded transition-colors"
-              title="Delete Selected"
+              title={activeCollectionId === 'trash' ? "Delete Permanently" : "Move to Trash"}
             >
               <Trash2 size={14} />
             </button>
@@ -238,30 +251,54 @@ export const NoteList: React.FC<NoteListProps> = ({
 
               {/* Hover Actions */}
               <div className="absolute right-2 top-2 lg:opacity-0 opacity-100 group-hover:opacity-100 focus-within:opacity-100 transition-opacity flex gap-1 bg-surface-hover rounded-md shadow-lg border border-border p-0.5 backdrop-blur-md">
-                <button
-                  onClick={(e) => { e.stopPropagation(); updateNote(note.id, { starred: !note.starred }); }}
-                  className="p-1.5 text-text-secondary hover:text-yellow-500 rounded hover:bg-surface-active"
-                  title={note.starred ? "Unstar" : "Star"}
-                >
-                  <Star size={12} className={note.starred ? "fill-current text-yellow-500" : ""} />
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); updateNote(note.id, { pinned: !note.pinned }); }}
-                  className="p-1.5 text-text-secondary hover:text-accent rounded hover:bg-surface-active"
-                  title={note.pinned ? "Unpin" : "Pin"}
-                >
-                  <Pin size={12} className={note.pinned ? "fill-current" : ""} />
-                </button>
-                <button
-                  onClick={(e) => { 
-                    e.stopPropagation(); 
-                    setNoteToDelete(note.id);
-                  }}
-                  className="p-1.5 text-text-secondary hover:text-red-400 rounded hover:bg-surface-active"
-                  title="Delete"
-                >
-                  <Trash2 size={12} />
-                </button>
+                {activeCollectionId === 'trash' ? (
+                  <>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); restoreNote(note.id); }}
+                      className="p-1.5 text-text-secondary hover:text-green-400 rounded hover:bg-surface-active"
+                      title="Restore"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3"><polyline points="9 14 4 9 9 4"></polyline><path d="M20 20v-7a4 4 0 0 0-4-4H4"></path></svg>
+                    </button>
+                    <button
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        setNoteToDelete(note.id);
+                      }}
+                      className="p-1.5 text-text-secondary hover:text-red-400 rounded hover:bg-surface-active"
+                      title="Delete Permanently"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); updateNote(note.id, { starred: !note.starred }); }}
+                      className="p-1.5 text-text-secondary hover:text-yellow-500 rounded hover:bg-surface-active"
+                      title={note.starred ? "Unstar" : "Star"}
+                    >
+                      <Star size={12} className={note.starred ? "fill-current text-yellow-500" : ""} />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); updateNote(note.id, { pinned: !note.pinned }); }}
+                      className="p-1.5 text-text-secondary hover:text-accent rounded hover:bg-surface-active"
+                      title={note.pinned ? "Unpin" : "Pin"}
+                    >
+                      <Pin size={12} className={note.pinned ? "fill-current" : ""} />
+                    </button>
+                    <button
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        setNoteToDelete(note.id);
+                      }}
+                      className="p-1.5 text-text-secondary hover:text-red-400 rounded hover:bg-surface-active"
+                      title="Move to Trash"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </>
+                )}
               </div>
             </motion.div>
           ))
@@ -273,10 +310,12 @@ export const NoteList: React.FC<NoteListProps> = ({
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-surface border border-border rounded-xl shadow-2xl p-6 max-w-sm w-full animate-in fade-in zoom-in duration-200">
             <h3 className="text-lg font-semibold text-text-primary mb-2 flex items-center gap-2">
-              <Trash2 className="text-red-400" size={20} /> Delete Note?
+              <Trash2 className="text-red-400" size={20} /> {activeCollectionId === 'trash' ? 'Delete Permanently?' : 'Move to Trash?'}
             </h3>
             <p className="text-sm text-text-muted mb-6">
-              Are you sure you want to permanently delete this note? This action will also delete the note from cloud sync. This cannot be undone.
+              {activeCollectionId === 'trash' 
+                ? 'Are you sure you want to permanently delete this note? This action will also delete the note from cloud sync. This cannot be undone.'
+                : 'Are you sure you want to move this note to the trash? It can be restored for up to 30 days.'}
             </p>
             <div className="flex items-center justify-end gap-3">
               <button 
@@ -287,13 +326,17 @@ export const NoteList: React.FC<NoteListProps> = ({
               </button>
               <button 
                 onClick={() => {
-                  deleteNote(noteToDelete);
+                  if (activeCollectionId === 'trash') {
+                    permanentlyDeleteNote(noteToDelete);
+                  } else {
+                    deleteNote(noteToDelete);
+                  }
                   if (activeNoteId === noteToDelete) setActiveNoteId(null);
                   setNoteToDelete(null);
                 }}
                 className="px-4 py-2 text-sm font-medium bg-red-500/90 hover:bg-red-600 text-white rounded-md transition-colors shadow-sm"
               >
-                Delete Permanently
+                {activeCollectionId === 'trash' ? 'Delete Permanently' : 'Move to Trash'}
               </button>
             </div>
           </div>
@@ -304,10 +347,12 @@ export const NoteList: React.FC<NoteListProps> = ({
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-surface border border-border rounded-xl shadow-2xl p-6 max-w-sm w-full animate-in fade-in zoom-in duration-200">
             <h3 className="text-lg font-semibold text-text-primary mb-2 flex items-center gap-2">
-              <Trash2 className="text-red-400" size={20} /> Delete {selectedNotes.length} Notes?
+              <Trash2 className="text-red-400" size={20} /> {activeCollectionId === 'trash' ? 'Delete Permanently?' : 'Move to Trash?'}
             </h3>
             <p className="text-sm text-text-muted mb-6">
-              Are you sure you want to permanently delete these notes? They will also be removed from cloud sync. This cannot be undone.
+              {activeCollectionId === 'trash' 
+                ? `Are you sure you want to permanently delete these ${selectedNotes.length} notes? They will also be removed from cloud sync. This cannot be undone.`
+                : `Are you sure you want to move ${selectedNotes.length} notes to the trash?`}
             </p>
             <div className="flex items-center justify-end gap-3">
               <button 
@@ -317,10 +362,55 @@ export const NoteList: React.FC<NoteListProps> = ({
                 Cancel
               </button>
               <button 
-                onClick={handleBulkDeleteContent}
+                onClick={() => {
+                  if (activeCollectionId === 'trash') {
+                    selectedNotes.forEach(id => permanentlyDeleteNote(id));
+                    setSelectedNotes([]);
+                    setIsBulkMode(false);
+                    if (activeNoteId && selectedNotes.includes(activeNoteId)) {
+                      setActiveNoteId(null);
+                    }
+                    setShowBulkDeleteConfirm(false);
+                  } else {
+                    handleBulkDeleteContent();
+                  }
+                }}
                 className="px-4 py-2 text-sm font-medium bg-red-500/90 hover:bg-red-600 text-white rounded-md transition-colors shadow-sm"
               >
-                Delete Permanently
+                {activeCollectionId === 'trash' ? 'Delete Permanently' : 'Move to Trash'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Empty Trash Confirmation Modal */}
+      {showEmptyTrashConfirm && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-surface border border-border rounded-xl shadow-2xl p-6 max-w-sm w-full animate-in fade-in zoom-in duration-200">
+            <h3 className="text-lg font-semibold text-text-primary mb-2 flex items-center gap-2">
+              <Trash2 className="text-red-400" size={20} /> Empty Trash?
+            </h3>
+            <p className="text-sm text-text-muted mb-6">
+              Are you sure you want to permanently delete all notes in the trash? This action will also delete them from cloud sync and cannot be undone.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button 
+                onClick={() => setShowEmptyTrashConfirm(false)}
+                className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => {
+                  emptyTrash();
+                  setShowEmptyTrashConfirm(false);
+                  if (activeNoteId && notes.find(n => n.id === activeNoteId)) {
+                     setActiveNoteId(null);
+                  }
+                }}
+                className="px-4 py-2 text-sm font-medium bg-red-500/90 hover:bg-red-600 text-white rounded-md transition-colors shadow-sm"
+              >
+                Empty Trash
               </button>
             </div>
           </div>

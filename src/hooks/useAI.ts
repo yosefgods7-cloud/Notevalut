@@ -89,7 +89,7 @@ export function useAI() {
     incrementRateLimit('embedding');
 
     const scoredNotes = data.notes
-      .filter(n => isNoteInAiScope(n, data.settings.aiScope) && n.embedding && n.embedding.length > 0)
+      .filter(n => !n.isDeleted && isNoteInAiScope(n, data.settings.aiScope) && n.embedding && n.embedding.length > 0)
       .map(n => ({
         note: n,
         score: cosineSimilarity(queryEmbedding, n.embedding!)
@@ -104,7 +104,7 @@ export function useAI() {
     const sharedTags = new Set(topNotes.flatMap(n => n.tags));
     
     const candidates = data.notes.filter(n => {
-      if (topIds.has(n.id)) return false;
+      if (topIds.has(n.id) || n.isDeleted) return false;
       return n.tags.some(t => sharedTags.has(t));
     });
 

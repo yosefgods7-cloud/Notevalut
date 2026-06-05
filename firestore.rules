@@ -41,7 +41,7 @@ service cloud.firestore {
     }
 
     function isValidNote(data) {
-      return data.keys().hasAll(['userId', 'id', 'workspaceId', 'collectionId', 'title', 'content', 'tags', 'pinned', 'starred', 'createdAt', 'updatedAt', 'wordCount']) &&
+      return data.keys().hasAll(['userId', 'id', 'workspaceId', 'collectionId', 'title', 'content', 'tags', 'pinned', 'createdAt', 'updatedAt', 'wordCount']) &&
              data.userId is string &&
              data.id is string &&
              data.workspaceId is string &&
@@ -50,10 +50,12 @@ service cloud.firestore {
              data.content is string && data.content.size() <= 1048000 &&
              data.tags is list && data.tags.size() <= 100 &&
              data.pinned is bool &&
-             data.starred is bool &&
+             (data.keys().hasAll(['starred']) == false || data.starred is bool) &&
              data.createdAt is string &&
              data.updatedAt is string &&
              data.wordCount is number &&
+             (data.keys().hasAll(['isDeleted']) == false || data.isDeleted is bool) &&
+             (data.keys().hasAll(['deletedAt']) == false || data.deletedAt is string) &&
              (data.keys().hasAll(['headerMeta']) == false || data.headerMeta is map) &&
              (data.keys().hasAll(['images']) == false || data.images is list) &&
              (data.keys().hasAll(['attachments']) == false || data.attachments is list) &&
@@ -85,7 +87,7 @@ service cloud.firestore {
       match /notes/{noteId} {
         allow get, list: if isOwner(userId);
         allow create: if isOwner(userId) && isValidId(noteId) && isValidNote(incoming()) && incoming().userId == userId && incoming().keys().size() <= 17;
-        allow update: if isOwner(userId) && isValidId(noteId) && isValidNote(incoming()) && incoming().userId == existing().userId && incoming().id == existing().id && incoming().diff(existing()).affectedKeys().hasOnly(['workspaceId', 'collectionId', 'title', 'content', 'tags', 'pinned', 'starred', 'updatedAt', 'wordCount', 'headerMeta', 'images', 'attachments', 'charts', 'userId']);
+        allow update: if isOwner(userId) && isValidId(noteId) && isValidNote(incoming()) && incoming().userId == existing().userId && incoming().id == existing().id && incoming().diff(existing()).affectedKeys().hasOnly(['workspaceId', 'collectionId', 'title', 'content', 'tags', 'pinned', 'starred', 'isDeleted', 'deletedAt', 'updatedAt', 'wordCount', 'headerMeta', 'images', 'attachments', 'charts', 'userId']);
         allow delete: if isOwner(userId);
       }
     }

@@ -57,9 +57,11 @@
         "starred": { "type": "boolean" },
         "createdAt": { "type": "string" },
         "updatedAt": { "type": "string" },
-        "wordCount": { "type": "number" }
+        "wordCount": { "type": "number" },
+        "isDeleted": { "type": "boolean" },
+        "deletedAt": { "type": "string" }
       },
-      "required": ["userId", "id", "workspaceId", "collectionId", "title", "content", "tags", "pinned", "starred", "createdAt", "updatedAt", "wordCount"]
+      "required": ["userId", "id", "workspaceId", "collectionId", "title", "content", "tags", "pinned", "createdAt", "updatedAt", "wordCount"]
     }
   },
   "firestore": {

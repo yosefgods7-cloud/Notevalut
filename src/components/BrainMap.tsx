@@ -119,7 +119,7 @@ export const BrainMap: React.FC<BrainMapProps> = ({
 
     // Notes
     const tagSet = new Set<string>();
-    let targetNotes = data.notes.filter(n => collectionIds.has(n.collectionId) || workspaceIds.has(n.workspaceId));
+    let targetNotes = data.notes.filter(n => (!n.isDeleted) && (collectionIds.has(n.collectionId) || workspaceIds.has(n.workspaceId)));
     
     // Compute available attributes for filters before applying filters
     const availableTags = Array.from(new Set(targetNotes.flatMap(n => n.tags)));

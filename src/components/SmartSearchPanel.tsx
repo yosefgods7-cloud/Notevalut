@@ -66,7 +66,7 @@ export const SmartSearchPanel: React.FC<SmartSearchPanelProps> = ({
     const connected: { note: Note; sharedTags: string[]; isWikilink: boolean }[] = [];
     
     data.notes.forEach(note => {
-      if (note.id === currentNote.id) return;
+      if (note.id === currentNote.id || note.isDeleted) return;
 
       let hasWikilink = false;
       const noteTitle = (note.title || "Untitled").trim().toLowerCase();

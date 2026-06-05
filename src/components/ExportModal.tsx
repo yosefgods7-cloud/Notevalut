@@ -24,12 +24,13 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, activ
        return [activeNoteId];
     }
     if (scope === 'collection' && activeCollectionId) {
-      return data.notes.filter(n => n.collectionId === activeCollectionId).map(n => n.id);
+      return data.notes.filter(n => n.collectionId === activeCollectionId && !n.isDeleted).map(n => n.id);
     }
-    return data.notes.map(n => n.id);
+    return data.notes.filter(n => !n.isDeleted).map(n => n.id);
   };
   
   const notesCount = getSelectedIds().length;
+  const activeNotesLength = data.notes.filter(n => !n.isDeleted).length;
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -71,7 +72,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, activ
               </label>
               <label className="flex items-center gap-3 cursor-pointer">
                 <input type="radio" name="scope" checked={scope === 'all'} onChange={() => setScope('all')} className="accent-accent w-4 h-4" />
-                <span>All {data.notes.length} notes</span>
+                <span>All {activeNotesLength} notes</span>
               </label>
             </div>
           </div>
