@@ -39,6 +39,7 @@ interface SettingsModalProps {
 }
 
 import { AutoStructureSettingsPanel } from "./AutoStructureSettings";
+import { BrainMapSettingsPanel } from "./BrainMapSettingsPanel";
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
@@ -977,6 +978,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                      onUpdate={setLocalSettings} 
                      collections={data.collections} 
                   />
+                  <BrainMapSettingsPanel settings={localSettings} onUpdate={setLocalSettings} />
                 </div>
               </div>
             )}

@@ -102,6 +102,24 @@ export interface AutoStructureSettings {
   customPlaceholders: Record<string, string>;
 }
 
+export interface BrainMapFilters {
+  searchTerm: string;
+  tags: string[];
+  folders: string[];
+  dateRange: { start: string | null; end: string | null };
+  connectionTypes: {
+    wikilinks: boolean;
+    tags: boolean;
+  };
+}
+
+export interface BrainMapSettings {
+  enabled: boolean;
+  rememberLastFilter: boolean;
+  nonMatchingBehavior: "dim" | "hide";
+  defaultFilters: BrainMapFilters;
+}
+
 export interface PluginSettings {
   autoCategorize?: {
     enabled: boolean;
@@ -109,6 +127,7 @@ export interface PluginSettings {
   };
   smartLinking?: SmartLinkingPluginSettings;
   autoStructure?: AutoStructureSettings;
+  brainMap?: BrainMapSettings;
 }
 
 export interface DriveBackupSettings {
@@ -186,6 +205,7 @@ export interface NoteVaultData {
   settings: Settings;
   templates?: NoteTemplate[];
   reviewNotes?: ReviewNote[];
+  brainMapLastFilters?: BrainMapFilters;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -231,6 +251,18 @@ export const DEFAULT_SETTINGS: Settings = {
         "{{summary}}": true,
       },
       customPlaceholders: {},
+    },
+    brainMap: {
+      enabled: true,
+      rememberLastFilter: true,
+      nonMatchingBehavior: "dim",
+      defaultFilters: {
+        searchTerm: "",
+        tags: [],
+        folders: [],
+        dateRange: { start: null, end: null },
+        connectionTypes: { wikilinks: true, tags: true },
+      },
     },
   },
   driveBackup: {

@@ -9,8 +9,10 @@ import {
   X,
   Download,
   Palette,
+  Search,
+  Filter,
 } from "lucide-react";
-import { Note } from "../types";
+import { Note, BrainMapFilters } from "../types";
 
 interface BrainMapProps {
   activeWorkspaceId: string;
@@ -28,12 +30,13 @@ interface GraphNode extends d3.SimulationNodeDatum {
   label: string;
   noteRef?: Note; // Reference to the note if type is 'note'
   val: number; // size
+  dimmed?: boolean;
 }
 
 interface GraphLink extends d3.SimulationLinkDatum<GraphNode> {
   source: string | GraphNode;
   target: string | GraphNode;
-  type: "parent" | "tag"; // parent = hierarchy, tag = hashtag link
+  type: "parent" | "tag" | "wikilink";
 }
 
 export const BrainMap: React.FC<BrainMapProps> = ({
@@ -41,7 +44,7 @@ export const BrainMap: React.FC<BrainMapProps> = ({
   onNavigateToNote,
   onClose,
 }) => {
-  const { data, loadAllNotes } = useStorage();
+  const { data, loadAllNotes, saveData } = useStorage();
 
   useEffect(() => {
     loadAllNotes();
@@ -89,9 +92,29 @@ export const BrainMap: React.FC<BrainMapProps> = ({
   };
 
   const [showAllHolders, setShowAllHolders] = useState<boolean>(true);
-  const [activeFilterTag, setActiveFilterTag] = useState<string | null>(null);
-  const [activeFilterFolder, setActiveFilterFolder] = useState<string | null>(null);
-  const [activeFilterDate, setActiveFilterDate] = useState<string | null>(null);
+  
+  const bmSettings = data.settings.plugins?.brainMap;
+  const initialFilters: BrainMapFilters = (bmSettings?.rememberLastFilter ? data.brainMapLastFilters : null) 
+    || bmSettings?.defaultFilters 
+    || {
+      searchTerm: "",
+      tags: [],
+      folders: [],
+      dateRange: { start: null, end: null },
+      connectionTypes: { wikilinks: true, tags: true },
+    };
+
+  const [filters, setFilters] = useState<BrainMapFilters>(initialFilters);
+
+  // Auto-save filters if enabled
+  useEffect(() => {
+    if (bmSettings?.rememberLastFilter) {
+      const timer = setTimeout(() => {
+        saveData({ ...data, brainMapLastFilters: filters });
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [filters, bmSettings?.rememberLastFilter, saveData, data]);
 
   // Compute Graph Data
   const graphData = useMemo(() => {
@@ -119,34 +142,91 @@ export const BrainMap: React.FC<BrainMapProps> = ({
 
     // Notes
     const tagSet = new Set<string>();
-    let targetNotes = data.notes.filter(n => (!n.isDeleted) && (collectionIds.has(n.collectionId) || workspaceIds.has(n.workspaceId)));
-    
-    // Compute available attributes for filters before applying filters
-    const availableTags = Array.from(new Set(targetNotes.flatMap(n => n.tags)));
-    const availableFolders = Array.from(new Set(targetNotes.map(n => n.collectionId)));
-    const availableDates = Array.from(new Set(targetNotes.map(n => new Date(n.createdAt).toLocaleDateString())));
+    let allValidNotes = data.notes.filter(
+      (n) =>
+        !n.isDeleted &&
+        (collectionIds.has(n.collectionId) || workspaceIds.has(n.workspaceId)),
+    );
 
-    // Apply Filter
-    targetNotes = targetNotes.filter(n => {
-      if (activeFilterTag && !n.tags.includes(activeFilterTag)) return false;
-      if (activeFilterFolder && n.collectionId !== activeFilterFolder) return false;
-      if (activeFilterDate && new Date(n.createdAt).toLocaleDateString() !== activeFilterDate) return false;
+    // Compute available attributes for filters before applying filters
+    const availableTags = Array.from(
+      new Set(allValidNotes.flatMap((n) => n.tags)),
+    );
+    const availableFolders = Array.from(
+      new Set(allValidNotes.map((n) => n.collectionId)),
+    );
+    const availableDates = Array.from(
+      new Set(
+        allValidNotes.map((n) => new Date(n.createdAt).toLocaleDateString()),
+      ),
+    );
+
+    const checkNoteMatches = (n: Note) => {
+      // Tags
+      if (filters.tags.length > 0) {
+        if (!filters.tags.some((t) => n.tags.includes(t))) return false;
+      }
+      // Folders
+      if (filters.folders.length > 0) {
+        if (!filters.folders.includes(n.collectionId)) return false;
+      }
+      // Dates
+      if (filters.dateRange.start || filters.dateRange.end) {
+        const d = new Date(n.createdAt).getTime();
+        const start = filters.dateRange.start ? new Date(filters.dateRange.start).getTime() : 0;
+        const end = filters.dateRange.end ? new Date(filters.dateRange.end).getTime() : Infinity;
+        // set end to end of day if it exists
+        const endOfDay = filters.dateRange.end ? new Date(filters.dateRange.end).setHours(23,59,59,999) : Infinity;
+        if (d < start || d > endOfDay) return false;
+      }
+      // Search term
+      if (filters.searchTerm) {
+        const term = filters.searchTerm.toLowerCase();
+        if (!n.title.toLowerCase().includes(term) && !n.content.toLowerCase().includes(term)) {
+          return false;
+        }
+      }
       return true;
+    };
+
+    const isFilterActive = filters.tags.length > 0 || filters.folders.length > 0 || filters.dateRange.start || filters.dateRange.end || filters.searchTerm;
+
+    const matchedNotes = new Set<string>();
+    allValidNotes.forEach((n) => {
+       if (!isFilterActive || checkNoteMatches(n)) {
+          matchedNotes.add(n.id);
+       }
     });
 
-    const activeCollectionIds = new Set(targetNotes.map(n => n.collectionId));
-    const activeWorkspaceIds = new Set(targetCollections.filter(c => activeCollectionIds.has(c.id)).map(c => c.workspaceId));
+    const hideNonMatching = bmSettings?.nonMatchingBehavior === "hide" && isFilterActive;
+
+    let targetNotes = allValidNotes;
+    if (hideNonMatching) {
+      targetNotes = targetNotes.filter((n) => matchedNotes.has(n.id));
+    }
+
+    const activeCollectionIds = new Set(targetNotes.map((n) => n.collectionId));
+    const activeWorkspaceIds = new Set(
+      targetCollections
+        .filter((c) => activeCollectionIds.has(c.id))
+        .map((c) => c.workspaceId),
+    );
 
     // Workspaces (Holders)
     targetWorkspaces.forEach((ws) => {
-      if (activeFilterFolder || activeFilterTag || activeFilterDate) {
-        if (!activeWorkspaceIds.has(ws.id)) return;
-      }
+      if (hideNonMatching && !activeWorkspaceIds.has(ws.id)) return;
+      
+      const hasMatchInWs = targetNotes.some(n => n.workspaceId === ws.id && matchedNotes.has(n.id) || 
+         targetCollections.some(c => c.workspaceId === ws.id && targetNotes.some(n2 => n2.collectionId === c.id && matchedNotes.has(n2.id)))
+      );
+      const isDimmed = isFilterActive && !hasMatchInWs;
+
       nodes.push({
         id: `workspace-${ws.id}`,
         type: "workspace",
         label: ws.name,
-        val: 35, // bigger circle
+        val: 35,
+        dimmed: isDimmed,
       });
 
       if (showAllHolders) {
@@ -158,18 +238,19 @@ export const BrainMap: React.FC<BrainMapProps> = ({
       }
     });
 
-
     // Collections
     targetCollections.forEach((col) => {
-      if (activeFilterFolder || activeFilterTag || activeFilterDate) {
-        if (!activeCollectionIds.has(col.id)) return;
-      }
+      if (hideNonMatching && !activeCollectionIds.has(col.id)) return;
+
+      const hasMatchInCol = targetNotes.some(n => n.collectionId === col.id && matchedNotes.has(n.id));
+      const isDimmed = isFilterActive && !hasMatchInCol;
 
       nodes.push({
         id: `collection-${col.id}`,
         type: "collection",
         label: col.name,
         val: 20,
+        dimmed: isDimmed,
       });
 
       // Link Collection -> Workspace
@@ -181,12 +262,14 @@ export const BrainMap: React.FC<BrainMapProps> = ({
     });
 
     targetNotes.forEach((note) => {
+      const isDimmed = isFilterActive && !matchedNotes.has(note.id);
       nodes.push({
         id: `note-${note.id}`,
         type: "note",
         label: note.title || "Untitled",
         val: 12,
         noteRef: note,
+        dimmed: isDimmed,
       });
 
       // Link Note -> Collection
@@ -201,27 +284,66 @@ export const BrainMap: React.FC<BrainMapProps> = ({
 
     // Tag nodes
     tagSet.forEach((tag) => {
+      if (hideNonMatching) {
+        const hasMatchWithTag = targetNotes.some(n => n.tags.includes(tag) && matchedNotes.has(n.id));
+        if (!hasMatchWithTag) return; // Hide tags that don't belong to any matched note if hide mode
+      }
+      
+      const hasMatchWithTag = targetNotes.some(n => n.tags.includes(tag) && matchedNotes.has(n.id));
+      const isDimmed = isFilterActive && !hasMatchWithTag;
+
       nodes.push({
         id: `tag-${tag}`,
         type: "tag",
         label: `#${tag}`,
         val: 18,
+        dimmed: isDimmed,
       });
     });
 
-    // Links for tags
+    // Links for tags and wikilinks
     targetNotes.forEach((note) => {
-      note.tags.forEach((tag) => {
-        links.push({
-          source: `note-${note.id}`,
-          target: `tag-${tag}`,
-          type: "tag",
+      // Tags
+      if (filters.connectionTypes.tags !== false) {
+        note.tags.forEach((tag) => {
+          if (hideNonMatching && (!matchedNotes.has(note.id) || !targetNotes.some(n => n.tags.includes(tag) && matchedNotes.has(n.id)))) return;
+          links.push({
+            source: `note-${note.id}`,
+            target: `tag-${tag}`,
+            type: "tag",
+          });
         });
-      });
+      }
+
+      // Wikilinks
+      if (filters.connectionTypes.wikilinks !== false) {
+        // Simple mock parse: Look for [[Note Title]]
+        const titleMatches = Array.from(note.content.matchAll(/\[\[(.*?)\]\]/g)).map(m => m[1]);
+        if (titleMatches.length > 0) {
+          titleMatches.forEach(title => {
+            // Find note by title
+            const targetNoteMatch = targetNotes.find(n => n.title.toLowerCase() === title.toLowerCase());
+            if (targetNoteMatch) {
+              if (hideNonMatching && (!matchedNotes.has(note.id) || !matchedNotes.has(targetNoteMatch.id))) return;
+              links.push({
+                source: `note-${note.id}`,
+                target: `note-${targetNoteMatch.id}`,
+                type: "wikilink",
+              });
+            }
+          });
+        }
+      }
     });
 
     return { nodes, links, availableTags, availableFolders, availableDates };
-  }, [data, activeWorkspaceId, showAllHolders, activeFilterTag, activeFilterFolder, activeFilterDate]);
+  }, [
+    data,
+    activeWorkspaceId,
+    showAllHolders,
+    filters,
+    bmSettings?.nonMatchingBehavior,
+  ]);
 
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
 
@@ -267,9 +389,10 @@ export const BrainMap: React.FC<BrainMapProps> = ({
           .distance((d) => {
             if (d.type === "tag") return 300;
             if (d.type === "parent") return 220;
+            if (d.type === "wikilink") return 200;
             return 140;
           })
-          .strength(1),
+          .strength((d) => (d.type === "wikilink" ? 0.5 : 1)),
       )
       .force("charge", d3.forceManyBody().strength(-2000).distanceMax(3000))
       .force(
@@ -299,16 +422,23 @@ export const BrainMap: React.FC<BrainMapProps> = ({
       .attr("stroke", (d) =>
         d.type === "tag"
           ? themes[colorTheme].linkTag
-          : themes[colorTheme].linkDefault,
+          : d.type === "wikilink"
+            ? "var(--color-accent)"
+            : themes[colorTheme].linkDefault,
       )
-      .attr("stroke-width", (d) => (d.type === "tag" ? 1.5 : 1))
-      .attr("stroke-dasharray", (d) => (d.type === "parent" ? "4,4" : "none"));
+      .attr("stroke-width", (d) => (d.type === "tag" || d.type === "wikilink" ? 1.5 : 1))
+      .attr("stroke-dasharray", (d) => {
+        if (d.type === "parent") return "4,4";
+        if (d.type === "wikilink") return "2,2";
+        return "none";
+      });
 
     const nodeG = g
       .append("g")
       .selectAll("g")
       .data(graphData.nodes)
       .join("g")
+      .style("opacity", (d) => (d.dimmed ? 0.2 : 1))
       .call(
         d3
           .drag<SVGGElement, GraphNode>()
@@ -472,18 +602,54 @@ export const BrainMap: React.FC<BrainMapProps> = ({
           {showAllHolders ? "Viewing All Holders" : "Viewing Current Holder"}
         </button>
 
-        <div className="flex flex-col gap-1 max-w-[200px] pointer-events-auto mt-2 max-h-[300px] overflow-y-auto hidden-scrollbar">
+        <div className="flex flex-col gap-1 max-w-[250px] pointer-events-auto mt-2 max-h-[400px] overflow-y-auto hidden-scrollbar bg-surface/80 backdrop-blur-sm p-3 rounded-lg border border-border shadow-sm">
+          
+          <div className="relative mb-2">
+            <Search className="absolute left-2 text-text-muted top-1/2 -translate-y-1/2" size={14} />
+            <input
+              type="text"
+              placeholder="Search graph..."
+              className="w-full bg-surface-active text-text-primary text-xs rounded border border-border pl-7 pr-2 py-1.5 focus:border-accent outline-none"
+              value={filters.searchTerm}
+              onChange={(e) => setFilters({ ...filters, searchTerm: e.target.value })}
+            />
+          </div>
+
+          <div className="flex items-center justify-between mt-1 mb-1 border-t border-border pt-2">
+            <span className="text-[10px] font-bold text-text-muted">FILTERS</span>
+            <button
+               onClick={() => setFilters({
+                 searchTerm: "",
+                 tags: [],
+                 folders: [],
+                 dateRange: { start: null, end: null },
+                 connectionTypes: { wikilinks: true, tags: true },
+               })}
+               className="text-[10px] text-accent hover:text-orange-400"
+            >
+               Clear All
+            </button>
+          </div>
+
           {graphData.availableTags.length > 0 && <span className="text-[10px] font-bold text-text-muted mt-2 mb-1">TAGS</span>}
           <div className="flex flex-wrap gap-1">
-             {graphData.availableTags.map(tag => (
-                <button
-                  key={tag}
-                  onClick={() => setActiveFilterTag(activeFilterTag === tag ? null : tag)}
-                  className={`px-1.5 py-0.5 rounded text-[10px] ${activeFilterTag === tag ? "bg-accent text-white" : "bg-surface text-text-secondary hover:bg-surface-hover border border-border"}`}
-                >
-                  #{tag}
-                </button>
-             ))}
+             {graphData.availableTags.map(tag => {
+                const isActive = filters.tags.includes(tag);
+                return (
+                  <button
+                    key={tag}
+                    onClick={() => {
+                      const newTags = isActive 
+                        ? filters.tags.filter(t => t !== tag)
+                        : [...filters.tags, tag];
+                      setFilters({ ...filters, tags: newTags });
+                    }}
+                    className={`px-1.5 py-0.5 rounded text-[10px] ${isActive ? "bg-accent text-white" : "bg-surface text-text-secondary hover:bg-surface-hover border border-border"}`}
+                  >
+                    #{tag}
+                  </button>
+                )
+             })}
           </div>
 
           {graphData.availableFolders.length > 0 && <span className="text-[10px] font-bold text-text-muted mt-2 mb-1">FOLDERS</span>}
@@ -491,11 +657,17 @@ export const BrainMap: React.FC<BrainMapProps> = ({
              {graphData.availableFolders.map(folderId => {
                 const col = data.collections.find(c => c.id === folderId);
                 if (!col) return null;
+                const isActive = filters.folders.includes(folderId);
                 return (
                    <button
                      key={folderId}
-                     onClick={() => setActiveFilterFolder(activeFilterFolder === folderId ? null : folderId)}
-                     className={`px-1.5 py-0.5 rounded text-[10px] ${activeFilterFolder === folderId ? "bg-accent text-white" : "bg-surface text-text-secondary hover:bg-surface-hover border border-border"}`}
+                     onClick={() => {
+                        const newFolders = isActive
+                          ? filters.folders.filter(f => f !== folderId)
+                          : [...filters.folders, folderId];
+                        setFilters({ ...filters, folders: newFolders });
+                     }}
+                     className={`px-1.5 py-0.5 rounded text-[10px] ${isActive ? "bg-accent text-white" : "bg-surface text-text-secondary hover:bg-surface-hover border border-border"}`}
                    >
                      📁 {col.name}
                    </button>
@@ -503,17 +675,43 @@ export const BrainMap: React.FC<BrainMapProps> = ({
              })}
           </div>
 
-          {graphData.availableDates.length > 0 && <span className="text-[10px] font-bold text-text-muted mt-2 mb-1">DATES</span>}
-          <div className="flex flex-wrap gap-1">
-             {graphData.availableDates.map(date => (
-                <button
-                  key={date}
-                  onClick={() => setActiveFilterDate(activeFilterDate === date ? null : date)}
-                  className={`px-1.5 py-0.5 rounded text-[10px] ${activeFilterDate === date ? "bg-accent text-white" : "bg-surface text-text-secondary hover:bg-surface-hover border border-border"}`}
-                >
-                  📅 {date}
-                </button>
-             ))}
+          <div className="text-[10px] font-bold text-text-muted mt-2 mb-1">DATE RANGE</div>
+          <div className="flex items-center gap-1">
+             <input 
+               type="date"
+               value={filters.dateRange.start || ""}
+               onChange={(e) => setFilters({ ...filters, dateRange: { ...filters.dateRange, start: e.target.value }})}
+               className="bg-surface-active border border-border rounded text-[10px] px-1 py-0.5 outline-none focus:border-accent w-full"
+             />
+             <span className="text-text-muted">-</span>
+             <input 
+               type="date"
+               value={filters.dateRange.end || ""}
+               onChange={(e) => setFilters({ ...filters, dateRange: { ...filters.dateRange, end: e.target.value }})}
+               className="bg-surface-active border border-border rounded text-[10px] px-1 py-0.5 outline-none focus:border-accent w-full"
+             />
+          </div>
+
+          <div className="text-[10px] font-bold text-text-muted mt-2 mb-1">CONNECTIONS</div>
+          <div className="flex flex-col gap-1.5">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input 
+                 type="checkbox" 
+                 checked={filters.connectionTypes.wikilinks !== false}
+                 onChange={(e) => setFilters({ ...filters, connectionTypes: { ...filters.connectionTypes, wikilinks: e.target.checked }})}
+                 className="rounded bg-surface text-accent border-border"
+              />
+              <span className="text-xs text-text-secondary">Wikilinks <code>[[...]]</code></span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input 
+                 type="checkbox" 
+                 checked={filters.connectionTypes.tags !== false}
+                 onChange={(e) => setFilters({ ...filters, connectionTypes: { ...filters.connectionTypes, tags: e.target.checked }})}
+                 className="rounded bg-surface text-accent border-border"
+              />
+              <span className="text-xs text-text-secondary">#Tag Links</span>
+            </label>
           </div>
         </div>
       </div>
