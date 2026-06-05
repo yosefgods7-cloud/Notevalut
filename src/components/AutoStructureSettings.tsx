@@ -10,17 +10,18 @@ interface Props {
 }
 
 export const AutoStructureSettingsPanel: React.FC<Props> = ({ settings, onUpdate, collections }) => {
-  const autoStructure: AutoStructureSettings = settings.plugins?.autoStructure || {
-    enabled: false,
-    templates: [],
-    folderTemplates: {},
-    activePlaceholders: {
+  const rawAst = settings.plugins?.autoStructure;
+  const autoStructure: AutoStructureSettings = {
+    enabled: rawAst?.enabled || false,
+    templates: rawAst?.templates || [],
+    folderTemplates: rawAst?.folderTemplates || {},
+    activePlaceholders: rawAst?.activePlaceholders || {
       "{{date}}": true,
       "{{title}}": true,
       "{{tags}}": true,
       "{{summary}}": true,
     },
-    customPlaceholders: {},
+    customPlaceholders: rawAst?.customPlaceholders || {},
   };
   const enabled = autoStructure.enabled;
 
@@ -33,25 +34,26 @@ export const AutoStructureSettingsPanel: React.FC<Props> = ({ settings, onUpdate
       plugins: {
         ...s.plugins,
         autoStructure: {
-          ...s.plugins?.autoStructure,
+          ...getAst(s),
           enabled: checked,
-        } as AutoStructureSettings,
+        },
       },
     }));
   };
 
   const getAst = (s: Settings): AutoStructureSettings => {
-    return s.plugins?.autoStructure || {
-      enabled: false,
-      templates: [],
-      folderTemplates: {},
-      activePlaceholders: {
+    const rawAst = s.plugins?.autoStructure;
+    return {
+      enabled: rawAst?.enabled || false,
+      templates: rawAst?.templates || [],
+      folderTemplates: rawAst?.folderTemplates || {},
+      activePlaceholders: rawAst?.activePlaceholders || {
         "{{date}}": true,
         "{{title}}": true,
         "{{tags}}": true,
         "{{summary}}": true,
       },
-      customPlaceholders: {},
+      customPlaceholders: rawAst?.customPlaceholders || {},
     };
   };
 
