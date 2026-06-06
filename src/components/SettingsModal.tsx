@@ -41,6 +41,7 @@ interface SettingsModalProps {
 import { AutoStructureSettingsPanel } from "./AutoStructureSettings";
 import { BrainMapSettingsPanel } from "./BrainMapSettingsPanel";
 import { DailyDigestSettingsPanel } from "./DailyDigestSettingsPanel";
+import { AskYourVaultSettingsPanel } from "./AskYourVaultSettingsPanel";
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
@@ -980,6 +981,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                      collections={data.collections} 
                   />
                   <BrainMapSettingsPanel settings={localSettings} onUpdate={setLocalSettings} />
+                  <AskYourVaultSettingsPanel 
+                     settings={localSettings} 
+                     onUpdate={setLocalSettings} 
+                     apiUsage={data.settings.apiUsage} 
+                  />
                   <DailyDigestSettingsPanel 
                      settings={localSettings} 
                      onUpdate={setLocalSettings} 

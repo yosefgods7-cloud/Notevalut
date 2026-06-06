@@ -38,14 +38,14 @@ async function fetchWithBackoff(url: string, init: RequestInit, maxRetries = 2):
 
 export async function fetchEmbedding(text: string, apiKey: string): Promise<number[] | null> {
   if (!apiKey) return null;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:embedContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${apiKey}`;
   
   try {
     const response = await fetchWithBackoff(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "models/gemini-2.5-flash-lite",
+        model: "models/text-embedding-004",
         content: { parts: [{ text }] }
       })
     });
@@ -66,16 +66,21 @@ export async function fetchEmbedding(text: string, apiKey: string): Promise<numb
   }
 }
 
-export async function fetchAIAnswer(prompt: string, apiKey: string): Promise<string | null> {
+export async function fetchAIAnswer(messages: {role: "user" | "model", text: string}[], apiKey: string): Promise<string | null> {
   if (!apiKey) return null;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
   
   try {
+    const formattedContents = messages.map(m => ({
+      role: m.role,
+      parts: [{ text: m.text }]
+    }));
+    
     const response = await fetchWithBackoff(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }]
+        contents: formattedContents
       })
     });
     

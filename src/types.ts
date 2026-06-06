@@ -126,6 +126,12 @@ export interface DailyDigestSettings {
   timeOfDay: string;
 }
 
+export interface AskYourVaultSettings {
+  enabled: boolean;
+  sourceNotesCount: number;
+  conversationMode: boolean;
+}
+
 export interface PluginSettings {
   autoCategorize?: {
     enabled: boolean;
@@ -135,6 +141,7 @@ export interface PluginSettings {
   autoStructure?: AutoStructureSettings;
   brainMap?: BrainMapSettings;
   dailyDigest?: DailyDigestSettings;
+  askYourVault?: AskYourVaultSettings;
 }
 
 export interface DriveBackupSettings {
@@ -284,6 +291,11 @@ export const DEFAULT_SETTINGS: Settings = {
       enabled: false,
       minNotesRequired: 3,
       timeOfDay: "09:00",
+    },
+    askYourVault: {
+      enabled: true,
+      sourceNotesCount: 5,
+      conversationMode: true,
     },
   },
   driveBackup: {

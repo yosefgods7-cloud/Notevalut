@@ -100,16 +100,33 @@ export function useAI() {
   const getTagGraphBoost = useCallback((topNotes: Note[], maxToAdd = 2) => {
     const topIds = new Set(topNotes.map(n => n.id));
     const sharedTags = new Set(topNotes.flatMap(n => n.tags));
+    const linkedTitles = new Set(topNotes.flatMap(n => {
+      const matches = Array.from(n.content.matchAll(/\[\[(.*?)\]\]/g));
+      return matches.map(m => m[1].toLowerCase());
+    }));
     
     const candidates = data.notes.filter(n => {
       if (topIds.has(n.id) || n.isDeleted) return false;
-      return n.tags.some(t => sharedTags.has(t));
+      
+      const hasSharedTag = n.tags.some(t => sharedTags.has(t));
+      const hasWikilinkConnect = linkedTitles.has(n.title.toLowerCase());
+      
+      return hasSharedTag || hasWikilinkConnect;
     });
 
     return candidates.slice(0, maxToAdd);
   }, [data.notes]);
 
-  const askSecondBrain = useCallback(async (userQuestion: string) => {
+  const askSecondBrain = useCallback(async (
+    userQuestion: string, 
+    options?: {
+      history?: {role: 'user' | 'ai', content: string}[];
+      lastQueryEmbedding?: number[];
+      lastTrimmedBundle?: Note[];
+      topK?: number;
+      conversationMode?: boolean;
+    }
+  ) => {
     const apiKey = data.settings.geminiApiKey;
     if (!apiKey) {
       setAiError("Missing Gemini API Key. Please add it in Settings.");
@@ -123,43 +140,75 @@ export function useAI() {
     setIsGenerating(true);
     setAiError(null);
     try {
-      // Step 2: Vector Search
-      const relevantResults = await findRelevantNotes(userQuestion, 5);
-      let bundleNotes = relevantResults.map(r => r.note);
-
-      // Step 3: Tag Graph Boost
-      const boostedNotes = getTagGraphBoost(bundleNotes, 2);
-      bundleNotes = [...bundleNotes, ...boostedNotes];
-
-      // Total characters check max 24,000 mapping ~6000 tokens
-      let totalChars = 0;
+      const topK = options?.topK || 5;
+      const conversationMode = options?.conversationMode !== false;
+      const history = options?.history || [];
+      
+      let queryEmbedding: number[] | null = null;
+      let isUnrelated = true;
+      
+      queryEmbedding = await fetchEmbedding(userQuestion, apiKey);
+      if (queryEmbedding) incrementRateLimit('embedding');
+      
+      if (conversationMode && queryEmbedding && options?.lastQueryEmbedding) {
+         const score = cosineSimilarity(queryEmbedding, options.lastQueryEmbedding);
+         isUnrelated = score < 0.4;
+      }
+      
       let trimmedBundle: Note[] = [];
-      for (const note of bundleNotes) {
-        const charCount = note.title.length + note.content.length + note.tags.join("").length;
-        if (totalChars + charCount <= 24000) {
-          trimmedBundle.push(note);
-          totalChars += charCount;
+      
+      if (conversationMode && !isUnrelated && options?.lastTrimmedBundle) {
+        trimmedBundle = options.lastTrimmedBundle;
+      } else {
+        // Step 2: Vector Search using new question
+        const relevantResults = await findRelevantNotes(userQuestion, topK);
+        let bundleNotes = relevantResults.map(r => r.note);
+
+        // Step 3: Tag Graph Boost
+        const boostedNotes = getTagGraphBoost(bundleNotes, Math.max(1, topK - bundleNotes.length));
+        bundleNotes = [...bundleNotes, ...boostedNotes].slice(0, topK + 2);
+
+        // Total characters check max 24,000 mapping ~6000 tokens
+        let totalChars = 0;
+        for (const note of bundleNotes) {
+          const charCount = note.title.length + note.content.length + note.tags.join("").length;
+          if (totalChars + charCount <= 24000) {
+            trimmedBundle.push(note);
+            totalChars += charCount;
+          }
         }
       }
 
       // Format bundle
       const notesContext = trimmedBundle.map((n, i) => `[NOTE ${i + 1}] Title: ${n.title} | Tags: ${n.tags.join(', ')}\n${n.content}\n`).join("\n");
-      const prompt = `System: "You are a second brain assistant for NoteVault.
+      const systemPrompt = `System: "You are a second brain assistant for NoteVault.
 Answer using ONLY the notes provided below.
 If the answer is not in the notes, say so clearly.
 Always reference which note your answer comes from."
 
 Notes:
-${notesContext}
+${notesContext}`;
 
-Question: ${userQuestion}`;
+      const messages: {role: "user" | "model", text: string}[] = [
+        { role: "user", text: systemPrompt }
+      ];
 
-      const answer = await fetchAIAnswer(prompt, apiKey);
+      if (conversationMode && !isUnrelated) {
+        history.forEach(h => {
+          messages.push({ role: h.role === 'ai' ? 'model' : 'user', text: h.content });
+        });
+      }
+
+      messages.push({ role: "user", text: userQuestion });
+
+      const answer = await fetchAIAnswer(messages, apiKey);
       if (answer) {
         incrementRateLimit('answer');
         return {
           answer,
-          sources: trimmedBundle.map(n => n.title)
+          sources: trimmedBundle.map(n => n.title),
+          queryEmbedding,
+          trimmedBundle
         };
       }
       setAiError("Failed to get answer from AI.");

@@ -10,11 +10,17 @@ export const SecondBrainSidebar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [messages, setMessages] = useState<{ role: 'user' | 'ai', content: string, sources?: string[] }[]>([]);
+  const [lastQueryEmbedding, setLastQueryEmbedding] = useState<number[] | undefined>(undefined);
+  const [lastTrimmedBundle, setLastTrimmedBundle] = useState<any[] | undefined>(undefined);
   const { askSecondBrain, isGenerating, aiError, setAiError } = useAI();
   const { data } = useStorage();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const hasApiKey = !!data.settings.geminiApiKey;
+  const today = new Date().toISOString().split('T')[0];
+  const u = data.settings.apiUsage;
+  const currentUsage = u?.date === today ? (u.embeddingCount || 0) + (u.answerCount || 0) + (u.digestCount || 0) + (u.editorCount || 0) : 0;
+  const isEnabled = data.settings.plugins?.askYourVault?.enabled !== false;
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -30,8 +36,25 @@ export const SecondBrainSidebar: React.FC = () => {
     setQuery('');
     setMessages(prev => [...prev, { role: 'user', content: userQuery }]);
 
-    const response = await askSecondBrain(userQuery);
+    const askSettings = data.settings.plugins?.askYourVault;
+    const topK = askSettings?.sourceNotesCount || 5;
+    const conversationMode = askSettings?.conversationMode !== false;
+
+    const response = await askSecondBrain(userQuery, {
+      history: messages,
+      lastQueryEmbedding,
+      lastTrimmedBundle,
+      topK,
+      conversationMode
+    });
+
     if (response) {
+      if (response.queryEmbedding) {
+         setLastQueryEmbedding(response.queryEmbedding);
+      }
+      if (response.trimmedBundle) {
+         setLastTrimmedBundle(response.trimmedBundle);
+      }
       setMessages(prev => [...prev, { 
         role: 'ai', 
         content: response.answer,
@@ -39,6 +62,8 @@ export const SecondBrainSidebar: React.FC = () => {
       }]);
     }
   };
+
+  if (!isEnabled) return null;
 
   return (
     <>
@@ -62,13 +87,20 @@ export const SecondBrainSidebar: React.FC = () => {
             transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
             className="fixed bottom-24 right-6 w-[380px] h-[550px] max-w-[calc(100vw-3rem)] max-h-[calc(100vh-8rem)] bg-surface border border-border rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden no-print"
           >
-            <div className="flex items-center gap-3 p-4 border-b border-border bg-surface-active/50">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white">
-                <Brain size={16} />
+            <div className="flex items-center gap-3 p-4 border-b border-border bg-surface-active/50 justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white">
+                  <Brain size={16} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm">Ask Your Vault</h3>
+                  <p className="text-xs text-text-muted">Chat with your Second Brain</p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-bold text-sm">NoteVault AI</h3>
-                <p className="text-xs text-text-muted">Chat with your Second Brain</p>
+              <div className="text-right flex flex-col items-end">
+                <span className={cn("text-xs font-semibold", currentUsage > 1300 ? "text-orange-400" : "text-text-muted")}>
+                  {currentUsage} / 1500 API Calls
+                </span>
               </div>
             </div>
 
