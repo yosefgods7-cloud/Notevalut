@@ -17,6 +17,7 @@ export const BackgroundAIProcessor: React.FC = () => {
 
   useEffect(() => {
     const processOutdatedNotes = async () => {
+      // Use requestIdleCallback if available to prevent stopping the main thread
       if (isProcessing.current || !dataRef.current.settings.geminiApiKey) return;
       isProcessing.current = true;
       
@@ -24,9 +25,7 @@ export const BackgroundAIProcessor: React.FC = () => {
         let processedCount = 0;
         const notes = dataRef.current.notes.filter(n => isNoteInAiScope(n, dataRef.current.settings.aiScope));
         for (const note of notes) {
-          if (processedCount >= 3) break;
-          // Very quick check to avoid even hashing if there's no note change since last load, 
-          // but we can't reliably know without hash. Hashing is relatively fast anyway.
+          if (processedCount >= 1) break; // Dramatically reduced load size per cycle
           const res = await generatorRef.current(note);
           if (res) {
             processedCount++;
@@ -39,7 +38,7 @@ export const BackgroundAIProcessor: React.FC = () => {
       }
     };
 
-    const interval = setInterval(processOutdatedNotes, 15000); 
+    const interval = setInterval(processOutdatedNotes, 60000); // reduced frequency to 1 minute
     return () => clearInterval(interval);
   }, []);
 

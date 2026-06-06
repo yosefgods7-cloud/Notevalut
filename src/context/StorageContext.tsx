@@ -205,9 +205,9 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const saveData = useCallback(
     async (newData: NoteVaultData, skipHistory = false) => {
-      if (!skipHistory) {
-        setHistory((prev) => [data, ...prev].slice(0, 20));
-      }
+      // Disabling global tree history to prevent memory leak
+      // if (!skipHistory) { ... }
+      
       setData(newData);
       
       // Merge with hidden nodes before writing to storage
@@ -223,7 +223,15 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
         await set(STORAGE_KEY, JSON.stringify(fullData));
       } catch (e) {
         console.warn("Failed to write to IndexedDB, fallback to localStorage");
-        safeStorage.setItem(STORAGE_KEY, JSON.stringify(fullData));
+        // Strip out large vectors for localStorage to avoid crashing 5MB quota
+        const safeDataForLs = {
+          ...fullData,
+          notes: fullData.notes.map(n => {
+            const { embedding, ...rest } = n;
+            return rest;
+          })
+        };
+        safeStorage.setItem(STORAGE_KEY, JSON.stringify(safeDataForLs));
       }
     },
     [data, areAllNotesLoaded],
@@ -832,10 +840,14 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
         };
 
         // We manually handle saveData's duties here to get the correct prevData
-        setHistory((prevHist: NoteVaultData[]) =>
-          [prevData, ...prevHist].slice(0, 20),
-        );
-        safeStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
+        const safeDataForLs = {
+          ...newData,
+          notes: newData.notes.map(n => {
+            const { embedding, ...rest } = n;
+            return rest;
+          })
+        };
+        safeStorage.setItem(STORAGE_KEY, JSON.stringify(safeDataForLs));
         // Also save to indexedDB
         set(STORAGE_KEY, JSON.stringify(newData)).catch((e) => {
           console.warn("IndexedDB set failed", e);
