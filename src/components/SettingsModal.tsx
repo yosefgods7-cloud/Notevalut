@@ -42,6 +42,7 @@ import { AutoStructureSettingsPanel } from "./AutoStructureSettings";
 import { BrainMapSettingsPanel } from "./BrainMapSettingsPanel";
 import { DailyDigestSettingsPanel } from "./DailyDigestSettingsPanel";
 import { AskYourVaultSettingsPanel } from "./AskYourVaultSettingsPanel";
+import { ApiKeysSettingsPanel } from "./ApiKeysSettingsPanel";
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
@@ -984,16 +985,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <AskYourVaultSettingsPanel 
                      settings={localSettings} 
                      onUpdate={setLocalSettings} 
-                     apiUsage={data.settings.apiUsage} 
+                     apiUsage={(() => {
+                       const keyId = localSettings.featureApiConfigs?.chatKeyId || (localSettings.apiKeys && localSettings.apiKeys[0]?.id) || 'legacy';
+                       return data.settings.apiUsageByKey?.[keyId] || (keyId === 'legacy' ? data.settings.apiUsage : undefined);
+                     })()} 
                   />
                   <DailyDigestSettingsPanel 
                      settings={localSettings} 
                      onUpdate={setLocalSettings} 
-                     apiUsageCount={
-                       data.settings.apiUsage?.date === new Date().toISOString().split('T')[0] 
-                        ? (data.settings.apiUsage.embeddingCount || 0) + (data.settings.apiUsage.answerCount || 0) + (data.settings.apiUsage.digestCount || 0) + (data.settings.apiUsage.editorCount || 0) 
-                        : 0
-                     } 
+                     apiUsageCount={(() => {
+                       const keyId = localSettings.featureApiConfigs?.digestKeyId || (localSettings.apiKeys && localSettings.apiKeys[0]?.id) || 'legacy';
+                       const u = data.settings.apiUsageByKey?.[keyId] || (keyId === 'legacy' ? data.settings.apiUsage : undefined);
+                       return u?.date === new Date().toISOString().split('T')[0]
+                         ? (u.embeddingCount || 0) + (u.answerCount || 0) + (u.digestCount || 0) + (u.editorCount || 0) 
+                         : 0;
+                     })()} 
                   />
                 </div>
               </div>
@@ -1307,86 +1313,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <Cpu className="text-blue-500" /> AI Features
                 </h3>
                 <div className="space-y-4">
-                  <div className="flex flex-col gap-2 bg-surface p-4 rounded-xl border border-border">
-                    <label className="text-sm font-medium flex justify-between">
-                      <span>Gemini API Key</span>
-                      <span className="text-xs text-text-muted font-normal bg-surface-active px-2 py-0.5 rounded">
-                        Optional
-                      </span>
-                    </label>
-                    <input
-                      type="password"
-                      value={localSettings.geminiApiKey || ""}
-                      onChange={(e) =>
-                        setLocalSettings((s) => ({
-                          ...s,
-                          geminiApiKey: e.target.value,
-                        }))
-                      }
-                      placeholder="AI Studio Free API Key..."
-                      className="bg-surface border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-blue-500 w-full"
-                    />
-                    <div className="flex items-center gap-2 mt-2">
-                       <button
-                         type="button"
-                         onClick={async () => {
-                           if (!localSettings.geminiApiKey) return;
-                           const { fetchEmbedding } = await import('../lib/ai');
-                           const el = document.getElementById("apiKeyMessage");
-                           if (el) el.textContent = "Verifying...";
-                           const res = await fetchEmbedding("test", localSettings.geminiApiKey);
-                           if (el) {
-                             if (res) el.textContent = "✅ Valid API Key";
-                             else el.textContent = "❌ Invalid API Key format or network error";
-                           }
-                         }}
-                         className="px-3 py-1.5 text-xs bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 rounded font-medium transition-colors border border-blue-500/20"
-                       >
-                         Verify Key
-                       </button>
-                       <span id="apiKeyMessage" className="text-xs font-mono text-text-muted"></span>
-                    </div>
-                    <p className="text-xs text-text-muted leading-relaxed mt-1">
-                      Required for the Second Brain features. You can get a free API key from Google AI Studio. Stored securely and locally in your browser.
-                    </p>
-                  </div>
+                  <ApiKeysSettingsPanel localSettings={localSettings} setLocalSettings={setLocalSettings} />
                   
                   {/* Search Scope */}
                   <AISearchScopeSettings localSettings={localSettings} setLocalSettings={setLocalSettings} />
-                  
-                  {/* API Usage Metrics */}
-                  <div className="flex flex-col gap-2 bg-surface p-4 rounded-xl border border-border mt-4">
-                    <h4 className="text-sm font-medium">Daily API Usage</h4>
-                    <p className="text-xs text-text-muted mb-2">Monitor your Gemini API usage for second brain and AI features. Free tier limits apply.</p>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-background rounded-lg p-3 border border-border">
-                        <div className="text-xs text-text-muted mb-1">Embedding Calls</div>
-                        <div className="flex items-end gap-2">
-                          <span className="text-lg font-bold">{data.settings.apiUsage?.date === new Date().toISOString().split('T')[0] ? data.settings.apiUsage?.embeddingCount || 0 : 0}</span>
-                          <span className="text-xs text-text-muted mb-1">/ 1400</span>
-                        </div>
-                        <div className="w-full bg-surface-active h-1.5 rounded-full mt-2 overflow-hidden">
-                          <div 
-                            className="bg-blue-500 h-full rounded-full transition-all" 
-                            style={{ width: `${Math.min(((data.settings.apiUsage?.date === new Date().toISOString().split('T')[0] ? data.settings.apiUsage?.embeddingCount || 0 : 0) / 1400) * 100, 100)}%` }}
-                          />
-                        </div>
-                      </div>
-                      <div className="bg-background rounded-lg p-3 border border-border">
-                        <div className="text-xs text-text-muted mb-1">AI Chat Calls</div>
-                        <div className="flex items-end gap-2">
-                          <span className="text-lg font-bold">{data.settings.apiUsage?.date === new Date().toISOString().split('T')[0] ? data.settings.apiUsage?.answerCount || 0 : 0}</span>
-                          <span className="text-xs text-text-muted mb-1">/ 1400</span>
-                        </div>
-                        <div className="w-full bg-surface-active h-1.5 rounded-full mt-2 overflow-hidden">
-                          <div 
-                            className="bg-purple-500 h-full rounded-full transition-all" 
-                            style={{ width: `${Math.min(((data.settings.apiUsage?.date === new Date().toISOString().split('T')[0] ? data.settings.apiUsage?.answerCount || 0 : 0) / 1400) * 100, 100)}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </div>
             )}

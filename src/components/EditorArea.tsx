@@ -27,6 +27,7 @@ import { FoldableBlock } from "../lib/FoldableExtension";
 import { FontSize } from "../lib/FontSize";
 import { WikiLink } from "../lib/WikiLink";
 import { cleanAIPaste } from "../lib/paste-cleaner";
+import { getSelectedApiKey } from "../hooks/useAI";
 import { NoteHistoryModal } from "./NoteHistoryModal";
 import { ImageCropModal } from "./ImageCropModal";
 import { ChartBuilderModal } from "./ChartBuilderModal";
@@ -190,6 +191,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
     deleteTemplate,
     updateSettings,
     showToast,
+    isSaving,
   } = useStorage();
   const { accessToken } = useAuth();
   const note = data.notes.find((n) => n.id === noteId);
@@ -279,41 +281,48 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
   }, [data.notes, note?.title, note?.id]);
 
   // Helper
-  const checkAndIncrementAPI = () => {
+  const checkAndIncrementAPI = (keyId: string) => {
     const today = new Date().toISOString().split('T')[0];
-    const u = data.settings.apiUsage;
+    const keyUsageMap = data.settings.apiUsageByKey || {};
+    const u = keyUsageMap[keyId] || (keyId === "legacy" ? data.settings.apiUsage : undefined);
+    
     const current = u?.date === today ? (u.embeddingCount || 0) + (u.answerCount || 0) + (u.digestCount || 0) + (u.editorCount || 0) : 0;
     if (current >= 1400) {
-      throw new Error("Daily API limit reached (1400/1500 limit).");
+      throw new Error(`Daily API limit reached (1400/1500 limit) for key: ${keyId}`);
     }
     
-    updateSettings({
-      apiUsage: {
-        date: today,
-        embeddingCount: u?.date === today ? (u.embeddingCount || 0) : 0,
-        answerCount: u?.date === today ? (u.answerCount || 0) : 0,
-        digestCount: u?.date === today ? (u.digestCount || 0) : 0,
-        editorCount: (u?.date === today ? (u.editorCount || 0) : 0) + 1,
-      }
-    });
+    const newUsage = {
+      date: today,
+      embeddingCount: u?.date === today ? (u.embeddingCount || 0) : 0,
+      answerCount: u?.date === today ? (u.answerCount || 0) : 0,
+      digestCount: u?.date === today ? (u.digestCount || 0) : 0,
+      editorCount: (u?.date === today ? (u.editorCount || 0) : 0) + 1,
+    };
+    
+    const updatedMap = { ...keyUsageMap, [keyId]: newUsage };
+    const updates: any = { apiUsageByKey: updatedMap };
+    if (keyId === 'legacy') updates.apiUsage = newUsage;
+
+    updateSettings(updates);
   };
 
   const handleSummarizeNote = async () => {
     if (!editor) return;
-    const ai = getAiClient(data.settings?.geminiApiKey);
-    if (!ai) {
+    const keyInfo = getSelectedApiKey(data.settings, 'editor');
+    if (!keyInfo) {
       showToast("AI features require an API key to be set");
       return;
     }
+    const ai = getAiClient(keyInfo.key);
 
     setAiSummary((prev) => ({ ...prev, loading: true, open: true }));
     const textContent = editor.getText();
 
     try {
-      checkAndIncrementAPI();
+      checkAndIncrementAPI(keyInfo.id);
       
-      const response = await ai.models.generateContent({
-        model: "gemini-1.5-flash",
+      const response = await ai!.models.generateContent({
+        model: "gemini-3.5-flash",
         contents: `Please summarize the following note in a concise but comprehensive way:\n\n${textContent}`,
       });
 
@@ -447,16 +456,17 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
       const base64Data = base64.split(",")[1];
       const mimeType = base64.split(";")[0].split(":")[1];
 
-      const ai = getAiClient(data.settings?.geminiApiKey);
-      if (!ai) {
+      const keyInfo = getSelectedApiKey(data.settings, 'editor');
+      if (!keyInfo) {
         showToast("AI features require an API key to be set");
         return;
       }
+      const ai = getAiClient(keyInfo.key);
 
-      checkAndIncrementAPI();
+      checkAndIncrementAPI(keyInfo.id);
 
-      const response = await ai.models.generateContent({
-        model: "gemini-1.5-flash",
+      const response = await ai!.models.generateContent({
+        model: "gemini-3.5-flash",
         contents: [
           {
             role: "user",
@@ -2414,8 +2424,18 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
                   : `${Math.round((editor?.storage?.characterCount?.words() || 0) / 200)} min read`}
               </span>
             </div>
-            <div className="text-xs text-text-muted select-none w-16 text-left">
-              {savedStatus === "saving" ? "Saving..." : "✓ Saved"}
+            <div className="flex items-center text-xs text-text-muted select-none w-20 text-left">
+              {(savedStatus === "saving" || isSaving) ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-3 w-3 text-text-muted" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Saving...
+                </>
+              ) : (
+                "✓ Saved"
+              )}
             </div>
           </div>
 

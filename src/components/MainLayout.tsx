@@ -140,6 +140,18 @@ export const MainLayout: React.FC = () => {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isFocusMode, setIsFocusMode] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Auto-collapse sidebar on very small screens
   useEffect(() => {
@@ -455,6 +467,25 @@ export const MainLayout: React.FC = () => {
                 })}
               </AnimatePresence>
             </div>
+            
+            <div className="flex-1"></div>
+            
+            <div className="flex items-center px-3 h-full mb-1">
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-surface-active rounded border border-border text-[10px] uppercase font-bold tracking-wider text-text-muted select-none">
+                 {isOnline ? (
+                    <>
+                       <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+                       <span>Synced</span>
+                    </>
+                 ) : (
+                    <>
+                       <div className="w-1.5 h-1.5 rounded-full bg-orange-500"></div>
+                       <span>Offline Mode</span>
+                    </>
+                 )}
+              </div>
+            </div>
+            
           </div>
         )}
         {activeNoteId === "brain_map" ? (

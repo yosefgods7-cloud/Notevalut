@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useStorage } from '../context/StorageContext';
-import { useAI, isNoteInAiScope } from '../hooks/useAI';
+import { useAI, isNoteInAiScope, getSelectedApiKey } from '../hooks/useAI';
 
 export const BackgroundAIProcessor: React.FC = () => {
   const { data } = useStorage();
@@ -18,7 +18,8 @@ export const BackgroundAIProcessor: React.FC = () => {
   useEffect(() => {
     const processOutdatedNotes = async () => {
       // Use requestIdleCallback if available to prevent stopping the main thread
-      if (isProcessing.current || !dataRef.current.settings.geminiApiKey) return;
+      const keyInfo = getSelectedApiKey(dataRef.current.settings, 'embedding');
+      if (isProcessing.current || !keyInfo) return;
       isProcessing.current = true;
       
       try {

@@ -152,6 +152,12 @@ export interface DriveBackupSettings {
   fileId?: string;
 }
 
+export interface ExternalApiKey {
+  id: string;
+  name: string;
+  key: string;
+}
+
 export interface AiSearchScope {
   workspaceIds: string[];
   collectionIds: string[];
@@ -163,12 +169,27 @@ export interface CalloutStyle {
   icon: string;
 }
 
+export interface ApiUsageStats {
+  date: string;
+  embeddingCount: number;
+  answerCount: number;
+  digestCount: number;
+  editorCount: number;
+}
+
 export interface Settings {
   theme: "dark" | "light" | "system";
   fontSize: "small" | "medium" | "large" | "ultralarge";
   defaultWorkspace: string;
   smartPaste: boolean;
-  geminiApiKey?: string;
+  geminiApiKey?: string; // Legacy/fallback
+  apiKeys?: ExternalApiKey[];
+  featureApiConfigs?: {
+    embeddingKeyId?: string;
+    chatKeyId?: string;
+    digestKeyId?: string;
+    editorKeyId?: string;
+  };
   aiScope?: AiSearchScope;
   plugins?: PluginSettings;
   toolbarItems?: string[];
@@ -178,13 +199,8 @@ export interface Settings {
   highlightColor?: string;
   defaultCallout?: string;
   calloutStyles?: Record<string, CalloutStyle>;
-  apiUsage?: {
-    date: string;
-    embeddingCount: number;
-    answerCount: number;
-    digestCount: number;
-    editorCount: number;
-  };
+  apiUsage?: ApiUsageStats; // Legacy
+  apiUsageByKey?: Record<string, ApiUsageStats>;
 }
 
 export interface NoteTemplate {

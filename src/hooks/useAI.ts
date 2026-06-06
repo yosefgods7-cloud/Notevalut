@@ -21,14 +21,39 @@ export function isNoteInAiScope(note: Note, scope?: AiSearchScope): boolean {
   return false;
 }
 
+export function getSelectedApiKey(settings: any, featureType: 'embedding' | 'chat' | 'digest' | 'editor') {
+  const configs = settings.featureApiConfigs;
+  const legacyKey = settings.geminiApiKey;
+  const allKeys = settings.apiKeys || [];
+  
+  let selectedId: string | undefined;
+  if (featureType === 'embedding') selectedId = configs?.embeddingKeyId;
+  else if (featureType === 'chat') selectedId = configs?.chatKeyId;
+  else if (featureType === 'digest') selectedId = configs?.digestKeyId;
+  else if (featureType === 'editor') selectedId = configs?.editorKeyId;
+
+  if (selectedId) {
+    const found = allKeys.find((k: any) => k.id === selectedId);
+    if (found?.key) return { id: selectedId, key: found.key };
+  }
+  
+  if (allKeys.length > 0 && allKeys[0].key) return { id: allKeys[0].id, key: allKeys[0].key };
+  
+  if (legacyKey) return { id: 'legacy', key: legacyKey };
+  return null;
+}
+
 export function useAI() {
   const { data, updateSettings, updateNote } = useStorage();
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
 
-  const checkRateLimit = (type: 'embedding' | 'answer') => {
+  const checkRateLimit = (keyId: string, type: 'embedding' | 'answer') => {
     const today = new Date().toISOString().split('T')[0];
-    const usage = data.settings.apiUsage;
+    
+    // Check key-specific limits
+    const keyUsageMap = data.settings.apiUsageByKey || {};
+    const usage = keyUsageMap[keyId] || (keyId === 'legacy' ? data.settings.apiUsage : undefined);
     
     if (usage?.date !== today) return true;
     
@@ -38,9 +63,10 @@ export function useAI() {
     return true;
   };
 
-  const incrementRateLimit = (type: 'embedding' | 'answer') => {
+  const incrementRateLimit = (keyId: string, type: 'embedding' | 'answer') => {
     const today = new Date().toISOString().split('T')[0];
-    const u = data.settings.apiUsage;
+    const keyUsageMap = data.settings.apiUsageByKey || {};
+    const u = keyUsageMap[keyId] || (keyId === 'legacy' ? data.settings.apiUsage : undefined);
     
     const newUsage = {
       date: today,
@@ -53,13 +79,22 @@ export function useAI() {
     if (type === 'embedding') newUsage.embeddingCount++;
     if (type === 'answer') newUsage.answerCount++;
     
-    updateSettings({ apiUsage: newUsage });
+    const updatedMap = { ...keyUsageMap, [keyId]: newUsage };
+    const updates: any = { apiUsageByKey: updatedMap };
+    
+    if (keyId === 'legacy') {
+      updates.apiUsage = newUsage; // fallback compatibility
+    }
+    
+    updateSettings(updates);
   };
 
   const generateEmbeddingForNote = useCallback(async (note: Note) => {
-    const apiKey = data.settings.geminiApiKey;
-    if (!apiKey) return false;
-    if (!checkRateLimit('embedding')) return false;
+    const keyInfo = getSelectedApiKey(data.settings, 'embedding');
+    if (!keyInfo) return false;
+    if (!checkRateLimit(keyInfo.id, 'embedding')) return false;
+    
+    const apiKey = keyInfo.key;
 
     const textToEmbed = `Title: ${note.title}\nContent: ${note.content}`;
     const hash = await generateContentHash(textToEmbed);
@@ -70,21 +105,23 @@ export function useAI() {
 
     const embedding = await fetchEmbedding(textToEmbed, apiKey);
     if (embedding) {
-      incrementRateLimit('embedding');
+      incrementRateLimit(keyInfo.id, 'embedding');
       updateNote(note.id, { contentHash: hash, embedding });
       return true;
     }
     return false;
-  }, [data.settings.geminiApiKey, data.settings.apiUsage, updateNote, updateSettings]);
+  }, [data.settings.apiKeys, data.settings.featureApiConfigs, data.settings.geminiApiKey, data.settings.apiUsage, data.settings.apiUsageByKey, updateNote, updateSettings]);
 
   const findRelevantNotes = useCallback(async (query: string, topK = 5) => {
-    const apiKey = data.settings.geminiApiKey;
-    if (!apiKey) throw new Error("Missing API Key");
-    if (!checkRateLimit('embedding')) throw new Error("Daily embedding rate limit reached (1400/day)");
+    const keyInfo = getSelectedApiKey(data.settings, 'embedding');
+    if (!keyInfo) throw new Error("Missing API Key");
+    if (!checkRateLimit(keyInfo.id, 'embedding')) throw new Error("Daily embedding rate limit reached (1400/day)");
+    
+    const apiKey = keyInfo.key;
 
     const queryEmbedding = await fetchEmbedding(query, apiKey);
     if (!queryEmbedding) throw new Error("Failed to generate embedding for query");
-    incrementRateLimit('embedding');
+    incrementRateLimit(keyInfo.id, 'embedding');
 
     const scoredNotes = data.notes
       .filter(n => !n.isDeleted && isNoteInAiScope(n, data.settings.aiScope) && n.embedding && n.embedding.length > 0)
@@ -95,7 +132,7 @@ export function useAI() {
       .sort((a, b) => b.score - a.score);
 
     return scoredNotes.slice(0, topK);
-  }, [data.notes, data.settings.geminiApiKey, data.settings.apiUsage, updateSettings]);
+  }, [data.notes, data.settings.apiKeys, data.settings.featureApiConfigs, data.settings.geminiApiKey, data.settings.apiUsageByKey, data.settings.apiUsage, updateSettings]);
 
   const getTagGraphBoost = useCallback((topNotes: Note[], maxToAdd = 2) => {
     const topIds = new Set(topNotes.map(n => n.id));
@@ -127,15 +164,20 @@ export function useAI() {
       conversationMode?: boolean;
     }
   ) => {
-    const apiKey = data.settings.geminiApiKey;
-    if (!apiKey) {
+    const answerKeyInfo = getSelectedApiKey(data.settings, 'chat');
+    if (!answerKeyInfo) {
       setAiError("Missing Gemini API Key. Please add it in Settings.");
       return null;
     }
-    if (!checkRateLimit('answer')) {
+    if (!checkRateLimit(answerKeyInfo.id, 'answer')) {
       setAiError("Daily answer rate limit reached (1400/day).");
       return null;
     }
+    const answerApiKey = answerKeyInfo.key;
+
+    // For embeddings, we should use the embedding key
+    const embeddingKeyInfo = getSelectedApiKey(data.settings, 'embedding') || answerKeyInfo;
+    const embeddingApiKey = embeddingKeyInfo.key;
 
     setIsGenerating(true);
     setAiError(null);
@@ -147,8 +189,10 @@ export function useAI() {
       let queryEmbedding: number[] | null = null;
       let isUnrelated = true;
       
-      queryEmbedding = await fetchEmbedding(userQuestion, apiKey);
-      if (queryEmbedding) incrementRateLimit('embedding');
+      queryEmbedding = await fetchEmbedding(userQuestion, embeddingApiKey);
+      if (queryEmbedding && checkRateLimit(embeddingKeyInfo.id, 'embedding')) {
+        incrementRateLimit(embeddingKeyInfo.id, 'embedding');
+      }
       
       if (conversationMode && queryEmbedding && options?.lastQueryEmbedding) {
          const score = cosineSimilarity(queryEmbedding, options.lastQueryEmbedding);
@@ -201,9 +245,9 @@ ${notesContext}`;
 
       messages.push({ role: "user", text: userQuestion });
 
-      const answer = await fetchAIAnswer(messages, apiKey);
+      const answer = await fetchAIAnswer(messages, answerApiKey);
       if (answer) {
-        incrementRateLimit('answer');
+        incrementRateLimit(answerKeyInfo.id, 'answer');
         return {
           answer,
           sources: trimmedBundle.map(n => n.title),
@@ -219,7 +263,7 @@ ${notesContext}`;
     } finally {
       setIsGenerating(false);
     }
-  }, [findRelevantNotes, getTagGraphBoost, data.settings.geminiApiKey, data.settings.apiUsage, updateSettings]);
+  }, [findRelevantNotes, getTagGraphBoost, data.settings.apiKeys, data.settings.featureApiConfigs, data.settings.geminiApiKey, data.settings.apiUsageByKey, data.settings.apiUsage, updateSettings]);
 
   return {
     generateEmbeddingForNote,

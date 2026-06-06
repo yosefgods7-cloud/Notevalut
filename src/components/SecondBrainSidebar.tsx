@@ -16,10 +16,29 @@ export const SecondBrainSidebar: React.FC = () => {
   const { data } = useStorage();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const hasApiKey = !!data.settings.geminiApiKey;
-  const today = new Date().toISOString().split('T')[0];
-  const u = data.settings.apiUsage;
-  const currentUsage = u?.date === today ? (u.embeddingCount || 0) + (u.answerCount || 0) + (u.digestCount || 0) + (u.editorCount || 0) : 0;
+  const chatKeyId = data.settings.featureApiConfigs?.chatKeyId;
+  const legacyKey = data.settings.geminiApiKey;
+  const allKeys = data.settings.apiKeys || [];
+  
+  let hasApiKey = false;
+  if (chatKeyId) hasApiKey = allKeys.some(k => k.id === chatKeyId && k.key);
+  else hasApiKey = (allKeys.length > 0 && !!allKeys[0].key) || !!legacyKey;
+
+  const getUsage = () => {
+    let keyId = 'legacy';
+    if (chatKeyId) keyId = chatKeyId;
+    else if (allKeys.length > 0) keyId = allKeys[0].id;
+
+    const today = new Date().toISOString().split('T')[0];
+    const u = data.settings.apiUsageByKey?.[keyId] || (keyId === 'legacy' ? data.settings.apiUsage : undefined);
+    
+    if (u?.date === today) {
+       return (u.embeddingCount || 0) + (u.answerCount || 0) + (u.digestCount || 0) + (u.editorCount || 0);
+    }
+    return 0;
+  };
+  
+  const currentUsage = getUsage();
   const isEnabled = data.settings.plugins?.askYourVault?.enabled !== false;
 
   useEffect(() => {

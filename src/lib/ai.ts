@@ -1,3 +1,5 @@
+import { GoogleGenAI } from "@google/genai";
+
 export async function generateContentHash(content: string): Promise<string> {
   const enc = new TextEncoder();
   const data = enc.encode(content);
@@ -20,44 +22,18 @@ export function cosineSimilarity(a: number[], b: number[]): number {
   return dot / (Math.sqrt(magA) * Math.sqrt(magB));
 }
 
-// Ensure the helper function accurately handles API calls and exponential backoff
-async function fetchWithBackoff(url: string, init: RequestInit, maxRetries = 2): Promise<Response> {
-  let retries = 0;
-  while (true) {
-    const response = await fetch(url, init);
-    if (response.status === 429 && retries < maxRetries) {
-      // Exponential backoff
-      const waitTime = Math.pow(2, retries + 1) * 1000;
-      await new Promise(r => setTimeout(r, waitTime));
-      retries++;
-      continue;
-    }
-    return response;
-  }
-}
-
 export async function fetchEmbedding(text: string, apiKey: string): Promise<number[] | null> {
   if (!apiKey) return null;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${apiKey}`;
+  const ai = new GoogleGenAI({ apiKey });
   
   try {
-    const response = await fetchWithBackoff(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "models/text-embedding-004",
-        content: { parts: [{ text }] }
-      })
+    const response = await ai.models.embedContent({
+      model: "gemini-embedding-2-preview",
+      contents: text
     });
     
-    if (!response.ok) {
-      console.error("Embedding API error:", await response.text());
-      return null;
-    }
-    
-    const data = await response.json();
-    if (data.embedding?.values) {
-      return data.embedding.values as number[];
+    if (response.embeddings?.[0]?.values) {
+      return response.embeddings[0].values;
     }
     return null;
   } catch (err) {
@@ -68,7 +44,7 @@ export async function fetchEmbedding(text: string, apiKey: string): Promise<numb
 
 export async function fetchAIAnswer(messages: {role: "user" | "model", text: string}[], apiKey: string): Promise<string | null> {
   if (!apiKey) return null;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  const ai = new GoogleGenAI({ apiKey });
   
   try {
     const formattedContents = messages.map(m => ({
@@ -76,22 +52,13 @@ export async function fetchAIAnswer(messages: {role: "user" | "model", text: str
       parts: [{ text: m.text }]
     }));
     
-    const response = await fetchWithBackoff(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: formattedContents
-      })
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: formattedContents
     });
     
-    if (!response.ok) {
-      console.error("Generate Content API error:", await response.text());
-      return null;
-    }
-    
-    const data = await response.json();
-    if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
-      return data.candidates[0].content.parts[0].text;
+    if (response.text) {
+      return response.text;
     }
     return null;
   } catch (err) {
@@ -99,3 +66,4 @@ export async function fetchAIAnswer(messages: {role: "user" | "model", text: str
     return null;
   }
 }
+

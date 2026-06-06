@@ -120,6 +120,7 @@ interface StorageContextType {
   loadAllNotes: () => void;
   areAllNotesLoaded: boolean;
   isSyncing: boolean;
+  isSaving: boolean;
   undo: () => void;
   canUndo: boolean;
   // UI
@@ -140,6 +141,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const { user } = useAuth();
   const { cloudNotes } = useFirebaseConnection();
   const [history, setHistory] = useState<NoteVaultData[]>([]);
@@ -208,6 +210,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
       // Disabling global tree history to prevent memory leak
       // if (!skipHistory) { ... }
       
+      setIsSaving(true);
       setData(newData);
       
       // Merge with hidden nodes before writing to storage
@@ -232,6 +235,8 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
           })
         };
         safeStorage.setItem(STORAGE_KEY, JSON.stringify(safeDataForLs));
+      } finally {
+        setIsSaving(false);
       }
     },
     [data, areAllNotesLoaded],
@@ -792,6 +797,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
         updatedAt: new Date().toISOString(),
       };
 
+      setIsSaving(true);
       setData((prevData) => {
         let targetCollectionId: string | null = null;
         let targetWorkspaceId: string | null = null;
@@ -849,9 +855,11 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
         };
         safeStorage.setItem(STORAGE_KEY, JSON.stringify(safeDataForLs));
         // Also save to indexedDB
-        set(STORAGE_KEY, JSON.stringify(newData)).catch((e) => {
-          console.warn("IndexedDB set failed", e);
-        });
+        set(STORAGE_KEY, JSON.stringify(newData))
+          .catch((e) => {
+            console.warn("IndexedDB set failed", e);
+          })
+          .finally(() => setIsSaving(false));
 
         return newData;
       });
@@ -1270,6 +1278,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
         loadAllNotes,
         areAllNotesLoaded,
         isSyncing,
+        isSaving,
         undo,
         canUndo: history.length > 0,
         toast,

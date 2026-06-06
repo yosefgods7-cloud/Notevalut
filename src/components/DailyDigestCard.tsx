@@ -4,6 +4,8 @@ import { GoogleGenAI } from "@google/genai";
 import { Sparkles, RefreshCw, AlertCircle, FileText, ChevronRight } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
+import { getSelectedApiKey } from "../hooks/useAI";
+
 export const DailyDigestCard: React.FC<{
   onOpenNote: (noteId: string) => void;
 }> = ({ onOpenNote }) => {
@@ -26,9 +28,16 @@ export const DailyDigestCard: React.FC<{
     return getEditedNotesSince(dayAgo);
   };
 
+  const getDigestKeyId = () => {
+    const keyInfo = getSelectedApiKey(data.settings, 'digest');
+    return keyInfo ? keyInfo.id : 'legacy';
+  };
+
   const getApiUsageTotal = () => {
     const today = new Date().toISOString().split('T')[0];
-    const u = data.settings.apiUsage;
+    const keyId = getDigestKeyId();
+    const u = data.settings.apiUsageByKey?.[keyId] || (keyId === "legacy" ? data.settings.apiUsage : undefined);
+    
     if (u?.date === today) {
       return (u.embeddingCount || 0) + (u.answerCount || 0) + (u.digestCount || 0) + (u.editorCount || 0);
     }
@@ -45,21 +54,29 @@ export const DailyDigestCard: React.FC<{
 
   const incrementApiLimit = () => {
     const today = new Date().toISOString().split('T')[0];
-    const u = data.settings.apiUsage || {
+    const keyId = getDigestKeyId();
+    const keyUsageMap = data.settings.apiUsageByKey || {};
+    const u = keyUsageMap[keyId] || (keyId === 'legacy' ? data.settings.apiUsage : {
       date: today, embeddingCount: 0, answerCount: 0, digestCount: 0, editorCount: 0
+    });
+    
+    const newUsage = {
+      date: today,
+      embeddingCount: u.date === today ? (u.embeddingCount || 0) : 0,
+      answerCount: u.date === today ? (u.answerCount || 0) : 0,
+      digestCount: (u.date === today ? (u.digestCount || 0) : 0) + 1,
+      editorCount: u.date === today ? (u.editorCount || 0) : 0,
     };
+    
+    const updatedMap = { ...keyUsageMap, [keyId]: newUsage };
+    const updates: any = { apiUsageByKey: updatedMap };
+    if (keyId === 'legacy') updates.apiUsage = newUsage;
     
     saveData({
       ...data,
       settings: {
         ...data.settings,
-        apiUsage: {
-          date: today,
-          embeddingCount: u.date === today ? (u.embeddingCount || 0) : 0,
-          answerCount: u.date === today ? (u.answerCount || 0) : 0,
-          digestCount: (u.date === today ? (u.digestCount || 0) : 0) + 1,
-          editorCount: u.date === today ? (u.editorCount || 0) : 0,
-        }
+        ...updates
       }
     });
   };
@@ -95,7 +112,8 @@ export const DailyDigestCard: React.FC<{
       checkApiLimit();
 
       // Retrieve Gemini API Key
-      const apiKey = process.env.GEMINI_API_KEY;
+      const keyInfo = getSelectedApiKey(data.settings, 'digest');
+      const apiKey = keyInfo?.key || process.env.GEMINI_API_KEY;
       if (!apiKey) {
         throw new Error("GEMINI_API_KEY is not configured.");
       }
@@ -107,7 +125,7 @@ Notes:
 ${notesToSummarize.map(n => `Title: ${n.title}\nContent: ${n.content}`).join("\n\n---\n\n")}`;
 
       const response = await gemini.models.generateContent({
-        model: "gemini-1.5-flash",
+        model: "gemini-3.5-flash",
         contents: prompt
       });
 
