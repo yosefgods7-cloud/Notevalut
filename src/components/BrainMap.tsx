@@ -513,17 +513,6 @@ export const BrainMap: React.FC<BrainMapProps> = ({
       );
 
     simulation.on("tick", () => {
-      // Add slight circular drift
-      graphData.nodes.forEach((d) => {
-        if (!d.x || !d.y) return;
-        const dist = Math.sqrt(d.x * d.x + d.y * d.y);
-        if (dist > 0) {
-          const angle = Math.atan2(d.y, d.x) + 0.002;
-          d.x = Math.cos(angle) * dist;
-          d.y = Math.sin(angle) * dist;
-        }
-      });
-
       link
         .attr("x1", (d) => (d.source as GraphNode).x!)
         .attr("y1", (d) => (d.source as GraphNode).y!)
