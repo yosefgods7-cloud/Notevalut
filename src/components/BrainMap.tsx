@@ -336,7 +336,13 @@ export const BrainMap: React.FC<BrainMapProps> = ({
       }
     });
 
-    return { nodes, links, availableTags, availableFolders, availableDates };
+    // Filter out any links where source or target nodes do not exist
+    const validNodeIds = new Set(nodes.map((n) => n.id));
+    const validLinks = links.filter(
+      (l) => validNodeIds.has(l.source as string) && validNodeIds.has(l.target as string)
+    );
+
+    return { nodes, links: validLinks, availableTags, availableFolders, availableDates };
   }, [
     data,
     activeWorkspaceId,
@@ -409,9 +415,6 @@ export const BrainMap: React.FC<BrainMapProps> = ({
       .force("x", d3.forceX().strength(0.01))
       .force("y", d3.forceY().strength(0.01));
 
-    // Keep simulation running gently so elements drift continuously if desired
-    simulation.alphaMin(0.01).alphaTarget(0.02);
-
     // Draw Links
     const link = g
       .append("g")
@@ -443,7 +446,7 @@ export const BrainMap: React.FC<BrainMapProps> = ({
         d3
           .drag<SVGGElement, GraphNode>()
           .on("start", function (event, d) {
-            if (!event.active) simulation.alphaTarget(0.1).restart();
+            if (!event.active) simulation.alphaTarget(0.3).restart();
             d.fx = d.x;
             d.fy = d.y;
           })
@@ -452,7 +455,7 @@ export const BrainMap: React.FC<BrainMapProps> = ({
             d.fy = event.y;
           })
           .on("end", function (event, d) {
-            if (!event.active) simulation.alphaTarget(0.01);
+            if (!event.active) simulation.alphaTarget(0);
             d.fx = null;
             d.fy = null;
           }),
