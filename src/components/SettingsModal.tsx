@@ -25,6 +25,7 @@ import {
   ArrowDown,
   Minus,
   Activity,
+  Upload,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { Settings as SettingsType, DEFAULT_SETTINGS } from "../types";
@@ -207,6 +208,45 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       calculateSize();
     }
   }, [isOpen, data.settings]);
+
+  const [isManualBackingUp, setIsManualBackingUp] = useState(false);
+  const [manualBackupProgress, setManualBackupProgress] = useState<{current: number; total: number} | null>(null);
+
+  const handleManualDriveBackup = async () => {
+    if (!accessToken) {
+      showToast("Please sign in to Google Drive first.");
+      return;
+    }
+    setIsManualBackingUp(true);
+    setManualBackupProgress({ current: 0, total: 0 });
+    
+    try {
+      const { get } = await import("idb-keyval");
+      const storedDataStr = await get("notevault_data");
+      const fullData = storedDataStr ? JSON.parse(storedDataStr) : data;
+      
+      const totalNotes = fullData.notes?.length || 0;
+      setManualBackupProgress({ current: 0, total: totalNotes });
+
+      // Simulate step-by-step progress for UX
+      for (let i = 0; i < totalNotes; i++) {
+        setManualBackupProgress({ current: i + 1, total: totalNotes });
+        if (i % 10 === 0) {
+          await new Promise(r => setTimeout(r, 0)); // yield
+        }
+      }
+
+      await uploadToDrive(accessToken, fullData, undefined, `NoteVault_Manual_Backup_${new Date().toISOString().replace(/:/g, '-')}.json`);
+      setManualBackupProgress({ current: totalNotes, total: totalNotes });
+      alert("Manual Backup completed successfully.");
+    } catch (err: any) {
+      console.error(err);
+      alert(`Backup failed: ${err.message}`);
+    } finally {
+      setIsManualBackingUp(false);
+      setManualBackupProgress(null);
+    }
+  };
 
   const handleSave = () => {
     updateSettings(localSettings);
@@ -1492,6 +1532,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           </div>
                         </div>
                       )}
+                      
+                      <div className="pt-3 mt-3 border-t border-border flex flex-col gap-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-text-secondary">Manual Full Backup</span>
+                          <button
+                            onClick={handleManualDriveBackup}
+                            disabled={isManualBackingUp}
+                            className="bg-accent hover:bg-accent-hover text-white disabled:opacity-50 text-[11px] px-3 py-1.5 rounded-md font-medium transition-colors flex items-center gap-1"
+                          >
+                            <Upload size={12} /> Backup Now
+                          </button>
+                        </div>
+                        {isManualBackingUp && manualBackupProgress && (
+                           <div className="space-y-1 mt-1">
+                             <div className="flex justify-between text-[10px] text-text-muted">
+                               <span>Backing up...</span>
+                               <span>{manualBackupProgress.current} / {manualBackupProgress.total} notes</span>
+                             </div>
+                             <div className="w-full bg-surface-active rounded-full h-1.5">
+                               <div className="bg-green-500 h-1.5 rounded-full transition-all duration-300" style={{ width: `${(manualBackupProgress.current / (manualBackupProgress.total || 1)) * 100}%` }}></div>
+                             </div>
+                           </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 

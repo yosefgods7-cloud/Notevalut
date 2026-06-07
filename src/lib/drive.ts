@@ -26,9 +26,9 @@ export const shouldRunBackup = (settings?: DriveBackupSettings): boolean => {
   return isAfter(now, nextBackup) || isBefore(nextBackup, now);
 };
 
-export const uploadToDrive = async (accessToken: string, data: NoteVaultData, fileId?: string): Promise<string> => {
+export const uploadToDrive = async (accessToken: string, data: NoteVaultData, fileId?: string, fileName?: string): Promise<string> => {
   const metadata = {
-    name: 'NoteVault_Backup.json',
+    name: fileName || 'NoteVault_Backup.json',
     mimeType: 'application/json',
     parents: ['root'], // Remove if fileId is present, we don't move it.
   };
