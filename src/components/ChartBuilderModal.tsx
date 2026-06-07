@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Check, BarChart3, LineChart, PieChart, AreaChart as AreaChartIcon, Hexagon, Plus, Trash2 } from 'lucide-react';
 import { NoteChart } from '../types';
 import { generateId } from '../lib/utils';
+import { ChartRenderer } from './ChartRenderer';
 import {
   BarChart, Bar, LineChart as RechartsLineChart, Line, PieChart as RechartsPieChart, Pie,
   AreaChart as RechartsAreaChart, Area, RadarChart as RechartsRadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
@@ -136,93 +137,16 @@ export function ChartBuilderModal({ onClose, onSave, initialChart }: ChartBuilde
   const renderChart = () => {
     if (!parsedData.length || error) return <div className="flex items-center justify-center h-full text-text-muted">Missing or Invalid Data</div>;
 
-    switch (type) {
-      case 'bar':
-        return (
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={parsedData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-              <XAxis dataKey={xAxisName} stroke="#888" />
-              <YAxis stroke="#888" />
-              <Tooltip contentStyle={{ backgroundColor: '#1e1e1e', borderColor: '#333' }} />
-              <Legend />
-              {dataKeys.map((key, i) => (
-                <Bar key={key} dataKey={key} fill={customColors[i % customColors.length]} />
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
-        );
-      case 'line':
-        return (
-          <ResponsiveContainer width="100%" height="100%">
-            <RechartsLineChart data={parsedData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-              <XAxis dataKey={xAxisName} stroke="#888" />
-              <YAxis stroke="#888" />
-              <Tooltip contentStyle={{ backgroundColor: '#1e1e1e', borderColor: '#333' }} />
-              <Legend />
-              {dataKeys.map((key, i) => (
-                <Line key={key} type="monotone" dataKey={key} stroke={customColors[i % customColors.length]} />
-              ))}
-            </RechartsLineChart>
-          </ResponsiveContainer>
-        );
-      case 'pie':
-        return (
-          <ResponsiveContainer width="100%" height="100%">
-            <RechartsPieChart>
-              <Tooltip contentStyle={{ backgroundColor: '#1e1e1e', borderColor: '#333' }} />
-              <Legend />
-              {dataKeys.map((key, i) => (
-                <Pie 
-                  key={key} 
-                  data={parsedData} 
-                  dataKey={key} 
-                  nameKey={xAxisName} 
-                  cx="50%" 
-                  cy="50%" 
-                  outerRadius={100 - (i * 20)} 
-                  fill={customColors[i % customColors.length]}
-                >
-                  {parsedData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={customColors[(index + i) % customColors.length]} />
-                  ))}
-                </Pie>
-              ))}
-            </RechartsPieChart>
-          </ResponsiveContainer>
-        );
-      case 'area':
-        return (
-          <ResponsiveContainer width="100%" height="100%">
-            <RechartsAreaChart data={parsedData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-              <XAxis dataKey={xAxisName} stroke="#888" />
-              <YAxis stroke="#888" />
-              <Tooltip contentStyle={{ backgroundColor: '#1e1e1e', borderColor: '#333' }} />
-              <Legend />
-              {dataKeys.map((key, i) => (
-                <Area key={key} type="monotone" dataKey={key} stroke={customColors[i % customColors.length]} fill={customColors[i % customColors.length]} fillOpacity={0.3} />
-              ))}
-            </RechartsAreaChart>
-          </ResponsiveContainer>
-        );
-      case 'radar':
-        return (
-          <ResponsiveContainer width="100%" height="100%">
-            <RechartsRadarChart data={parsedData}>
-              <PolarGrid stroke="#555" />
-              <PolarAngleAxis dataKey={xAxisName} stroke="#888" />
-              <PolarRadiusAxis stroke="#888" />
-              <Tooltip contentStyle={{ backgroundColor: '#1e1e1e', borderColor: '#333' }} />
-              <Legend />
-              {dataKeys.map((key, i) => (
-                <Radar key={key} name={key} dataKey={key} stroke={customColors[i % customColors.length]} fill={customColors[i % customColors.length]} fillOpacity={0.6} />
-              ))}
-            </RechartsRadarChart>
-          </ResponsiveContainer>
-        );
-    }
+    return (
+      <ChartRenderer
+        type={type}
+        data={parsedData}
+        xAxisKey={xAxisName}
+        dataKeys={dataKeys}
+        colors={customColors}
+        height="100%"
+      />
+    );
   };
 
   return (

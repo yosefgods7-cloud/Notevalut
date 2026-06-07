@@ -3,7 +3,7 @@ import { useStorage } from '../context/StorageContext';
 import { useAuth } from '../context/AuthContext';
 import { uploadToDrive } from '../lib/drive';
 import { cn } from '../lib/utils';
-import { Plus, Tag, Settings as SettingsIcon, Download, Upload, Star, Undo2, Network, Menu, Folder, Pencil, Trash2, MoreHorizontal, ArrowUp, ArrowDown, Calendar } from 'lucide-react';
+import { Plus, Tag, Settings as SettingsIcon, Download, Upload, Star, Undo2, Network, Menu, Folder, Pencil, Trash2, MoreHorizontal, ArrowUp, ArrowDown, Calendar, ChevronRight, ChevronDown } from 'lucide-react';
 import { appPrompt, appConfirm } from './GlobalDialogs';
 
 interface SidebarProps {
@@ -31,25 +31,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { data, saveData, addCollection, updateCollection, deleteCollection, addWorkspace, updateWorkspace, deleteWorkspace, undo, canUndo } = useStorage();
   const { accessToken } = useAuth();
-  const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
   const [editingWorkspace, setEditingWorkspace] = useState<string | null>(null);
   const [editingCollection, setEditingCollection] = useState<string | null>(null);
+  const [expandedWorkspaces, setExpandedWorkspaces] = useState<string[]>([activeWorkspaceId]);
 
-  const activeWorkspace = data.workspaces.find(w => w.id === activeWorkspaceId);
-  const collections = data.collections.filter(c => c.workspaceId === activeWorkspaceId);
-
-  const handleCreateCollection = async () => {
-    const name = await appPrompt('Collection Name:');
-    if (name && activeWorkspaceId) {
-      const newCol = addCollection(activeWorkspaceId, name, '📁');
-      setActiveCollectionId(newCol.id);
-      syncDrive({
-        ...data,
-        collections: [...data.collections, newCol]
-      });
-    }
+  const toggleWorkspace = (id: string) => {
+    setExpandedWorkspaces(prev => 
+      prev.includes(id) ? prev.filter(w => w !== id) : [...prev, id]
+    );
   };
 
   const syncDrive = async (updatedData: any) => {
@@ -59,6 +50,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
       } catch (e) {
         console.error("Failed to sync to Drive", e);
       }
+    }
+  };
+
+  const handleCreateWorkspace = async () => {
+    const name = await appPrompt('Holder Name:');
+    if (name) {
+      const newWorkspace = addWorkspace(name, '🧠');
+      setExpandedWorkspaces(prev => [...prev, newWorkspace.id]);
+      setActiveWorkspaceId(newWorkspace.id);
+      setActiveCollectionId(null);
+      syncDrive({
+        ...data,
+        workspaces: [...data.workspaces, newWorkspace]
+      });
+    }
+  };
+
+  const handleCreateCollection = async (e: React.MouseEvent, workspaceId: string) => {
+    e.stopPropagation();
+    const name = await appPrompt('Folder Name:');
+    if (name) {
+      const newCol = addCollection(workspaceId, name, '📁');
+      if (!expandedWorkspaces.includes(workspaceId)) {
+        setExpandedWorkspaces(prev => [...prev, workspaceId]);
+      }
+      setActiveWorkspaceId(workspaceId);
+      setActiveCollectionId(newCol.id);
+      syncDrive({
+        ...data,
+        collections: [...data.collections, newCol]
+      });
     }
   };
 
@@ -90,7 +112,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         notes: data.notes.filter((n) => n.workspaceId !== id),
       });
       if (activeWorkspaceId === id) {
-         setActiveWorkspaceId(data.workspaces[0]?.id || '');
+         setActiveWorkspaceId(data.workspaces.filter(w => w.id !== id)[0]?.id || '');
          setActiveCollectionId(null);
       }
     }
@@ -202,97 +224,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       
       {isMenuOpen && (
         <div className="border-b border-border bg-surface-active/50 space-y-1 p-2 text-sm z-50">
-          <div className="relative">
-            <button 
-              onClick={() => setIsWorkspaceOpen(!isWorkspaceOpen)}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-md hover:bg-surface-hover text-text-primary group"
-            >
-              <span className="flex items-center gap-2">
-                <Folder size={16} />
-                <span className="truncate">{activeWorkspace?.name || 'Workspace'}</span>
-              </span>
-              <span className="flex items-center gap-2">
-                {activeWorkspaceId && (
-                  <span 
-                    onClick={(e) => { e.stopPropagation(); setEditingWorkspace(activeWorkspaceId); }}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center"
-                  >
-                    <MoreHorizontal size={14} className="text-text-muted hover:text-text-primary" />
-                  </span>
-                )}
-                <span className="text-xs text-text-muted">▼</span>
-              </span>
-            </button>
-            
-            {editingWorkspace === activeWorkspaceId && activeWorkspaceId && (
-               <div className="flex items-center gap-1 bg-surface-hover rounded-md p-1 mx-3 mb-1 justify-end">
-                   <button onClick={(e) => handleMoveWorkspace(e, activeWorkspaceId, 'up')} className="hover:bg-surface p-1 rounded text-text-secondary hover:text-text-primary" title="Move Up"><ArrowUp size={14} /></button>
-                   <button onClick={(e) => handleMoveWorkspace(e, activeWorkspaceId, 'down')} className="hover:bg-surface p-1 rounded text-text-secondary hover:text-text-primary" title="Move Down"><ArrowDown size={14} /></button>
-                   <div className="w-px h-4 bg-border mx-1"></div>
-                   <button onClick={(e) => { handleEditWorkspace(e, activeWorkspaceId); setEditingWorkspace(null); }} className="hover:bg-surface p-1 rounded text-text-secondary hover:text-text-primary" title="Edit"><Pencil size={14} /></button>
-                   <button onClick={(e) => { handleDeleteWorkspace(e, activeWorkspaceId); setEditingWorkspace(null); }} className="hover:bg-red-500/10 p-1 rounded text-red-500" title="Delete"><Trash2 size={14} /></button>
-               </div>
-            )}
-            
-            {isWorkspaceOpen && (
-              <div className="absolute z-50 top-full left-0 w-full mt-1 bg-surface border border-border rounded-lg shadow-xl py-1">
-                {data.workspaces.map(w => (
-                  <div key={w.id} className="relative group flex flex-col">
-                    <button
-                      onClick={() => {
-                        setActiveWorkspaceId(w.id);
-                        const firstCol = data.collections.find(c => c.workspaceId === w.id);
-                        setActiveCollectionId(firstCol ? firstCol.id : null);
-                        setIsWorkspaceOpen(false);
-                      }}
-                      className={cn("w-full flex items-center justify-between px-4 py-2 hover:bg-surface-hover text-sm", w.id === activeWorkspaceId ? "text-accent bg-accent-transparent" : "text-text-primary")}
-                    >
-                      <span className="flex items-center gap-2">
-                        <span>{w.icon}</span>
-                        <span className="truncate">{w.name}</span>
-                      </span>
-                      <span 
-                        onClick={(e) => { e.stopPropagation(); setEditingWorkspace(editingWorkspace === w.id ? null : w.id); }}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-surface rounded-md"
-                      >
-                         <MoreHorizontal size={14} className="text-text-muted hover:text-text-primary" />
-                      </span>
-                    </button>
-                    {editingWorkspace === w.id && (
-                      <div className="flex items-center gap-1 bg-surface-active px-4 py-1 justify-end border-b border-border/50">
-                         <button onClick={(e) => handleMoveWorkspace(e, w.id, 'up')} className="hover:bg-surface p-1.5 rounded text-text-secondary hover:text-text-primary" title="Move Up"><ArrowUp size={14} /></button>
-                         <button onClick={(e) => handleMoveWorkspace(e, w.id, 'down')} className="hover:bg-surface p-1.5 rounded text-text-secondary hover:text-text-primary" title="Move Down"><ArrowDown size={14} /></button>
-                         <div className="w-px h-4 bg-border mx-1"></div>
-                         <button onClick={(e) => { handleEditWorkspace(e, w.id); setEditingWorkspace(null); }} className="hover:bg-surface p-1.5 rounded text-text-secondary hover:text-text-primary" title="Edit"><Pencil size={14} /></button>
-                         <button onClick={(e) => { handleDeleteWorkspace(e, w.id); setEditingWorkspace(null); }} className="hover:bg-red-500/10 p-1.5 rounded text-red-500" title="Delete"><Trash2 size={14} /></button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-                <div className="border-t border-border mt-1 pt-1">
-                  <button
-                    onClick={async () => {
-                      const name = await appPrompt('Main Holder Name:');
-                      if (name) {
-                        const newWorkspace = addWorkspace(name, '🧠');
-                        setActiveWorkspaceId(newWorkspace.id);
-                        setActiveCollectionId(null);
-                        setIsWorkspaceOpen(false);
-                        syncDrive({
-                          ...data,
-                          workspaces: [...data.workspaces, newWorkspace]
-                        });
-                      }
-                    }}
-                    className="w-full flex items-center gap-2 px-4 py-2 hover:bg-surface-hover text-sm text-text-primary"
-                  >
-                    <Plus size={14} />
-                    <span>New Main Holder</span>
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
           <button 
             onClick={undo} 
             disabled={!canUndo}
@@ -308,10 +239,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button onClick={onOpenExport} className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-text-secondary hover:bg-surface-hover hover:text-text-primary transition-colors">
             <Download size={16} />
             <span>Export</span>
-          </button>
-          <button onClick={onOpenSettings} className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-text-secondary hover:bg-surface-hover hover:text-text-primary transition-colors">
-            <SettingsIcon size={16} />
-            <span>Settings</span>
           </button>
         </div>
       )}
@@ -353,66 +280,140 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
 
+        <div className="mb-6 space-y-0.5">
+          <button
+            onClick={() => setActiveCollectionId('starred')}
+            className={cn(
+              "w-full flex items-center gap-3 px-3 py-1.5 rounded-md text-sm transition-colors",
+              activeCollectionId === 'starred' ? "bg-surface-active text-text-primary font-medium" : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+            )}
+          >
+            <span className="text-lg leading-none shrink-0"><Star size={16} className="text-yellow-500 fill-yellow-500" /></span>
+            <span className="truncate">Starred</span>
+          </button>
+          <button
+            onClick={() => setActiveCollectionId('trash')}
+            className={cn(
+              "w-full flex items-center gap-3 px-3 py-1.5 rounded-md text-sm transition-colors",
+              activeCollectionId === 'trash' ? "bg-surface-active text-rose-400 font-medium" : "text-text-secondary hover:bg-surface-hover hover:text-rose-400"
+            )}
+          >
+            <span className="text-lg leading-none shrink-0"><Trash2 size={16} /></span>
+            <span className="truncate">Trash</span>
+          </button>
+        </div>
+
         <div className="mb-6">
           <div className="flex items-center justify-between px-2 mb-2 text-xs font-semibold text-text-muted uppercase tracking-wider">
-            <span>Collections</span>
-            <button onClick={handleCreateCollection} className="hover:text-text-primary">
+            <span>Holders</span>
+            <button onClick={handleCreateWorkspace} className="hover:text-text-primary p-1">
               <Plus size={14} />
             </button>
           </div>
           
-          <div className="space-y-0.5">
-            <button
-                onClick={() => setActiveCollectionId('starred')}
-                className={cn(
-                  "w-full flex items-center gap-3 px-3 py-1.5 rounded-md text-sm transition-colors",
-                  activeCollectionId === 'starred' ? "bg-surface-active text-text-primary font-medium" : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"
-                )}
-              >
-                <span className="text-lg leading-none shrink-0"><Star size={16} className="text-yellow-500 fill-yellow-500" /></span>
-                <span className="truncate">Starred</span>
-            </button>
-            <button
-                onClick={() => setActiveCollectionId('trash')}
-                className={cn(
-                  "w-full flex items-center gap-3 px-3 py-1.5 rounded-md text-sm transition-colors",
-                  activeCollectionId === 'trash' ? "bg-surface-active text-rose-400 font-medium" : "text-text-secondary hover:bg-surface-hover hover:text-rose-400"
-                )}
-              >
-                <span className="text-lg leading-none shrink-0"><Trash2 size={16} /></span>
-                <span className="truncate">Trash</span>
-            </button>
-            {collections.map(c => (
-              <div key={c.id} className="flex flex-col group relative">
-                <button
-                  onClick={() => setActiveCollectionId(c.id)}
-                  className={cn(
-                    "w-full flex items-center justify-between px-3 py-1.5 rounded-md text-sm transition-colors",
-                    activeCollectionId === c.id ? "bg-surface-active text-text-primary font-medium" : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"
-                  )}
-                >
-                  <span className="flex items-center gap-3 overflow-hidden">
-                    <span className="text-lg leading-none shrink-0">{c.icon}</span>
-                    <span className="truncate">{c.name}</span>
-                  </span>
-                  <span 
-                     onClick={(e) => { e.stopPropagation(); setEditingCollection(editingCollection === c.id ? null : c.id); }}
-                     className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-surface rounded-md"
+          <div className="space-y-1">
+            {data.workspaces.map(w => {
+              const wsCollections = data.collections.filter(c => c.workspaceId === w.id);
+              const isExpanded = expandedWorkspaces.includes(w.id);
+              
+              return (
+                <div key={w.id} className="flex flex-col group/ws relative">
+                  <button
+                    onClick={() => {
+                        toggleWorkspace(w.id);
+                        setActiveWorkspaceId(w.id);
+                    }}
+                    className={cn(
+                      "w-full flex items-center justify-between px-2 py-1.5 rounded-md text-sm transition-colors font-medium",
+                      w.id === activeWorkspaceId ? "text-text-primary bg-surface-active/30" : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                    )}
                   >
-                     <MoreHorizontal size={14} className="text-text-muted hover:text-text-primary" />
-                  </span>
-                </button>
-                {editingCollection === c.id && (
-                  <div className="flex items-center gap-1 bg-surface-active px-3 py-1 justify-end rounded-md mt-0.5">
-                     <button onClick={(e) => handleMoveCollection(e, c.id, 'up')} className="hover:bg-surface p-1.5 rounded-md text-text-secondary hover:text-text-primary" title="Move Up"><ArrowUp size={14} /></button>
-                     <button onClick={(e) => handleMoveCollection(e, c.id, 'down')} className="hover:bg-surface p-1.5 rounded-md text-text-secondary hover:text-text-primary" title="Move Down"><ArrowDown size={14} /></button>
-                     <div className="w-px h-4 bg-border mx-1"></div>
-                     <button onClick={(e) => { handleEditCollection(e, c.id); setEditingCollection(null); }} className="hover:bg-surface p-1.5 rounded-md text-text-secondary hover:text-text-primary" title="Edit"><Pencil size={14} /></button>
-                     <button onClick={(e) => { handleDeleteCollection(e, c.id); setEditingCollection(null); }} className="hover:bg-red-500/10 p-1.5 rounded-md text-red-500" title="Delete"><Trash2 size={14} /></button>
-                  </div>
-                )}
-              </div>
-            ))}
+                    <span className="flex items-center gap-2 overflow-hidden flex-1">
+                      <span className="text-text-muted shrink-0 p-0.5">
+                        {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                      </span>
+                      <span className="text-sm leading-none shrink-0">{w.icon}</span>
+                      <span className="truncate text-left">{w.name}</span>
+                    </span>
+                    <span className="flex items-center opacity-0 group-hover/ws:opacity-100 transition-opacity">
+                      <span 
+                        onClick={(e) => handleCreateCollection(e, w.id)}
+                        className="p-1 hover:bg-surface rounded-md shrink-0"
+                        title="Add Folder"
+                      >
+                         <Plus size={14} className="text-text-muted hover:text-text-primary" />
+                      </span>
+                      <span 
+                         onClick={(e) => { e.stopPropagation(); setEditingWorkspace(editingWorkspace === w.id ? null : w.id); }}
+                         className="p-1 hover:bg-surface rounded-md shrink-0"
+                      >
+                         <MoreHorizontal size={14} className="text-text-muted hover:text-text-primary" />
+                      </span>
+                    </span>
+                  </button>
+
+                  {editingWorkspace === w.id && (
+                    <div className="flex items-center gap-1 bg-surface py-1 px-3 ml-2 justify-end rounded-md mb-1 border border-border/50">
+                       <button onClick={(e) => handleMoveWorkspace(e, w.id, 'up')} className="hover:bg-surface-hover p-1.5 rounded-md text-text-secondary hover:text-text-primary" title="Move Up"><ArrowUp size={14} /></button>
+                       <button onClick={(e) => handleMoveWorkspace(e, w.id, 'down')} className="hover:bg-surface-hover p-1.5 rounded-md text-text-secondary hover:text-text-primary" title="Move Down"><ArrowDown size={14} /></button>
+                       <div className="w-px h-4 bg-border mx-1"></div>
+                       <button onClick={(e) => { handleEditWorkspace(e, w.id); setEditingWorkspace(null); }} className="hover:bg-surface-hover p-1.5 rounded-md text-text-secondary hover:text-text-primary" title="Edit"><Pencil size={14} /></button>
+                       <button onClick={(e) => { handleDeleteWorkspace(e, w.id); setEditingWorkspace(null); }} className="hover:bg-red-500/10 p-1.5 rounded-md text-red-500" title="Delete"><Trash2 size={14} /></button>
+                    </div>
+                  )}
+
+                  {isExpanded && (
+                    <div className="ml-5 pl-2 border-l border-border/40 mt-1 space-y-0.5">
+                      {wsCollections.map(c => (
+                        <div key={c.id} className="flex flex-col group relative">
+                          <button
+                            onClick={() => {
+                                setActiveWorkspaceId(w.id);
+                                setActiveCollectionId(c.id);
+                            }}
+                            className={cn(
+                              "w-full flex items-center justify-between px-2 py-1.5 rounded-md text-sm transition-colors",
+                              activeCollectionId === c.id ? "bg-surface-active text-text-primary font-medium" : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                            )}
+                          >
+                            <span className="flex items-center gap-2 overflow-hidden">
+                              <span className="text-sm leading-none shrink-0">{c.icon}</span>
+                              <span className="truncate">{c.name}</span>
+                            </span>
+                            <span 
+                               onClick={(e) => { e.stopPropagation(); setEditingCollection(editingCollection === c.id ? null : c.id); }}
+                               className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-surface rounded-md"
+                            >
+                               <MoreHorizontal size={14} className="text-text-muted hover:text-text-primary" />
+                            </span>
+                          </button>
+                          {editingCollection === c.id && (
+                            <div className="flex items-center gap-1 bg-surface px-2 py-1 justify-end rounded-md mt-0.5 border border-border/50">
+                               <button onClick={(e) => handleMoveCollection(e, c.id, 'up')} className="hover:bg-surface-hover p-1.5 rounded-md text-text-secondary hover:text-text-primary" title="Move Up"><ArrowUp size={14} /></button>
+                               <button onClick={(e) => handleMoveCollection(e, c.id, 'down')} className="hover:bg-surface-hover p-1.5 rounded-md text-text-secondary hover:text-text-primary" title="Move Down"><ArrowDown size={14} /></button>
+                               <div className="w-px h-4 bg-border mx-1"></div>
+                               <button onClick={(e) => { handleEditCollection(e, c.id); setEditingCollection(null); }} className="hover:bg-surface-hover p-1.5 rounded-md text-text-secondary hover:text-text-primary" title="Edit"><Pencil size={14} /></button>
+                               <button onClick={(e) => { handleDeleteCollection(e, c.id); setEditingCollection(null); }} className="hover:bg-red-500/10 p-1.5 rounded-md text-red-500" title="Delete"><Trash2 size={14} /></button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {wsCollections.length === 0 && (
+                        <div className="px-2 py-1.5 text-xs text-text-muted italic flex items-center justify-between">
+                            Empty holder
+                            <button 
+                                onClick={(e) => handleCreateCollection(e, w.id)}
+                                className="text-accent hover:underline px-1"
+                            >
+                                Add folder
+                            </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
         

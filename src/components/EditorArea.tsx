@@ -31,6 +31,7 @@ import { getSelectedApiKey } from "../hooks/useAI";
 import { NoteHistoryModal } from "./NoteHistoryModal";
 import { ImageCropModal } from "./ImageCropModal";
 import { ChartBuilderModal } from "./ChartBuilderModal";
+import { ChartRenderer } from "./ChartRenderer";
 import { TableControls } from "./TableControls";
 import { TaskDashboard } from "./TaskDashboard";
 import { appPrompt } from "./GlobalDialogs";
@@ -533,167 +534,16 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
   };
 
   const renderChartPreview = (chart: NoteChart) => {
-    const COLORS = chart.config.colors || [
-      "#8884d8",
-      "#82ca9d",
-      "#ffc658",
-      "#ff7300",
-      "#0088fe",
-      "#00c49f",
-      "#ffbb28",
-      "#ff8042",
-    ];
-
-    switch (chart.type) {
-      case "bar":
-        return (
-          <ResponsiveContainer width="100%" height={300}>
-            <RechartsBarChart data={chart.data}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-              <XAxis
-                dataKey={chart.config.xAxisKey}
-                stroke="#888"
-                fontSize={12}
-              />
-              <YAxis stroke="#888" fontSize={12} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#1e1e1e",
-                  borderColor: "#333",
-                }}
-              />
-              <Legend />
-              {chart.config.dataKeys.map((key, i) => (
-                <Bar key={key} dataKey={key} fill={COLORS[i % COLORS.length]} />
-              ))}
-            </RechartsBarChart>
-          </ResponsiveContainer>
-        );
-      case "line":
-        return (
-          <ResponsiveContainer width="100%" height={300}>
-            <RechartsLineChart data={chart.data}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-              <XAxis
-                dataKey={chart.config.xAxisKey}
-                stroke="#888"
-                fontSize={12}
-              />
-              <YAxis stroke="#888" fontSize={12} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#1e1e1e",
-                  borderColor: "#333",
-                }}
-              />
-              <Legend />
-              {chart.config.dataKeys.map((key, i) => (
-                <Line
-                  key={key}
-                  type="monotone"
-                  dataKey={key}
-                  stroke={COLORS[i % COLORS.length]}
-                />
-              ))}
-            </RechartsLineChart>
-          </ResponsiveContainer>
-        );
-      case "pie":
-        return (
-          <ResponsiveContainer width="100%" height={300}>
-            <RechartsPieChart>
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#1e1e1e",
-                  borderColor: "#333",
-                }}
-              />
-              <Legend />
-              {chart.config.dataKeys.map((key, i) => (
-                <Pie
-                  key={key}
-                  data={chart.data}
-                  dataKey={key}
-                  nameKey={chart.config.xAxisKey}
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={100 - i * 20}
-                  fill={COLORS[i % COLORS.length]}
-                >
-                  {chart.data.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={COLORS[(index + i) % COLORS.length]}
-                    />
-                  ))}
-                </Pie>
-              ))}
-            </RechartsPieChart>
-          </ResponsiveContainer>
-        );
-      case "area":
-        return (
-          <ResponsiveContainer width="100%" height={300}>
-            <RechartsAreaChart data={chart.data}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-              <XAxis
-                dataKey={chart.config.xAxisKey}
-                stroke="#888"
-                fontSize={12}
-              />
-              <YAxis stroke="#888" fontSize={12} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#1e1e1e",
-                  borderColor: "#333",
-                }}
-              />
-              <Legend />
-              {chart.config.dataKeys.map((key, i) => (
-                <Area
-                  key={key}
-                  type="monotone"
-                  dataKey={key}
-                  stroke={COLORS[i % COLORS.length]}
-                  fill={COLORS[i % COLORS.length]}
-                  fillOpacity={0.3}
-                />
-              ))}
-            </RechartsAreaChart>
-          </ResponsiveContainer>
-        );
-      case "radar":
-        return (
-          <ResponsiveContainer width="100%" height={300}>
-            <RechartsRadarChart data={chart.data}>
-              <PolarGrid stroke="#555" />
-              <PolarAngleAxis
-                dataKey={chart.config.xAxisKey}
-                stroke="#888"
-                fontSize={12}
-              />
-              <PolarRadiusAxis stroke="#888" fontSize={12} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#1e1e1e",
-                  borderColor: "#333",
-                }}
-              />
-              <Legend />
-              {chart.config.dataKeys.map((key, i) => (
-                <Radar
-                  key={key}
-                  name={key}
-                  dataKey={key}
-                  stroke={COLORS[i % COLORS.length]}
-                  fill={COLORS[i % COLORS.length]}
-                  fillOpacity={0.6}
-                />
-              ))}
-            </RechartsRadarChart>
-          </ResponsiveContainer>
-        );
-    }
+    return (
+      <ChartRenderer
+        type={chart.type}
+        data={chart.data}
+        xAxisKey={chart.config.xAxisKey}
+        dataKeys={chart.config.dataKeys}
+        colors={chart.config.colors}
+        height={300}
+      />
+    );
   };
 
   useEffect(() => {

@@ -24,6 +24,7 @@ import {
   ArrowUp,
   ArrowDown,
   Minus,
+  Activity,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { Settings as SettingsType, DEFAULT_SETTINGS } from "../types";
@@ -43,6 +44,7 @@ import { BrainMapSettingsPanel } from "./BrainMapSettingsPanel";
 import { DailyDigestSettingsPanel } from "./DailyDigestSettingsPanel";
 import { AskYourVaultSettingsPanel } from "./AskYourVaultSettingsPanel";
 import { ApiKeysSettingsPanel } from "./ApiKeysSettingsPanel";
+import { VaultHealthDashboard } from "./VaultHealthDashboard";
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
@@ -272,6 +274,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 label: "Data Management",
                 icon: Database,
                 color: "text-green-500",
+              },
+              {
+                id: "Health",
+                label: "Vault Health",
+                icon: Activity,
+                color: "text-emerald-500",
               },
             ].map((sec) => (
               <button
@@ -1545,6 +1553,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                 </div>
               </div>
+            )}
+
+            {/* Vault Health */}
+            {expandedSection === "Health" && (
+              <VaultHealthDashboard />
             )}
           </div>
         </div>
