@@ -26,6 +26,7 @@ import {
   Minus,
   Activity,
   Upload,
+  FolderPlus,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { Settings as SettingsType, DEFAULT_SETTINGS } from "../types";
@@ -346,270 +347,170 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <h3 className="text-lg font-bold flex items-center gap-2 mb-4">
                   <Folder className="text-yellow-500" /> File Manager
                 </h3>
-                <div className="flex flex-col gap-4">
-                  <div>
-                    <h4 className="text-xs font-semibold text-text-muted uppercase mb-3 flex items-center justify-between">
-                      <span>Holders</span>
-                      <button
-                        onClick={async () => {
-                          const name = await appPrompt("New Holder Name:");
-                          if (name) {
-                            const icon = await appPrompt("New Holder Icon/Emoji:", "🧠");
-                            const newWs = addWorkspace(name, icon || "🧠");
-                            if (data.settings.driveBackup?.enabled && accessToken) {
-                              const newData = {
-                                ...data,
-                                workspaces: [...data.workspaces, newWs],
-                              };
-                              uploadToDrive(
-                                accessToken,
-                                newData,
-                                data.settings.driveBackup.fileId
-                              ).catch(console.error);
-                            }
+                <div className="flex flex-col gap-6 w-full">
+                  <div className="flex items-center justify-between pointer-events-auto">
+                    <h4 className="text-sm font-semibold text-text-primary">Holders & Folders</h4>
+                    <button
+                      onClick={async () => {
+                        const name = await appPrompt("New Holder Name:");
+                        if (name) {
+                          const icon = await appPrompt("New Holder Icon/Emoji:", "🧠");
+                          const newWs = addWorkspace(name, icon || "🧠");
+                          if (data.settings.driveBackup?.enabled && accessToken) {
+                            const newData = {
+                              ...data,
+                              workspaces: [...data.workspaces, newWs],
+                            };
+                            uploadToDrive(accessToken, newData, data.settings.driveBackup.fileId).catch(console.error);
                           }
-                        }}
-                        className="p-1 hover:bg-surface rounded text-accent transition-colors"
-                        title="Add Holder"
-                      >
-                        <Plus size={14} />
-                      </button>
-                    </h4>
-                    <div className="space-y-2">
-                      {data.workspaces.map((w) => (
-                        <div
-                          key={w.id}
-                          className="flex items-center justify-between bg-surface border border-border rounded-lg p-2.5"
-                        >
-                          <div className="flex items-center gap-3">
-                            <span className="text-lg">{w.icon}</span>
-                            <span className="text-sm font-medium text-text-primary">
-                              {w.name}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={async () => {
-                                const newName = await appPrompt(
-                                  "Update Holder Name:",
-                                  w.name,
-                                );
-                                if (newName === null) return;
-                                const newIcon = await appPrompt(
-                                  "Update Holder Icon:",
-                                  w.icon,
-                                );
-                                updateWorkspace(w.id, {
-                                  name: newName || w.name,
-                                  icon: newIcon || w.icon,
-                                });
-                                if (
-                                  data.settings.driveBackup?.enabled &&
-                                  accessToken
-                                ) {
-                                  const newData = {
-                                    ...data,
-                                    workspaces: data.workspaces.map((ws) =>
-                                      ws.id === w.id
-                                        ? {
-                                            ...ws,
-                                            name: newName || w.name,
-                                            icon: newIcon || w.icon,
-                                          }
-                                        : ws,
-                                    ),
-                                  };
-                                  uploadToDrive(
-                                    accessToken,
-                                    newData,
-                                    data.settings.driveBackup.fileId,
-                                  ).catch(console.error);
-                                }
-                              }}
-                              className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-active rounded transition-colors"
-                              title="Edit Holder"
-                            >
-                              <Code size={14} className="hidden" />
-                              <span className="text-xs font-medium">Edit</span>
-                            </button>
-                            <button
-                              onClick={async () => {
-                                if (
-                                  await appConfirm(
-                                    `Are you sure you want to completely delete the holder "${w.name}" and ALL its folders and notes? This cannot be undone.`,
-                                  )
-                                ) {
-                                  deleteWorkspace(w.id);
-                                  if (
-                                    data.settings.driveBackup?.enabled &&
-                                    accessToken
-                                  ) {
-                                    const newData = {
-                                      ...data,
-                                      workspaces: data.workspaces.filter(
-                                        (ws) => ws.id !== w.id,
-                                      ),
-                                      collections: data.collections.filter(
-                                        (c) => c.workspaceId !== w.id,
-                                      ),
-                                      notes: data.notes.filter(
-                                        (n) => n.workspaceId !== w.id,
-                                      ),
-                                    };
-                                    uploadToDrive(
-                                      accessToken,
-                                      newData,
-                                      data.settings.driveBackup.fileId,
-                                    ).catch(console.error);
-                                  }
-                                }
-                              }}
-                              className="p-1.5 text-text-muted hover:text-red-500 hover:bg-red-500/10 rounded transition-colors"
-                              title="Delete Holder"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                        }
+                      }}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-accent hover:bg-accent-hover text-white rounded font-medium text-xs transition-colors shadow-sm"
+                      title="Add New Holder"
+                    >
+                      <Plus size={14} /> Add Holder
+                    </button>
                   </div>
 
-                  <div className="pt-4 border-t border-border">
-                    <h4 className="text-xs font-semibold text-text-muted uppercase mb-3 flex items-center justify-between">
-                      <span>Folders</span>
-                      <button
-                        onClick={async () => {
-                          // Pick a random workspace if there are none, though not likely. Best to offer a select if we wanted, but prompt is simple.
-                          const ws = data.workspaces[0];
-                          if (!ws) {
-                            alert("Create a holder first.");
-                            return;
-                          }
-                          const name = await appPrompt("New Folder Name:");
-                          if (name) {
-                            const icon = await appPrompt("New Folder Icon/Emoji:", "📁");
-                            // Find active workspace if possible, else use first.
-                            const newCol = addCollection(ws.id, name, icon || "📁");
-                            if (data.settings.driveBackup?.enabled && accessToken) {
-                              const newData = {
-                                ...data,
-                                collections: [...data.collections, newCol],
-                              };
-                              uploadToDrive(
-                                accessToken,
-                                newData,
-                                data.settings.driveBackup.fileId
-                              ).catch(console.error);
-                            }
-                          }
-                        }}
-                        className="p-1 hover:bg-surface rounded text-accent transition-colors"
-                        title="Add Folder"
-                      >
-                        <Plus size={14} />
-                      </button>
-                    </h4>
-                    <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-                      {data.collections.map((c) => {
-                        const ws = data.workspaces.find(
-                          (w) => w.id === c.workspaceId,
-                        );
-                        return (
-                          <div
-                            key={c.id}
-                            className="flex items-center justify-between bg-surface border border-border rounded-lg p-2.5"
-                          >
-                            <div className="flex items-center gap-3 overflow-hidden">
-                              <span className="text-lg shrink-0">{c.icon}</span>
-                              <div className="flex flex-col truncate">
-                                <span className="text-sm font-medium text-text-primary truncate">
-                                  {c.name}
-                                </span>
-                                <span className="text-[10px] text-text-muted truncate">
-                                  in {ws?.name || "Unknown"}
-                                </span>
-                              </div>
+                  <div className="space-y-6">
+                    {data.workspaces.map((w) => {
+                      const wsCollections = data.collections.filter((c) => c.workspaceId === w.id);
+                      return (
+                        <div key={w.id} className="flex flex-col gap-3">
+                          {/* Workspace Row */}
+                          <div className="flex items-center justify-between bg-surface border border-border rounded-xl p-3 shadow-sm min-h-[3.5rem]">
+                            <div className="flex items-center gap-3">
+                              <span className="text-xl">{w.icon}</span>
+                              <span className="text-base font-bold text-text-primary">
+                                {w.name}
+                              </span>
                             </div>
-                            <div className="flex items-center gap-1 shrink-0">
+                            <div className="flex items-center gap-1.5">
                               <button
                                 onClick={async () => {
-                                  const newName = await appPrompt(
-                                    "Update Folder Name:",
-                                    c.name,
-                                  );
-                                  if (newName === null) return;
-                                  const newIcon = await appPrompt(
-                                    "Update Folder Icon:",
-                                    c.icon,
-                                  );
-                                  updateCollection(c.id, {
-                                    name: newName || c.name,
-                                    icon: newIcon || c.icon,
-                                  });
-                                  if (data.settings.driveBackup?.enabled && accessToken) {
-                                    const newData = {
-                                      ...data,
-                                      collections: data.collections.map((col) =>
-                                        col.id === c.id
-                                          ? {
-                                              ...col,
-                                              name: newName || c.name,
-                                              icon: newIcon || c.icon,
-                                            }
-                                          : col
-                                      ),
-                                    };
-                                    uploadToDrive(
-                                      accessToken,
-                                      newData,
-                                      data.settings.driveBackup.fileId
-                                    ).catch(console.error);
+                                  const name = await appPrompt(`New Folder inside ${w.name}:`);
+                                  if (name) {
+                                    const icon = await appPrompt("New Folder Icon/Emoji:", "📁");
+                                    const newCol = addCollection(w.id, name, icon || "📁");
+                                    if (data.settings.driveBackup?.enabled && accessToken) {
+                                      const newData = { ...data, collections: [...data.collections, newCol] };
+                                      uploadToDrive(accessToken, newData, data.settings.driveBackup.fileId).catch(console.error);
+                                    }
                                   }
                                 }}
-                                className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-active rounded transition-colors"
-                                title="Edit Folder"
+                                className="p-1.5 text-text-muted hover:text-accent hover:bg-surface-active rounded transition-colors"
+                                title="Add Folder"
                               >
-                                <span className="text-xs font-medium">
-                                  Edit
-                                </span>
+                                <FolderPlus size={18} />
                               </button>
                               <button
                                 onClick={async () => {
-                                  if (
-                                    await appConfirm(
-                                      `Are you sure you want to completely delete the folder "${c.name}" and ALL its notes? This cannot be undone.`
-                                    )
-                                  ) {
-                                    deleteCollection(c.id);
+                                  const newName = await appPrompt("Update Holder Name:", w.name);
+                                  if (newName === null) return;
+                                  const newIcon = await appPrompt("Update Holder Icon:", w.icon);
+                                  updateWorkspace(w.id, { name: newName || w.name, icon: newIcon || w.icon });
+                                  if (data.settings.driveBackup?.enabled && accessToken) {
+                                    const newData = {
+                                      ...data,
+                                      workspaces: data.workspaces.map((ws) =>
+                                        ws.id === w.id ? { ...ws, name: newName || w.name, icon: newIcon || w.icon } : ws
+                                      ),
+                                    };
+                                    uploadToDrive(accessToken, newData, data.settings.driveBackup.fileId).catch(console.error);
+                                  }
+                                }}
+                                className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-active rounded transition-colors"
+                                title="Edit Holder"
+                              >
+                                <Code size={16} className="hidden" />
+                                <span className="text-xs font-medium">Edit</span>
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  if (await appConfirm(`Are you sure you want to completely delete the holder "${w.name}" and ALL its folders and notes? This cannot be undone.`)) {
+                                    deleteWorkspace(w.id);
                                     if (data.settings.driveBackup?.enabled && accessToken) {
                                       const newData = {
                                         ...data,
-                                        collections: data.collections.filter(
-                                          (col) => col.id !== c.id
-                                        ),
-                                        notes: data.notes.filter(
-                                          (n) => n.collectionId !== c.id
-                                        ),
+                                        workspaces: data.workspaces.filter((ws) => ws.id !== w.id),
+                                        collections: data.collections.filter((c) => c.workspaceId !== w.id),
+                                        notes: data.notes.filter((n) => n.workspaceId !== w.id),
                                       };
-                                      uploadToDrive(
-                                        accessToken,
-                                        newData,
-                                        data.settings.driveBackup.fileId
-                                      ).catch(console.error);
+                                      uploadToDrive(accessToken, newData, data.settings.driveBackup.fileId).catch(console.error);
                                     }
                                   }
                                 }}
                                 className="p-1.5 text-text-muted hover:text-red-500 hover:bg-red-500/10 rounded transition-colors"
-                                title="Delete Folder"
+                                title="Delete Holder"
                               >
-                                <Trash2 size={14} />
+                                <Trash2 size={16} />
                               </button>
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
+
+                          {/* Collections list for this Workspace */}
+                          {wsCollections.length > 0 && (
+                            <div className="flex flex-col gap-2 pl-4 md:pl-6 ml-4 border-l-2 border-border/50">
+                              {wsCollections.map((c) => (
+                                <div
+                                  key={c.id}
+                                  className="flex items-center justify-between bg-surface border border-border rounded-lg p-2.5 hover:border-accent/30 transition-colors"
+                                >
+                                  <div className="flex items-center gap-3 overflow-hidden">
+                                    <span className="text-lg shrink-0">{c.icon}</span>
+                                    <span className="text-sm font-medium text-text-primary truncate">
+                                      {c.name}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <button
+                                      onClick={async () => {
+                                        const newName = await appPrompt("Update Folder Name:", c.name);
+                                        if (newName === null) return;
+                                        const newIcon = await appPrompt("Update Folder Icon:", c.icon);
+                                        updateCollection(c.id, { name: newName || c.name, icon: newIcon || c.icon });
+                                        if (data.settings.driveBackup?.enabled && accessToken) {
+                                          const newData = {
+                                            ...data,
+                                            collections: data.collections.map((col) =>
+                                              col.id === c.id ? { ...col, name: newName || c.name, icon: newIcon || c.icon } : col
+                                            ),
+                                          };
+                                          uploadToDrive(accessToken, newData, data.settings.driveBackup.fileId).catch(console.error);
+                                        }
+                                      }}
+                                      className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-active rounded transition-colors"
+                                      title="Edit Folder"
+                                    >
+                                      <span className="text-xs font-medium">Edit</span>
+                                    </button>
+                                    <button
+                                      onClick={async () => {
+                                        if (await appConfirm(`Are you sure you want to completely delete the folder "${c.name}" and ALL its notes? This cannot be undone.`)) {
+                                          deleteCollection(c.id);
+                                          if (data.settings.driveBackup?.enabled && accessToken) {
+                                            const newData = {
+                                              ...data,
+                                              collections: data.collections.filter((col) => col.id !== c.id),
+                                              notes: data.notes.filter((n) => n.collectionId !== c.id),
+                                            };
+                                            uploadToDrive(accessToken, newData, data.settings.driveBackup.fileId).catch(console.error);
+                                          }
+                                        }
+                                      }}
+                                      className="p-1.5 text-text-muted hover:text-red-500 hover:bg-red-500/10 rounded transition-colors"
+                                      title="Delete Folder"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
