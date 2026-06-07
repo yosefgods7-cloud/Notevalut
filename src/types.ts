@@ -195,6 +195,10 @@ export interface Settings {
   toolbarItems?: string[];
   driveBackup?: DriveBackupSettings;
   lastCloudSyncDate?: string;
+  navBarSize?: "small" | "medium" | "large" | "xlarge";
+  toolbarSize?: "small" | "medium" | "large" | "xlarge";
+  floatBtnSize?: "small" | "medium" | "large" | "xlarge";
+  systemBarSize?: "small" | "medium" | "large" | "xlarge";
   customColors?: Record<string, string>;
   highlightColor?: string;
   defaultCallout?: string;
@@ -252,6 +256,10 @@ export const DEFAULT_SETTINGS: Settings = {
   fontSize: "medium",
   defaultWorkspace: "",
   smartPaste: true,
+  navBarSize: "medium",
+  toolbarSize: "medium",
+  floatBtnSize: "medium",
+  systemBarSize: "medium",
   customColors: {},
   highlightColor: "#facc15", // yellow-400
   defaultCallout: "NOTE",

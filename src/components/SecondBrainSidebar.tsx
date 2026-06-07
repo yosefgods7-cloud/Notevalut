@@ -89,12 +89,13 @@ export const SecondBrainSidebar: React.FC = () => {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "fixed bottom-6 right-6 w-14 h-14 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.15)] flex items-center justify-center z-50 transition-all hover:scale-105 active:scale-95 no-print border",
+          "fixed bottom-6 right-6 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.15)] flex items-center justify-center z-50 transition-all hover:scale-105 active:scale-95 no-print border",
           isOpen ? "bg-surface text-text-primary border-border" : "bg-gradient-to-r from-blue-600 to-purple-600 text-white border-transparent"
         )}
+        style={{ width: "var(--float-btn-size, 3.5rem)", height: "var(--float-btn-size, 3.5rem)" }}
         title="AI Second Brain"
       >
-        {isOpen ? <X size={24} /> : <Sparkles size={24} />}
+        {isOpen ? <X style={{ width: "var(--float-icon-size, 1.5rem)", height: "var(--float-icon-size, 1.5rem)" }} /> : <Sparkles style={{ width: "var(--float-icon-size, 1.5rem)", height: "var(--float-icon-size, 1.5rem)" }} />}
       </button>
 
       <AnimatePresence>

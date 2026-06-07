@@ -2589,12 +2589,15 @@ const ToolbarButton: React.FC<{
     disabled={disabled}
     title={title}
     className={cn(
-      "p-1.5 rounded-md transition-colors disabled:opacity-30 disabled:pointer-events-none",
+      "rounded-md transition-colors disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center",
       active
         ? "bg-accent/20 text-accent"
         : "text-text-secondary hover:bg-surface-active hover:text-text-primary",
     )}
+    style={{ width: "var(--toolbar-size, 2rem)", height: "var(--toolbar-size, 2rem)" }}
   >
-    {icon}
+    <div style={{ width: "var(--toolbar-icon-size, 1rem)", height: "var(--toolbar-icon-size, 1rem)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+       {React.isValidElement(icon) ? React.cloneElement(icon, { size: "100%", width: "100%", height: "100%" } as any) : icon}
+    </div>
   </button>
 );

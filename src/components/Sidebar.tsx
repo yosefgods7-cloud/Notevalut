@@ -212,10 +212,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <div className="w-60 bg-surface/90 backdrop-blur-md flex flex-col h-full shrink-0">
       {/* Top Menu Dropdown */}
-      <div className="p-3 border-b border-border flex items-center justify-between">
+      <div 
+         className="px-3 border-b border-border flex items-center justify-between"
+         style={{ height: "var(--system-bar-size, 3rem)" }}
+      >
         <button 
           onClick={() => setIsMenuOpen(!isMenuOpen)}
-          className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-hover text-text-primary font-medium w-full relative"
+          className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-hover text-text-primary font-medium w-full relative h-full"
         >
           <Menu size={18} />
           <span>Menu</span>
@@ -439,8 +442,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Persistent Bottom Settings Toggle */}
       <div className="p-3 border-t border-border mt-auto">
-        <button onClick={onOpenSettings} className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary transition-colors font-medium">
-          <SettingsIcon size={16} />
+        <button 
+          onClick={onOpenSettings} 
+          className="w-full flex items-center gap-3 px-3 rounded-md text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary transition-all font-medium"
+          style={{ height: "var(--nav-bar-size, 3rem)" }}
+        >
+          <SettingsIcon style={{ width: "var(--nav-icon-size, 16px)", height: "var(--nav-icon-size, 16px)" }} />
           <span>Settings</span>
         </button>
       </div>

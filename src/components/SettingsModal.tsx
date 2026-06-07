@@ -657,6 +657,94 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <option value="ultralarge">Ultra Large</option>
                     </select>
                   </div>
+
+                  <div className="flex flex-col bg-surface border border-border p-3 rounded-xl hover:border-accent transition-colors gap-2">
+                    <div className="flex justify-between items-center">
+                       <span className="text-sm">Navigation Bar Size</span>
+                       <span className="text-xs text-text-secondary capitalize">{localSettings.navBarSize === 'xlarge' ? 'Extra Large' : localSettings.navBarSize || 'medium'}</span>
+                    </div>
+                    <input 
+                      type="range" 
+                      min="0" max="3" step="1" 
+                      value={["small", "medium", "large", "xlarge"].indexOf(localSettings.navBarSize || "medium")}
+                      onChange={(e) => {
+                        const val = ["small", "medium", "large", "xlarge"][parseInt(e.target.value)];
+                        const newSettings = { ...localSettings, navBarSize: val as any };
+                        setLocalSettings(newSettings);
+                        updateSettings(newSettings);
+                      }}
+                      className="w-full accent-accent"
+                    />
+                    <div className="flex justify-between text-[10px] text-text-muted px-1">
+                      <span>S</span><span>M</span><span>L</span><span>XL</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col bg-surface border border-border p-3 rounded-xl hover:border-accent transition-colors gap-2">
+                    <div className="flex justify-between items-center">
+                       <span className="text-sm">Toolbar Bar Size</span>
+                       <span className="text-xs text-text-secondary capitalize">{localSettings.toolbarSize === 'xlarge' ? 'Extra Large' : localSettings.toolbarSize || 'medium'}</span>
+                    </div>
+                    <input 
+                      type="range" 
+                      min="0" max="3" step="1" 
+                      value={["small", "medium", "large", "xlarge"].indexOf(localSettings.toolbarSize || "medium")}
+                      onChange={(e) => {
+                        const val = ["small", "medium", "large", "xlarge"][parseInt(e.target.value)];
+                        const newSettings = { ...localSettings, toolbarSize: val as any };
+                        setLocalSettings(newSettings);
+                        updateSettings(newSettings);
+                      }}
+                      className="w-full accent-accent"
+                    />
+                    <div className="flex justify-between text-[10px] text-text-muted px-1">
+                      <span>S</span><span>M</span><span>L</span><span>XL</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col bg-surface border border-border p-3 rounded-xl hover:border-accent transition-colors gap-2">
+                    <div className="flex justify-between items-center">
+                       <span className="text-sm">Float Buttons Size</span>
+                       <span className="text-xs text-text-secondary capitalize">{localSettings.floatBtnSize === 'xlarge' ? 'Extra Large' : localSettings.floatBtnSize || 'medium'}</span>
+                    </div>
+                    <input 
+                      type="range" 
+                      min="0" max="3" step="1" 
+                      value={["small", "medium", "large", "xlarge"].indexOf(localSettings.floatBtnSize || "medium")}
+                      onChange={(e) => {
+                        const val = ["small", "medium", "large", "xlarge"][parseInt(e.target.value)];
+                        const newSettings = { ...localSettings, floatBtnSize: val as any };
+                        setLocalSettings(newSettings);
+                        updateSettings(newSettings);
+                      }}
+                      className="w-full accent-accent"
+                    />
+                    <div className="flex justify-between text-[10px] text-text-muted px-1">
+                      <span>S</span><span>M</span><span>L</span><span>XL</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col bg-surface border border-border p-3 rounded-xl hover:border-accent transition-colors gap-2">
+                    <div className="flex justify-between items-center">
+                       <span className="text-sm">System Bars Size</span>
+                       <span className="text-xs text-text-secondary capitalize">{localSettings.systemBarSize === 'xlarge' ? 'Extra Large' : localSettings.systemBarSize || 'medium'}</span>
+                    </div>
+                    <input 
+                      type="range" 
+                      min="0" max="3" step="1" 
+                      value={["small", "medium", "large", "xlarge"].indexOf(localSettings.systemBarSize || "medium")}
+                      onChange={(e) => {
+                        const val = ["small", "medium", "large", "xlarge"][parseInt(e.target.value)];
+                        const newSettings = { ...localSettings, systemBarSize: val as any };
+                        setLocalSettings(newSettings);
+                        updateSettings(newSettings);
+                      }}
+                      className="w-full accent-accent"
+                    />
+                    <div className="flex justify-between text-[10px] text-text-muted px-1">
+                      <span>S</span><span>M</span><span>L</span><span>XL</span>
+                    </div>
+                  </div>
                   
                   {/* Custom Colors */}
                   <div className="border border-border rounded-xl p-4 mt-6 bg-surface">

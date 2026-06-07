@@ -191,7 +191,36 @@ export const MainLayout: React.FC = () => {
         }
       });
     }
-  }, [data.settings.theme, data.settings.customColors]);
+
+    // Apply specific sizing settings
+    const navSizeMap = { small: "2.5rem", medium: "3.5rem", large: "4rem", xlarge: "5rem" };
+    const navIconMap = { small: "1.25rem", medium: "1.5rem", large: "1.75rem", xlarge: "2rem" };
+    
+    const toolbarSizeMap = { small: "2rem", medium: "2.5rem", large: "3rem", xlarge: "3.5rem" };
+    const toolbarIconMap = { small: "1rem", medium: "1.1rem", large: "1.25rem", xlarge: "1.5rem" };
+
+    const floatSizeMap = { small: "2.5rem", medium: "3.5rem", large: "4.5rem", xlarge: "5.5rem" };
+    const floatIconMap = { small: "1.25rem", medium: "1.5rem", large: "1.75rem", xlarge: "2.25rem" };
+
+    const systemSizeMap = { small: "2.5rem", medium: "3rem", large: "3.5rem", xlarge: "4.5rem" };
+
+    const navBase = data.settings.navBarSize || "medium";
+    const toolbarBase = data.settings.toolbarSize || "medium";
+    const floatBase = data.settings.floatBtnSize || "medium";
+    const systemBase = data.settings.systemBarSize || "medium";
+
+    root.style.setProperty("--nav-bar-size", navSizeMap[navBase as keyof typeof navSizeMap]);
+    root.style.setProperty("--nav-icon-size", navIconMap[navBase as keyof typeof navIconMap]);
+
+    root.style.setProperty("--toolbar-size", toolbarSizeMap[toolbarBase as keyof typeof toolbarSizeMap]);
+    root.style.setProperty("--toolbar-icon-size", toolbarIconMap[toolbarBase as keyof typeof toolbarIconMap]);
+
+    root.style.setProperty("--float-btn-size", floatSizeMap[floatBase as keyof typeof floatSizeMap]);
+    root.style.setProperty("--float-icon-size", floatIconMap[floatBase as keyof typeof floatIconMap]);
+
+    root.style.setProperty("--system-bar-size", systemSizeMap[systemBase as keyof typeof systemSizeMap]);
+
+  }, [data.settings.theme, data.settings.customColors, data.settings.navBarSize, data.settings.toolbarSize, data.settings.floatBtnSize, data.settings.systemBarSize]);
 
   // Set initial collection if none selected but workspace has collections
   useEffect(() => {
@@ -337,7 +366,10 @@ export const MainLayout: React.FC = () => {
 
       <div className={cn("flex-1 flex flex-col min-w-0 h-full relative transition-[padding] duration-300", isFocusMode ? "pl-0" : "pl-20")}>
         {!isFocusMode && openTabs.length > 0 && (
-          <div className="flex items-center w-full overflow-x-auto bg-surface border-b border-border h-12 no-print px-2 select-none shrink-0 no-scrollbar relative z-10 shadow-sm border-t">
+          <div 
+             className="flex items-center w-full overflow-x-auto bg-surface border-b border-border no-print px-2 select-none shrink-0 no-scrollbar relative z-10 shadow-sm border-t"
+             style={{ height: "var(--system-bar-size, 3rem)" }}
+          >
             <button
               onClick={() => {
                 const currentIndex = openTabs.indexOf(activeNoteId || "");
@@ -707,13 +739,13 @@ export const MainLayout: React.FC = () => {
             setActiveNoteId(newNote.id);
           }
         }}
-        className="fixed bottom-[8.5rem] right-8 w-14 h-14 bg-accent hover:bg-accent-hover text-white rounded-full shadow-[0_8px_30px_rgba(124,106,247,0.3)] flex items-center justify-center z-40 transition-transform hover:scale-105 active:scale-95 no-print"
+        className="fixed bottom-[8.5rem] right-8 bg-accent hover:bg-accent-hover text-white rounded-full shadow-[0_8px_30px_rgba(124,106,247,0.3)] flex items-center justify-center z-40 transition-transform hover:scale-105 active:scale-95 no-print"
+        style={{ width: "var(--float-btn-size, 3.5rem)", height: "var(--float-btn-size, 3.5rem)" }}
         title="Quick Capture"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          width="24"
-          height="24"
+          style={{ width: "var(--float-icon-size, 1.5rem)", height: "var(--float-icon-size, 1.5rem)" }}
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
