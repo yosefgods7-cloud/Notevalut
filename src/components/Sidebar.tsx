@@ -19,6 +19,7 @@ interface SidebarProps {
   onToggleReviews: () => void;
   isReviewsActive: boolean;
   onOpenTagManager: () => void;
+  onAddNote?: (workspaceId: string, collectionId: string) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -27,7 +28,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenExport, onOpenImport, onOpenSettings,
   onToggleBrainMap, isBrainMapActive,
   onToggleReviews, isReviewsActive,
-  onOpenTagManager
+  onOpenTagManager,
+  onAddNote,
 }) => {
   const { data, saveData, addCollection, updateCollection, deleteCollection, addWorkspace, updateWorkspace, deleteWorkspace, undo, canUndo } = useStorage();
   const { accessToken } = useAuth();
@@ -36,6 +38,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [editingWorkspace, setEditingWorkspace] = useState<string | null>(null);
   const [editingCollection, setEditingCollection] = useState<string | null>(null);
   const [expandedWorkspaces, setExpandedWorkspaces] = useState<string[]>([activeWorkspaceId]);
+
+  const [contextMenu, setContextMenu] = useState<{ type: 'workspace' | 'collection', id: string, x: number, y: number } | null>(null);
+
+  React.useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    window.addEventListener('click', handleClick);
+    return () => window.removeEventListener('click', handleClick);
+  }, []);
+
+  const handleContextMenu = (e: React.MouseEvent, type: 'workspace' | 'collection', id: string) => {
+    e.preventDefault();
+    setContextMenu({ type, id, x: e.clientX, y: e.clientY });
+  };
 
   const toggleWorkspace = (id: string) => {
     setExpandedWorkspaces(prev => 
@@ -322,6 +337,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               return (
                 <div key={w.id} className="flex flex-col group/ws relative">
                   <button
+                    onContextMenu={(e) => handleContextMenu(e, 'workspace', w.id)}
                     onClick={() => {
                         toggleWorkspace(w.id);
                         setActiveWorkspaceId(w.id);
@@ -370,6 +386,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       {wsCollections.map(c => (
                         <div key={c.id} className="flex flex-col group relative">
                           <button
+                            onContextMenu={(e) => handleContextMenu(e, 'collection', c.id)}
                             onClick={() => {
                                 setActiveWorkspaceId(w.id);
                                 setActiveCollectionId(c.id);
@@ -451,6 +468,82 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <span>Settings</span>
         </button>
       </div>
+
+      {contextMenu && (
+        <div
+          className="fixed bg-surface border border-border rounded-md shadow-xl z-50 py-1 min-w-[160px]"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {contextMenu.type === 'workspace' && (
+            <>
+              <button
+                className="w-full text-left px-3 py-1.5 text-sm hover:bg-surface-hover flex items-center gap-2"
+                onClick={(e) => {
+                  setContextMenu(null);
+                  handleCreateCollection(e, contextMenu.id);
+                }}
+              >
+                <Folder size={14} /> New Folder
+              </button>
+              <div className="h-px bg-border my-1"></div>
+              <button
+                className="w-full text-left px-3 py-1.5 text-sm hover:bg-surface-hover flex items-center gap-2"
+                onClick={(e) => {
+                  setContextMenu(null);
+                  handleEditWorkspace(e, contextMenu.id);
+                }}
+              >
+                <Pencil size={14} /> Rename
+              </button>
+              <button
+                className="w-full text-left px-3 py-1.5 text-sm hover:bg-red-500/10 text-red-500 flex items-center gap-2"
+                onClick={(e) => {
+                  setContextMenu(null);
+                  handleDeleteWorkspace(e, contextMenu.id);
+                }}
+              >
+                <Trash2 size={14} /> Delete
+              </button>
+            </>
+          )}
+          {contextMenu.type === 'collection' && (
+            <>
+              <button
+                className="w-full text-left px-3 py-1.5 text-sm hover:bg-surface-hover flex items-center gap-2"
+                onClick={(e) => {
+                  setContextMenu(null);
+                  if (onAddNote) {
+                    const c = data.collections.find(c => c.id === contextMenu.id);
+                    if (c) onAddNote(c.workspaceId, c.id);
+                  }
+                }}
+              >
+                <Plus size={14} /> New Note
+              </button>
+              <div className="h-px bg-border my-1"></div>
+              <button
+                className="w-full text-left px-3 py-1.5 text-sm hover:bg-surface-hover flex items-center gap-2"
+                onClick={(e) => {
+                  setContextMenu(null);
+                  handleEditCollection(e, contextMenu.id);
+                }}
+              >
+                <Pencil size={14} /> Rename
+              </button>
+              <button
+                className="w-full text-left px-3 py-1.5 text-sm hover:bg-red-500/10 text-red-500 flex items-center gap-2"
+                onClick={(e) => {
+                  setContextMenu(null);
+                  handleDeleteCollection(e, contextMenu.id);
+                }}
+              >
+                <Trash2 size={14} /> Delete
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
     </div>
   );

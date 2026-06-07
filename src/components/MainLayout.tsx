@@ -345,6 +345,12 @@ export const MainLayout: React.FC = () => {
             setActiveNoteId("review_notes");
           }}
           isReviewsActive={activeNoteId === "review_notes"}
+          onAddNote={(workspaceId, collectionId) => {
+            const newNote = addNote(workspaceId, collectionId);
+            setOpenTabs((prev) => [...prev, newNote.id]);
+            setActiveNoteId(newNote.id);
+            if (window.innerWidth < 768) setIsSidebarOpen(false);
+          }}
         />
 
         {activeCollectionId ? (
