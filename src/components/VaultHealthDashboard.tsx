@@ -4,7 +4,7 @@ import { useAI, getSelectedApiKey } from "../hooks/useAI";
 import { Activity, RefreshCw, Trash2, Database, AlertCircle, CheckCircle2 } from "lucide-react";
 
 export const VaultHealthDashboard: React.FC = () => {
-  const { data, updateNote } = useStorage();
+  const { data, updateNote, deleteNotes } = useStorage();
   const { generateEmbeddingForNote } = useAI();
   const [dbStatus, setDbStatus] = useState<"checking" | "ok" | "error">("checking");
   const [dbErrorMsg, setDbErrorMsg] = useState("");
@@ -14,11 +14,37 @@ export const VaultHealthDashboard: React.FC = () => {
 
   const [cacheSize, setCacheSize] = useState<string>("Calculating...");
   const [isClearingCache, setIsClearingCache] = useState(false);
+  const [ramUsage, setRamUsage] = useState<string>("Calculating...");
+  const [isClearingTrash, setIsClearingTrash] = useState(false);
 
   useEffect(() => {
     checkDBIntegrity();
     calculateImageCacheSize();
+    calculateRamUsage();
+    
+    // Refresh RAM usage every 5 seconds
+    const interval = setInterval(calculateRamUsage, 5000);
+    return () => clearInterval(interval);
   }, [data.notes]);
+
+  const calculateRamUsage = () => {
+    try {
+      // Estimate size of standard vault data
+      const dataStr = JSON.stringify(data);
+      const dataMb = dataStr.length / (1024 * 1024);
+      
+      // If browser supports real heap metrics
+      let browserMemory = "";
+      if (performance && (performance as any).memory) {
+        const jsHeap = (performance as any).memory.usedJSHeapSize / (1024 * 1024);
+        browserMemory = ` (V8 Heap: ${jsHeap.toFixed(2)} MB)`;
+      }
+
+      setRamUsage(`Vault Data: ${dataMb.toFixed(2)} MB${browserMemory}`);
+    } catch(e) {
+      setRamUsage("Unknown");
+    }
+  };
 
   const checkDBIntegrity = async () => {
     setDbStatus("checking");
@@ -108,11 +134,52 @@ export const VaultHealthDashboard: React.FC = () => {
     alert("Re-indexing complete.");
   };
 
+  const emptyTrash = () => {
+    if (!window.confirm("Are you sure you want to permanently delete all items in the Trash? This frees up RAM and storage immediately.")) return;
+    setIsClearingTrash(true);
+    
+    const trashIds = data.notes.filter(n => n.isDeleted).map(n => n.id);
+    if (trashIds.length > 0) {
+      deleteNotes(trashIds);
+    }
+
+    setTimeout(() => {
+      setIsClearingTrash(false);
+      alert(`Permanently deleted ${trashIds.length} trashed notes to free up RAM.`);
+      calculateRamUsage();
+      calculateImageCacheSize();
+    }, 500);
+  };
+
   return (
     <div className="space-y-5">
       <h3 className="text-lg font-bold flex items-center gap-2 mb-4">
         <Activity className="text-emerald-500" /> Vault Health
       </h3>
+
+      {/* RAM & Memory Usage */}
+      <div className="bg-surface border border-border p-4 rounded-xl">
+        <h4 className="text-sm font-semibold flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+             <Activity size={16} /> RAM & Memory Usage
+          </div>
+          <span className="font-normal text-xs bg-background px-2 py-1 rounded border border-border">
+            {ramUsage}
+          </span>
+        </h4>
+        <p className="text-xs text-text-muted mb-4">
+          Real-time measurement of memory consumed by Notevault. Lower usage ensures smooth performance across devices.
+        </p>
+        <div className="flex gap-2">
+            <button
+              onClick={emptyTrash}
+              disabled={isClearingTrash}
+              className="bg-red-500/10 text-red-500 hover:bg-red-500/20 disabled:opacity-50 text-xs px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
+            >
+              <Trash2 size={14} /> Purge Trash Memory
+            </button>
+        </div>
+      </div>
 
       {/* IndexedDB Integrity */}
       <div className="bg-surface border border-border p-4 rounded-xl">
