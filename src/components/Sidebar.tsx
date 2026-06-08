@@ -40,6 +40,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [editingWorkspace, setEditingWorkspace] = useState<string | null>(null);
   const [editingCollection, setEditingCollection] = useState<string | null>(null);
   const [expandedWorkspaces, setExpandedWorkspaces] = useState<string[]>([activeWorkspaceId]);
+  const [isTagsExpanded, setIsTagsExpanded] = useState(false);
 
   const [contextMenu, setContextMenu] = useState<{ type: 'workspace' | 'collection', id: string, x: number, y: number } | null>(null);
 
@@ -470,20 +471,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
         
         {data.tags.length > 0 && (
           <div className="mb-6">
-            <div className="flex items-center px-2 mb-2 text-xs font-semibold text-text-muted uppercase tracking-wider">
+            <button 
+                onClick={() => setIsTagsExpanded(!isTagsExpanded)}
+                className="w-full flex items-center justify-between px-2 mb-2 text-xs font-semibold text-text-muted hover:text-text-primary uppercase tracking-wider transition-colors cursor-pointer"
+            >
               <span>Tags</span>
-            </div>
-            <div className="space-y-0.5">
-              {data.tags.map(tag => (
-                <button
-                  key={tag}
-                  className="w-full flex items-center gap-3 px-3 py-1.5 rounded-md text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary transition-colors"
-                >
-                  <Tag size={14} className="opacity-70" />
-                  <span className="truncate">{tag}</span>
-                </button>
-              ))}
-            </div>
+              <span className="shrink-0 p-0.5">
+                {isTagsExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              </span>
+            </button>
+            {isTagsExpanded && (
+              <div className="space-y-0.5">
+                {data.tags.map(tag => (
+                  <button
+                    key={tag}
+                    className="w-full flex items-center gap-3 px-3 py-1.5 rounded-md text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary transition-colors"
+                  >
+                    <Tag size={14} className="opacity-70" />
+                    <span className="truncate">{tag}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
