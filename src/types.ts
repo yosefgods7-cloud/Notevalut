@@ -182,6 +182,7 @@ export interface Settings {
   fontSize: "small" | "medium" | "large" | "ultralarge";
   defaultWorkspace: string;
   smartPaste: boolean;
+  spellCheckEnabled?: boolean;
   geminiApiKey?: string; // Legacy/fallback
   apiKeys?: ExternalApiKey[];
   featureApiConfigs?: {

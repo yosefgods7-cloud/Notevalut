@@ -26,6 +26,8 @@ import { CalloutBlockquote } from "../lib/CalloutExtension";
 import { FoldableBlock } from "../lib/FoldableExtension";
 import { FontSize } from "../lib/FontSize";
 import { WikiLink } from "../lib/WikiLink";
+import { SpellCheckExtension, SpellCheckPluginKey, setSpellCheckEnabled } from "../lib/SpellCheckExtension";
+import { loadSpellchecker, unloadSpellchecker, getSuggestions, addWordToDictionary } from "../lib/dictionary";
 import { cleanAIPaste } from "../lib/paste-cleaner";
 import { getSelectedApiKey } from "../hooks/useAI";
 import { NoteHistoryModal } from "./NoteHistoryModal";
@@ -246,6 +248,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const pdfContainerRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [spellCheckPopup, setSpellCheckPopup] = useState<{ x: number, y: number, word: string, suggestions: string[], pos: number } | null>(null);
   const [isDictating, setIsDictating] = useState(false);
   const [isSmartSearchOpen, setIsSmartSearchOpen] = useState(false);
   const recognitionRef = useRef<any>(null);
@@ -713,6 +716,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
       WikiLink,
       CalloutBlockquote,
       FoldableBlock,
+      SpellCheckExtension,
       Placeholder.configure({
         placeholder: "Start writing or paste AI text...",
       }),
@@ -720,8 +724,41 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
     content: "",
     editable: isEditing && !note?.isDeleted,
     editorProps: {
+      handleDOMEvents: {
+        contextmenu: (view, event) => {
+          const target = event.target as HTMLElement;
+          if (target && target.classList.contains('spell-error')) {
+            event.preventDefault();
+            const word = target.getAttribute('data-word');
+            if (word) {
+              addWordToDictionary(word).then(() => {
+                editor?.view.dispatch(editor.state.tr.setMeta(SpellCheckPluginKey, 'force-update'));
+              });
+            }
+            return true;
+          }
+          return false;
+        }
+      },
       handleClick: (view, pos, event) => {
         const target = event.target as HTMLElement;
+        if (target && target.classList.contains('spell-error')) {
+           const word = target.getAttribute('data-word');
+           if (word) {
+              const suggestions = getSuggestions(word);
+              setSpellCheckPopup({
+                 x: event.clientX,
+                 y: event.clientY,
+                 word,
+                 suggestions,
+                 pos
+              });
+           }
+           // Do not prevent default so cursor still moves
+        } else {
+           setSpellCheckPopup(null);
+        }
+
         const wikiLinkNode = target.closest('[data-wiki-link="true"]');
         if (wikiLinkNode) {
           const targetNoteText =
@@ -817,6 +854,28 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
       }
     },
   });
+
+  useEffect(() => {
+    let mounted = true;
+    if (data.settings.spellCheckEnabled !== false) {
+       setSpellCheckEnabled(true);
+       loadSpellchecker().then(() => {
+         if (mounted && editor) {
+            editor.view.dispatch(editor.state.tr.setMeta(SpellCheckPluginKey, 'force-update'));
+         }
+       }).catch(console.error);
+    } else {
+       setSpellCheckEnabled(false);
+       if (editor) {
+         editor.view.dispatch(editor.state.tr.setMeta(SpellCheckPluginKey, 'force-update'));
+       }
+    }
+    
+    return () => {
+      mounted = false;
+      unloadSpellchecker();
+    };
+  }, [editor, data.settings.spellCheckEnabled]);
 
   useEffect(() => {
     // Only init if supported
@@ -1657,6 +1716,74 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
           >
             {isEditing && <TableControls editor={editor} />}
             <EditorContent editor={editor} className="min-h-[400px]" />
+            
+            {spellCheckPopup && (
+              <>
+                <div className="fixed inset-0 z-[90]" onClick={() => setSpellCheckPopup(null)} onContextMenu={(e) => { e.preventDefault(); setSpellCheckPopup(null); }} />
+                <div 
+                  className="fixed z-[100] bg-surface border border-border shadow-xl rounded-lg py-1 w-48 text-sm flex flex-col overflow-hidden"
+                  style={{ top: spellCheckPopup.y + 10, left: spellCheckPopup.x }}
+                >
+                  <div className="px-3 py-1 text-xs text-text-muted font-bold break-words">{spellCheckPopup.word}</div>
+                  {spellCheckPopup.suggestions.length > 0 ? (
+                    spellCheckPopup.suggestions.map(s => (
+                       <button
+                         key={s}
+                         className="w-full text-left px-3 py-1.5 hover:bg-surface-hover text-accent font-medium transition-colors"
+                         onClick={() => {
+                            if (!editor) return;
+                            const { state, view } = editor;
+                            const $pos = state.doc.resolve(spellCheckPopup.pos);
+                            const textNode = $pos.parent;
+                            const textOffset = $pos.parentOffset;
+                            const text = textNode.textContent;
+                            
+                            // Find the word bounds around textOffset
+                            const wordRegex = /([a-zA-Z]+(?:'[a-zA-Z]+)?)/g;
+                            let match;
+                            let replaced = false;
+                            while ((match = wordRegex.exec(text)) !== null) {
+                               const start = match.index;
+                               const end = start + match[0].length;
+                               if (textOffset >= start && textOffset <= end && match[0] === spellCheckPopup.word) {
+                                  const nodeStart = spellCheckPopup.pos - textOffset;
+                                  const replaceStart = nodeStart + start;
+                                  const replaceEnd = nodeStart + end;
+                                  view.dispatch(state.tr.replaceWith(replaceStart, replaceEnd, state.schema.text(s)));
+                                  replaced = true;
+                                  break;
+                               }
+                            }
+                            
+                            // If regex failed due to mismatch, fallback
+                            if (!replaced) {
+                               // simple fallback if textOffset didn't match perfectly
+                            }
+
+                            setSpellCheckPopup(null);
+                         }}
+                       >
+                         {s}
+                       </button>
+                    ))
+                  ) : (
+                    <div className="px-3 py-1 text-text-muted italic">No suggestions</div>
+                  )}
+                  <div className="h-px bg-border my-1" />
+                  <button
+                    className="w-full text-left px-3 py-1.5 hover:bg-surface-hover flex items-center gap-2 transition-colors text-text-primary"
+                    onClick={() => {
+                        addWordToDictionary(spellCheckPopup.word).then(() => {
+                           editor?.view.dispatch(editor.state.tr.setMeta(SpellCheckPluginKey, 'force-update'));
+                           setSpellCheckPopup(null);
+                        });
+                    }}
+                  >
+                    <Plus size={14} /> Add to Dictionary
+                  </button>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Attachments Section */}

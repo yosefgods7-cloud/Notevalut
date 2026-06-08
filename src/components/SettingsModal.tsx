@@ -27,11 +27,13 @@ import {
   Activity,
   Upload,
   FolderPlus,
+  BookText
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { Settings as SettingsType, DEFAULT_SETTINGS } from "../types";
 import { uploadToDrive } from "../lib/drive";
 import { appPrompt, appConfirm } from "./GlobalDialogs";
+import { getPersonalDictionary, addWordToDictionary, removeWordFromDictionary, clearPersonalDictionary } from "../lib/dictionary";
 
 import { AISearchScopeSettings } from "./AISearchScopeSettings";
 
@@ -91,6 +93,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [expandedSection, setExpandedSection] = useState<string | null>(
     "Appearance",
   );
+
+  const [personalDictionary, setPersonalDictionary] = useState<string[]>([]);
+  const [newDictWord, setNewDictWord] = useState("");
+  const [dictSearchTerm, setDictSearchTerm] = useState("");
+
+  useEffect(() => {
+    if (expandedSection === "Dictionary") {
+      getPersonalDictionary().then(setPersonalDictionary).catch(console.error);
+    }
+  }, [expandedSection]);
 
   const toggleSection = (section: string) => {
     setExpandedSection((prev) => (prev === section ? null : section));
@@ -303,6 +315,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 label: "Editor Settings",
                 icon: Code,
                 color: "text-orange-500",
+              },
+              {
+                id: "Dictionary",
+                label: "Dictionary Manager",
+                icon: BookText,
+                color: "text-emerald-500",
               },
               {
                 id: "AI",
@@ -1072,6 +1090,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
                   </label>
 
+                  <label className="flex items-center justify-between cursor-pointer bg-surface border border-border p-3 rounded-xl hover:border-accent transition-colors">
+                    <div>
+                      <div className="text-sm font-medium">Spell Check</div>
+                      <div className="text-xs text-text-muted mt-0.5">
+                        Highlight misspelled words and show suggestions
+                      </div>
+                    </div>
+                    <div className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={localSettings.spellCheckEnabled !== false}
+                        onChange={(e) =>
+                          setLocalSettings((s) => ({
+                            ...s,
+                            spellCheckEnabled: e.target.checked,
+                          }))
+                        }
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-surface-active border border-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2.5px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
+                    </div>
+                  </label>
+
                   <div className="border-t border-border pt-4">
                     <div className="text-sm font-medium mb-1">Highlight Colors</div>
                     <div className="text-xs text-text-muted mb-4">
@@ -1260,8 +1301,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         "bold",
                         "italic",
                         "underline",
+                        "highlight",
                         "link",
                         "blockquote",
+                        "callout",
+                        "foldable",
                         "bulletList",
                         "orderedList",
                         "taskList",
@@ -1290,8 +1334,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             "bold",
                             "italic",
                             "underline",
+                            "highlight",
                             "link",
                             "blockquote",
+                            "callout",
+                            "foldable",
                             "bulletList",
                             "orderedList",
                             "taskList",
@@ -1339,6 +1386,107 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       )}
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Dictionary Manager */}
+            {expandedSection === "Dictionary" && (
+              <div className="space-y-6">
+                <h3 className="text-lg font-bold flex items-center gap-2 mb-4">
+                  <BookText className="text-emerald-500" /> Dictionary Manager
+                </h3>
+                <div className="bg-surface border border-border p-4 rounded-xl">
+                  <p className="text-sm text-text-muted mb-4">
+                    Manage your personal vocabulary. These words will not be flagged as misspellings by the editor spell checker.
+                  </p>
+                  
+                  <div className="flex gap-2 items-center mb-4">
+                    <input
+                      type="text"
+                      className="flex-1 bg-surface-active rounded border border-border p-2 text-sm focus:outline-none focus:border-accent text-text-primary"
+                      placeholder="Add a new custom word..."
+                      value={newDictWord}
+                      onChange={(e) => setNewDictWord(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && newDictWord.trim()) {
+                          addWordToDictionary(newDictWord.trim()).then(() => {
+                             setNewDictWord("");
+                             getPersonalDictionary().then(setPersonalDictionary);
+                          });
+                        }
+                      }}
+                    />
+                    <button
+                      className="bg-accent text-bg px-4 py-2 rounded font-medium text-sm hover:opacity-90 transition-opacity"
+                      disabled={!newDictWord.trim()}
+                      onClick={() => {
+                        addWordToDictionary(newDictWord.trim()).then(() => {
+                           setNewDictWord("");
+                           getPersonalDictionary().then(setPersonalDictionary);
+                        });
+                      }}
+                    >
+                      Add
+                    </button>
+                  </div>
+                  
+                  <div className="mb-4">
+                     <input
+                        type="text"
+                        className="w-full bg-surface rounded border border-border px-3 py-1.5 text-sm focus:outline-none focus:border-accent text-text-primary placeholder:text-text-muted/50"
+                        placeholder="Search your dictionary..."
+                        value={dictSearchTerm}
+                        onChange={(e) => setDictSearchTerm(e.target.value)}
+                     />
+                  </div>
+                  
+                  {personalDictionary.length === 0 ? (
+                    <div className="text-center text-text-muted text-sm py-4 italic">
+                      Your personal dictionary is currently empty.
+                    </div>
+                  ) : (
+                    <div className="max-h-60 overflow-y-auto border border-border rounded-lg bg-surface divide-y divide-border/50">
+                      {personalDictionary
+                        .filter(w => dictSearchTerm ? w.toLowerCase().includes(dictSearchTerm.toLowerCase()) : true)
+                        .map(word => (
+                        <div key={word} className="flex justify-between items-center px-3 py-2 text-sm text-text-primary group">
+                           <span>{word}</span>
+                           <button
+                             className="text-text-muted hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                             onClick={() => {
+                               removeWordFromDictionary(word).then(() => {
+                                  getPersonalDictionary().then(setPersonalDictionary);
+                               });
+                             }}
+                             title="Remove word"
+                           >
+                             <Minus size={14} />
+                           </button>
+                        </div>
+                      ))}
+                      {dictSearchTerm && personalDictionary.filter(w => w.toLowerCase().includes(dictSearchTerm.toLowerCase())).length === 0 && (
+                         <div className="px-3 py-2 text-sm text-text-muted italic">No words match your search.</div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {personalDictionary.length > 0 && (
+                    <div className="mt-4 flex justify-end">
+                      <button
+                        className="text-xs text-red-500 font-medium hover:underline px-2 py-1 transition-colors"
+                        onClick={() => {
+                          if (confirm("Are you sure you want to clear your entire personal dictionary?")) {
+                             clearPersonalDictionary().then(() => {
+                                setPersonalDictionary([]);
+                             });
+                          }
+                        }}
+                      >
+                        Clear Dictionary
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
