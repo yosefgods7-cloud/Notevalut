@@ -137,10 +137,25 @@ export const SmartSearchPanel: React.FC<SmartSearchPanelProps> = ({
 
     const simulation = d3
       .forceSimulation<MiniGraphNode>(nodes)
+      .velocityDecay(0.6)
       .force("link", d3.forceLink<MiniGraphNode, MiniGraphLink>(d3Links).id((d) => d.id).distance(60))
       .force("charge", d3.forceManyBody().strength(-150))
       .force("center", d3.forceCenter(width / 2, height / 2))
-      .force("collide", d3.forceCollide().radius(20));
+      .force("collide", d3.forceCollide().radius(20))
+      .force("orbit", function (alpha) {
+        nodes.forEach((d) => {
+          if (d.fx != null || d.fy != null) return;
+          const dx = (d.x || 0) - (width / 2);
+          const dy = (d.y || 0) - (height / 2);
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist > 0) {
+            d.vx = (d.vx || 0) - (dy / dist) * 0.5 * alpha;
+            d.vy = (d.vy || 0) + (dx / dist) * 0.5 * alpha;
+          }
+        });
+      });
+
+    simulation.alphaTarget(0.02); // Keep moving slowly forever
 
     const g = svg.append("g");
 
@@ -172,7 +187,7 @@ export const SmartSearchPanel: React.FC<SmartSearchPanelProps> = ({
             d.fy = event.y;
           })
           .on("end", (event, d) => {
-            if (!event.active) simulation.alphaTarget(0);
+            if (!event.active) simulation.alphaTarget(0.02);
             d.fx = null;
             d.fy = null;
           })

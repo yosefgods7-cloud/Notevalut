@@ -387,6 +387,7 @@ export const BrainMap: React.FC<BrainMapProps> = ({
     // Force Simulation
     const simulation = d3
       .forceSimulation<GraphNode>(graphData.nodes)
+      .velocityDecay(0.6)
       .force(
         "link",
         d3
@@ -413,7 +414,21 @@ export const BrainMap: React.FC<BrainMapProps> = ({
       )
       .force("center", d3.forceCenter(0, 0))
       .force("x", d3.forceX().strength(0.01))
-      .force("y", d3.forceY().strength(0.01));
+      .force("y", d3.forceY().strength(0.01))
+      .force("orbit", function (alpha) {
+        graphData.nodes.forEach((d) => {
+          if (d.fx != null || d.fy != null) return;
+          const dx = d.x || 0;
+          const dy = d.y || 0;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist > 0) {
+            d.vx = (d.vx || 0) - (dy / dist) * 1.5 * alpha;
+            d.vy = (d.vy || 0) + (dx / dist) * 1.5 * alpha;
+          }
+        });
+      });
+
+    simulation.alphaTarget(0.02); // Keep moving slowly forever
 
     // Draw Links
     const link = g
@@ -455,7 +470,7 @@ export const BrainMap: React.FC<BrainMapProps> = ({
             d.fy = event.y;
           })
           .on("end", function (event, d) {
-            if (!event.active) simulation.alphaTarget(0);
+            if (!event.active) simulation.alphaTarget(0.02);
             d.fx = null;
             d.fy = null;
           }),

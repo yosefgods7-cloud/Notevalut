@@ -148,6 +148,36 @@ export const TableControls: React.FC<TableControlsProps> = ({ editor }) => {
     return null;
   };
 
+  const resolveCellPos = (type: 'col'|'row', index: number): number | null => {
+    try {
+      const data = getTableData();
+      if (!data) return null;
+      const { node, pos } = data;
+      let currentPos = pos + 1; // start inside table
+      for (let i = 0; i < node.childCount; i++) {
+        const row = node.child(i);
+        if (type === 'row' && i === index) {
+          return currentPos + 1; // inside the first cell of the target row
+        }
+        let cellPos = currentPos + 1; // start inside row
+        let colIndex = 0;
+        for (let j = 0; j < row.childCount; j++) {
+           const cell = row.child(j);
+           const colspan = cell.attrs.colspan || 1;
+           if (type === 'col' && index >= colIndex && index < colIndex + colspan) {
+              return cellPos + 1; // inside the cell matching the column
+           }
+           cellPos += cell.nodeSize;
+           colIndex += colspan;
+        }
+        currentPos += row.nodeSize;
+      }
+    } catch (e) {
+      console.error("resolveCellPos failed", e);
+    }
+    return null;
+  };
+
   const manualTableUpdate = (json: any, pos: number, size: number) => {
     try {
       const newNode = editor.schema.nodeFromJSON(json);
@@ -159,39 +189,11 @@ export const TableControls: React.FC<TableControlsProps> = ({ editor }) => {
   };
 
   const hackSelection = (type: 'col'|'row', index: number, callback: () => void) => {
-    let cell: HTMLElement | null = null;
-    if (activeTable) {
-      if (type === 'col') {
-        const firstRow = activeTable.querySelector('tr');
-        if (firstRow) {
-           const cells = Array.from(firstRow.children) as HTMLElement[];
-           cell = cells[index];
-        }
-      } else {
-        const allRows = Array.from(activeTable.querySelectorAll('tr')) as HTMLElement[];
-        const targetRow = allRows[index];
-        if (targetRow) {
-           const cells = Array.from(targetRow.children) as HTMLElement[];
-           cell = cells[0];
-        }
-      }
-    }
-
-    if (cell) {
-      let pos = null;
-      try {
-        const p = cell.querySelector('p');
-        pos = editor.view.posAtDOM(p || cell, 0);
-      } catch (e) {
-        console.warn("posAtDOM failed", e);
-      }
-      
-      if (pos !== null) {
-        editor.chain().focus().setTextSelection(pos).run();
-        // Give the editor a tick to update selection
-        setTimeout(callback, 20);
-        return;
-      }
+    const pos = resolveCellPos(type, index);
+    if (pos !== null) {
+      editor.chain().focus().setTextSelection(pos).run();
+      setTimeout(callback, 20);
+      return;
     }
     
     // Fallback if cell not found or coords failed
@@ -208,71 +210,21 @@ export const TableControls: React.FC<TableControlsProps> = ({ editor }) => {
       if (!data) return;
 
       if (action === 'delete') {
-         const json = data.node.toJSON();
          if (type === 'row') {
-            const rowsData = json.content || [];
-            if (rowsData.length > 1) {
-               rowsData.splice(index, 1);
-               manualTableUpdate(json, data.pos, data.node.nodeSize);
-            } else {
-               editor.chain().focus().deleteTable().run();
-            }
+            editor.chain().focus().deleteRow().run();
          } else if (type === 'col') {
-            const rowsData = json.content || [];
-            let isEmptyTable = false;
-            rowsData.forEach((row: any) => {
-               const cells = row.content || [];
-               if (cells.length > 1) {
-                  cells.splice(index, 1);
-               } else {
-                  isEmptyTable = true;
-               }
-            });
-            if (isEmptyTable) {
-               editor.chain().focus().deleteTable().run();
-            } else {
-               manualTableUpdate(json, data.pos, data.node.nodeSize);
-            }
+            editor.chain().focus().deleteColumn().run();
          }
          return;
       }
       
       if (action === 'add-before' || action === 'add-after') {
-         const json = data.node.toJSON();
-         const targetIndex = action === 'add-before' ? index : index + 1;
-         
          if (type === 'row') {
-            const rowsData = json.content || [];
-            const templateRow = rowsData[index] || rowsData[0];
-            if (templateRow) {
-               const newRow = {
-                  type: 'table_row',
-                  content: (templateRow.content || []).map(() => ({
-                     type: 'table_cell',
-                     content: [{ type: 'paragraph' }]
-                  }))
-               };
-               rowsData.splice(targetIndex, 0, newRow);
-               manualTableUpdate(json, data.pos, data.node.nodeSize);
-            }
+            if (action === 'add-before') editor.chain().focus().addRowBefore().run();
+            else editor.chain().focus().addRowAfter().run();
          } else if (type === 'col') {
-            const rowsData = json.content || [];
-            rowsData.forEach((row: any) => {
-               const cells = row.content || [];
-               const templateCell = cells[index] || cells[0];
-               if (templateCell) {
-                  const newCell: any = {
-                     type: templateCell.type,
-                     content: [{ type: 'paragraph' }]
-                  };
-                  // keep colwidth if it was present
-                  if (templateCell.attrs && templateCell.attrs.colwidth) {
-                      newCell.attrs = { colwidth: templateCell.attrs.colwidth };
-                  }
-                  cells.splice(targetIndex, 0, newCell);
-               }
-            });
-            manualTableUpdate(json, data.pos, data.node.nodeSize);
+            if (action === 'add-before') editor.chain().focus().addColumnBefore().run();
+            else editor.chain().focus().addColumnAfter().run();
          }
          return;
       }
