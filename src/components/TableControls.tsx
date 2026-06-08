@@ -178,14 +178,16 @@ export const TableControls: React.FC<TableControlsProps> = ({ editor }) => {
     }
 
     if (cell) {
-      const rect = cell.getBoundingClientRect();
-      // Use exactly the center of the target cell
-      const x = rect.left + rect.width / 2;
-      const y = rect.top + rect.height / 2;
+      let pos = null;
+      try {
+        const p = cell.querySelector('p');
+        pos = editor.view.posAtDOM(p || cell, 0);
+      } catch (e) {
+        console.warn("posAtDOM failed", e);
+      }
       
-      const pos = editor.view.posAtCoords({ left: x, top: y });
-      if (pos) {
-        editor.chain().focus().setTextSelection(pos.pos).run();
+      if (pos !== null) {
+        editor.chain().focus().setTextSelection(pos).run();
         // Give the editor a tick to update selection
         setTimeout(callback, 20);
         return;
@@ -206,18 +208,71 @@ export const TableControls: React.FC<TableControlsProps> = ({ editor }) => {
       if (!data) return;
 
       if (action === 'delete') {
-         if (type === 'col') editor.chain().focus().deleteColumn().run();
-         else editor.chain().focus().deleteRow().run();
+         const json = data.node.toJSON();
+         if (type === 'row') {
+            const rowsData = json.content || [];
+            if (rowsData.length > 1) {
+               rowsData.splice(index, 1);
+               manualTableUpdate(json, data.pos, data.node.nodeSize);
+            } else {
+               editor.chain().focus().deleteTable().run();
+            }
+         } else if (type === 'col') {
+            const rowsData = json.content || [];
+            let isEmptyTable = false;
+            rowsData.forEach((row: any) => {
+               const cells = row.content || [];
+               if (cells.length > 1) {
+                  cells.splice(index, 1);
+               } else {
+                  isEmptyTable = true;
+               }
+            });
+            if (isEmptyTable) {
+               editor.chain().focus().deleteTable().run();
+            } else {
+               manualTableUpdate(json, data.pos, data.node.nodeSize);
+            }
+         }
          return;
       }
       
       if (action === 'add-before' || action === 'add-after') {
-         if (type === 'col') {
-           if (action === 'add-before') editor.chain().focus().addColumnBefore().run();
-           else editor.chain().focus().addColumnAfter().run();
-         } else {
-           if (action === 'add-before') editor.chain().focus().addRowBefore().run();
-           else editor.chain().focus().addRowAfter().run();
+         const json = data.node.toJSON();
+         const targetIndex = action === 'add-before' ? index : index + 1;
+         
+         if (type === 'row') {
+            const rowsData = json.content || [];
+            const templateRow = rowsData[index] || rowsData[0];
+            if (templateRow) {
+               const newRow = {
+                  type: 'table_row',
+                  content: (templateRow.content || []).map(() => ({
+                     type: 'table_cell',
+                     content: [{ type: 'paragraph' }]
+                  }))
+               };
+               rowsData.splice(targetIndex, 0, newRow);
+               manualTableUpdate(json, data.pos, data.node.nodeSize);
+            }
+         } else if (type === 'col') {
+            const rowsData = json.content || [];
+            rowsData.forEach((row: any) => {
+               const cells = row.content || [];
+               const templateCell = cells[index] || cells[0];
+               if (templateCell) {
+                  const newCell: any = {
+                     type: templateCell.type,
+                     content: [{ type: 'paragraph' }]
+                  };
+                  // keep colwidth if it was present
+                  if (templateCell.attrs && templateCell.attrs.colwidth) {
+                      newCell.attrs = { colwidth: templateCell.attrs.colwidth };
+                  }
+                  cells.splice(targetIndex, 0, newCell);
+               }
+            });
+            manualTableUpdate(json, data.pos, data.node.nodeSize);
          }
          return;
       }
