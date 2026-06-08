@@ -311,6 +311,8 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
             settings: { ...DEFAULT_SETTINGS, ...(parsed.settings || {}) },
             templates: parsed.templates || [],
             reviewNotes: parsed.reviewNotes || [],
+            brainMapLastFilters: parsed.brainMapLastFilters,
+            dailyDigest: parsed.dailyDigest,
           };
           setData(migratedData);
           setIsInitialized(true);
