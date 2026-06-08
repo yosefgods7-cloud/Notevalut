@@ -344,10 +344,12 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
   };
 
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const activeUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   useEffect(() => {
     window.speechSynthesis.cancel();
     setIsSpeaking(false);
+    activeUtteranceRef.current = null;
     return () => {
       window.speechSynthesis.cancel();
     };
@@ -357,19 +359,45 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
     if (isSpeaking) {
       window.speechSynthesis.cancel();
       setIsSpeaking(false);
+      activeUtteranceRef.current = null;
     } else {
       if (!editor) return;
       const text = editor.getText();
       if (!text.trim()) return;
 
+      // Cancel any ongoing speech
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
 
-      utterance.onend = () => setIsSpeaking(false);
-      utterance.onerror = () => setIsSpeaking(false);
+      // Small delay prevents iOS Safari from cancelling the new utterance immediately
+      setTimeout(() => {
+        const utterance = new SpeechSynthesisUtterance(text);
+        activeUtteranceRef.current = utterance; // Prevent garbage collection on Android Chrome
 
-      window.speechSynthesis.speak(utterance);
-      setIsSpeaking(true);
+        // Set language to system default to ensure it works on phone
+        utterance.lang = window.navigator.language || "en-US";
+
+        // Try to pick a local voice if populated
+        const voices = window.speechSynthesis.getVoices();
+        if (voices.length > 0) {
+          const localVoice = voices.find(v => v.localService && (v.lang === utterance.lang || v.default)) || voices[0];
+          if (localVoice) {
+             utterance.voice = localVoice;
+          }
+        }
+
+        utterance.onend = () => {
+          setIsSpeaking(false);
+          activeUtteranceRef.current = null;
+        };
+        utterance.onerror = (e) => {
+          console.warn("TTS Error:", e);
+          setIsSpeaking(false);
+          activeUtteranceRef.current = null;
+        };
+
+        window.speechSynthesis.speak(utterance);
+        setIsSpeaking(true);
+      }, 50);
     }
   };
 

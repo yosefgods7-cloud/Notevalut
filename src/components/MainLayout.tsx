@@ -351,6 +351,15 @@ export const MainLayout: React.FC = () => {
             setActiveNoteId(newNote.id);
             if (window.innerWidth < 768) setIsSidebarOpen(false);
           }}
+          onSelectRecentNote={(noteId, collectionId, workspaceId) => {
+            setActiveWorkspaceId(workspaceId);
+            setActiveCollectionId(collectionId);
+            setActiveNoteId(noteId);
+            if (!openTabs.includes(noteId)) {
+                setOpenTabs(prev => [...prev, noteId]);
+            }
+            if (window.innerWidth < 768) setIsSidebarOpen(false);
+          }}
         />
 
         {activeCollectionId ? (

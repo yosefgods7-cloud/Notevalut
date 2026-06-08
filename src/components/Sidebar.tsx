@@ -3,7 +3,7 @@ import { useStorage } from '../context/StorageContext';
 import { useAuth } from '../context/AuthContext';
 import { uploadToDrive } from '../lib/drive';
 import { cn } from '../lib/utils';
-import { Plus, Tag, Settings as SettingsIcon, Download, Upload, Star, Undo2, Network, Menu, Folder, Pencil, Trash2, MoreHorizontal, ArrowUp, ArrowDown, Calendar, ChevronRight, ChevronDown } from 'lucide-react';
+import { Plus, Tag, Settings as SettingsIcon, Download, Upload, Star, Undo2, Network, Menu, Folder, Pencil, Trash2, MoreHorizontal, ArrowUp, ArrowDown, Calendar, ChevronRight, ChevronDown, Clock, FileText } from 'lucide-react';
 import { appPrompt, appConfirm } from './GlobalDialogs';
 
 interface SidebarProps {
@@ -20,6 +20,7 @@ interface SidebarProps {
   isReviewsActive: boolean;
   onOpenTagManager: () => void;
   onAddNote?: (workspaceId: string, collectionId: string) => void;
+  onSelectRecentNote?: (noteId: string, collectionId: string, workspaceId: string) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -30,6 +31,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleReviews, isReviewsActive,
   onOpenTagManager,
   onAddNote,
+  onSelectRecentNote,
 }) => {
   const { data, saveData, addCollection, updateCollection, deleteCollection, addWorkspace, updateWorkspace, deleteWorkspace, undo, canUndo } = useStorage();
   const { accessToken } = useAuth();
@@ -40,6 +42,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [expandedWorkspaces, setExpandedWorkspaces] = useState<string[]>([activeWorkspaceId]);
 
   const [contextMenu, setContextMenu] = useState<{ type: 'workspace' | 'collection', id: string, x: number, y: number } | null>(null);
+
+  const recentNotes = React.useMemo(() => {
+    return data.notes
+      .filter(n => !n.isDeleted)
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      .slice(0, 5);
+  }, [data.notes]);
 
   React.useEffect(() => {
     const handleClick = () => setContextMenu(null);
@@ -297,6 +306,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span>Tag Manager</span>
           </button>
         </div>
+
+        {recentNotes.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center px-2 mb-2 text-xs font-semibold text-text-muted uppercase tracking-wider">
+              <Clock size={12} className="mr-2" />
+              <span>Recent Notes</span>
+            </div>
+            <div className="space-y-0.5">
+              {recentNotes.map(note => (
+                <button
+                  key={note.id}
+                  onClick={() => onSelectRecentNote?.(note.id, note.collectionId, note.workspaceId)}
+                  className="w-full flex items-center gap-3 px-3 py-1.5 rounded-md text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary transition-colors text-left"
+                  title={note.title || 'Untitled Note'}
+                >
+                  <FileText size={14} className="opacity-70 shrink-0" />
+                  <span className="truncate">{note.title || 'Untitled Note'}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="mb-6 space-y-0.5">
           <button
