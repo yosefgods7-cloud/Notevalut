@@ -1,4 +1,4 @@
-import { Node, mergeAttributes, nodeInputRule } from '@tiptap/core';
+import { Node, mergeAttributes, nodeInputRule, nodePasteRule } from '@tiptap/core';
 
 export const WikiLink = Node.create({
   name: 'wikiLink',
@@ -43,6 +43,18 @@ export const WikiLink = Node.create({
     return [
       nodeInputRule({
         find: /\[\[([^\]]+)\]\]$/,
+        type: this.type,
+        getAttributes: match => {
+          return { target: match[1] };
+        },
+      }),
+    ];
+  },
+
+  addPasteRules() {
+    return [
+      nodePasteRule({
+        find: /\[\[([^\]]+)\]\]/g,
         type: this.type,
         getAttributes: match => {
           return { target: match[1] };

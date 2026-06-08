@@ -49,7 +49,9 @@ export async function parseMarkdownImport(file: File, targetWorkspaceId: string,
         }
       }
       
-      const preprocessedMd = contentMd.replace(/==([^=]+)==/g, '<mark>$1</mark>');
+      const preprocessedMd = contentMd
+        .replace(/==([^=]+)==/g, '<mark>$1</mark>')
+        .replace(/\[\[([^\]]+)\]\]/g, '<span data-wiki-link="true" data-target="$1"><span class="wiki-bracket text-accent/50">[[</span>$1<span class="wiki-bracket text-accent/50">]]</span></span>');
       const contentHtml = await marked.parse(preprocessedMd);
       
       resolve({
