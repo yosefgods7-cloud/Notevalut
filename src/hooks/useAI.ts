@@ -2,6 +2,7 @@ import { useStorage } from '../context/StorageContext';
 import { useCallback, useState } from 'react';
 import { fetchEmbedding, fetchAIAnswer, cosineSimilarity, generateContentHash } from '../lib/ai';
 import { Note, AiSearchScope } from '../types';
+import { extractWikilinks } from "../lib/WikiLink";
 
 export function isNoteInAiScope(note: Note, scope?: AiSearchScope): boolean {
   if (!scope) return true;
@@ -137,10 +138,7 @@ export function useAI() {
   const getTagGraphBoost = useCallback((topNotes: Note[], maxToAdd = 2) => {
     const topIds = new Set(topNotes.map(n => n.id));
     const sharedTags = new Set(topNotes.flatMap(n => n.tags));
-    const linkedTitles = new Set(topNotes.flatMap(n => {
-      const matches = Array.from(n.content.matchAll(/\[\[(.*?)\]\]/g));
-      return matches.map(m => m[1].toLowerCase());
-    }));
+    const linkedTitles = new Set(topNotes.flatMap(n => extractWikilinks(n.content)));
     
     const candidates = data.notes.filter(n => {
       if (topIds.has(n.id) || n.isDeleted) return false;

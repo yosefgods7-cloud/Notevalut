@@ -130,6 +130,11 @@ import { cosineSimilarity } from "../lib/ai";
 // @ts-ignore
 import html2pdf from "html2pdf.js";
 
+const preprocessWikilinks = (html: string) => {
+  if (!html) return html;
+  return html.replace(/\[\[([^\]<>]+)\]\]/g, '<span data-wiki-link="true" data-target="$1"><span class="wiki-bracket text-accent/50">[[</span>$1<span class="wiki-bracket text-accent/50">]]</span></span>');
+};
+
 const turndownService = new TurndownService();
 // Preserve some basic HTML if needed
 turndownService.addRule("strikethrough", {
@@ -959,7 +964,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
   useEffect(() => {
     if (note && editor) {
       if (editor.getHTML() !== note.content) {
-        editor.commands.setContent(note.content, { emitUpdate: false });
+        editor.commands.setContent(preprocessWikilinks(note.content), { emitUpdate: false });
       }
       setTitle(note.title);
       setSource(note.headerMeta?.source || "");
@@ -1081,14 +1086,14 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
         if (file.name.endsWith(".md")) {
           const preprocessed = content.replace(/==([^=]+)==/g, '<mark>$1</mark>');
           const html = await marked.parse(preprocessed);
-          editor.commands.setContent(html);
+          editor.commands.setContent(preprocessWikilinks(html));
           showToast("✓ Markdown imported");
         } else if (file.name.endsWith(".txt")) {
           const html = content
             .split("\n")
             .map((line) => `<p>${line}</p>`)
             .join("");
-          editor.commands.setContent(html);
+          editor.commands.setContent(preprocessWikilinks(html));
           showToast("✓ Text imported");
         } else {
           showToast("Unsupported file type");
@@ -1224,7 +1229,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
     try {
       const text = await navigator.clipboard.readText();
       const result = cleanAIPaste(text);
-      editor?.commands.insertContent(result.html);
+      editor?.commands.insertContent(preprocessWikilinks(result.html));
       showToast(
         `Smart Paste: Cleaned AI artifacts (${result.stats.disclaimersRemoved} disclaimers, ${result.stats.formattingCleaned} formats removed)`,
       );
@@ -1237,11 +1242,49 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
     if (!editor) return;
     const { state } = editor;
     const { from, to } = state.selection;
+    
+    // Check if the current selection contains or is inside a wikiLink node
+    let isWikiNode = false;
+    let targetText = "";
+    let nodeRange = { from: 0, to: 0 };
+    
+    state.doc.nodesBetween(Math.max(0, from - 1), to + 1, (node, pos) => {
+      if (node.type.name === 'wikiLink' && !isWikiNode) {
+        // If the selection touches or wraps this node
+        if (Math.max(from, pos) < Math.min(to, pos + node.nodeSize) || (from === to && from >= pos && from <= pos + node.nodeSize)) {
+           isWikiNode = true;
+           targetText = node.attrs.target;
+           nodeRange = { from: pos, to: pos + node.nodeSize };
+        }
+      }
+    });
+
+    if (editor.isActive('wikiLink') && !isWikiNode) {
+       // fallback
+       isWikiNode = true;
+       targetText = editor.getAttributes('wikiLink').target;
+       // if we don't have range, we just replace current selection
+       nodeRange = { from, to };
+    }
+
+    if (isWikiNode) {
+       // We should remove the [[ and ]] and just insert the core text
+       editor.chain().focus().deleteRange(nodeRange).insertContent(targetText).run();
+       return;
+    }
+
     const selectedText = state.doc.textBetween(from, to, " ");
     if (!selectedText || selectedText.trim() === "") {
       showToast("Select text to link to a note.");
       return;
     }
+
+    const literalMatch = selectedText.trim().match(/^\[\[(.*)\]\]$/);
+    if (literalMatch) {
+       editor.chain().focus().insertContent(literalMatch[1]).run();
+       return;
+    }
+
     editor
       .chain()
       .focus()
@@ -1341,7 +1384,10 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
                     key={sn.id}
                     className="w-full text-left px-2 py-1.5 border border-transparent hover:border-white/10 rounded-lg text-sm hover:bg-surface-active transition-all flex flex-col gap-0.5 group"
                     onClick={() => {
-                      editor?.chain().focus().insertContent(`[[${sn.title}]] `).run();
+                      editor?.chain().focus().insertContent({
+                        type: "wikiLink",
+                        attrs: { target: sn.title.trim() },
+                      }).insertContent(" ").run();
                       setSmartLinkingSuggestions([]);
                     }}
                   >
@@ -2497,7 +2543,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
                     >
                       <button
                         onClick={() => {
-                          editor?.commands.setContent(t.content);
+                          editor?.commands.setContent(preprocessWikilinks(t.content));
                           showToast(`Applied template: ${t.name}`);
                         }}
                         className="text-left px-2 py-2 text-sm flex-1 truncate"
@@ -2587,7 +2633,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
         onClose={() => setHistoryOpen(false)}
         noteId={noteId}
         onRestore={(content) => {
-          editor.commands.setContent(content, { emitUpdate: false });
+          editor.commands.setContent(preprocessWikilinks(content), { emitUpdate: false });
           updateNote(noteId, { content });
           showToast("✓ Resorted from history");
         }}

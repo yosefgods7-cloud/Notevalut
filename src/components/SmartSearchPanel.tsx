@@ -5,6 +5,7 @@ import { Note } from "../types";
 import { motion, AnimatePresence } from "motion/react";
 import * as d3 from "d3";
 import { cn } from "../lib/utils";
+import { extractWikilinks } from "../lib/WikiLink";
 
 interface SmartSearchPanelProps {
   noteId: string;
@@ -25,8 +26,6 @@ interface MiniGraphLink extends d3.SimulationLinkDatum<MiniGraphNode> {
   target: string | MiniGraphNode;
   type: string;
 }
-
-const wikilinkRegex = /\[\[(.*?)\]\]/g;
 
 export const SmartSearchPanel: React.FC<SmartSearchPanelProps> = ({
   noteId,
@@ -61,7 +60,7 @@ export const SmartSearchPanel: React.FC<SmartSearchPanelProps> = ({
     const currentTitle = (currentNote.title || "Untitled").trim().toLowerCase();
 
     // Extract links from current note
-    const outgoingLinks = Array.from(content.matchAll(wikilinkRegex)).map(m => m[1].trim().toLowerCase());
+    const outgoingLinks = extractWikilinks(content);
 
     const connected: { note: Note; sharedTags: string[]; isWikilink: boolean }[] = [];
     
@@ -80,7 +79,7 @@ export const SmartSearchPanel: React.FC<SmartSearchPanelProps> = ({
 
       // Has incoming wikilink from this note to currentNote
       const noteContent = note.content || "";
-      const noteOutgoingLinks = Array.from(noteContent.matchAll(wikilinkRegex)).map(m => m[1].trim().toLowerCase());
+      const noteOutgoingLinks = extractWikilinks(noteContent);
       if (currentTitle && noteOutgoingLinks.includes(currentTitle)) hasWikilink = true;
 
       if (sharedTags.length > 0 || hasWikilink) {

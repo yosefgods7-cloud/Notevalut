@@ -1,5 +1,24 @@
 import { Node, mergeAttributes, nodeInputRule, nodePasteRule } from '@tiptap/core';
 
+export const extractWikilinks = (content: string): string[] => {
+  if (!content) return [];
+  const links = new Set<string>();
+  
+  // 1. Match parsed wikilinks: data-target="target"
+  const parsedMatches = content.matchAll(/data-target="([^"]+)"/g);
+  for (const match of parsedMatches) {
+    if (match[1]) links.add(match[1].trim().toLowerCase());
+  }
+  
+  // 2. Match unparsed wikilinks: [[target]]
+  const unparsedMatches = content.matchAll(/\[\[([^\]<>]+)\]\]/g);
+  for (const match of unparsedMatches) {
+    if (match[1]) links.add(match[1].trim().toLowerCase());
+  }
+
+  return Array.from(links);
+};
+
 export const WikiLink = Node.create({
   name: 'wikiLink',
   inline: true,

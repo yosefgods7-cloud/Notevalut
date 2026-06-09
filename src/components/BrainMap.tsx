@@ -13,6 +13,7 @@ import {
   Filter,
 } from "lucide-react";
 import { Note, BrainMapFilters } from "../types";
+import { extractWikilinks } from "../lib/WikiLink";
 
 interface BrainMapProps {
   activeWorkspaceId: string;
@@ -317,8 +318,8 @@ export const BrainMap: React.FC<BrainMapProps> = ({
 
       // Wikilinks
       if (filters.connectionTypes.wikilinks !== false) {
-        // Simple mock parse: Look for [[Note Title]]
-        const titleMatches = Array.from(note.content.matchAll(/\[\[(.*?)\]\]/g)).map(m => m[1]);
+        // Find wikilinks natively through parsed data-target or raw [[target]]
+        const titleMatches = extractWikilinks(note.content);
         if (titleMatches.length > 0) {
           titleMatches.forEach(title => {
             // Find note by title
