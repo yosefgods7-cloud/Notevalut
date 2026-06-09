@@ -7,7 +7,6 @@ import React, {
   useMemo,
   useRef,
 } from "react";
-import { useFirebaseConnection } from './FirebaseConnectionManager';
 import {
   NoteVaultData,
   Workspace,
@@ -116,7 +115,8 @@ interface StorageContextType {
   clearAllData: () => void;
   importData: (importedData: NoteVaultData, merge: boolean) => Promise<void>;
   syncToCloud: () => Promise<void>;
-  syncFromCloud: () => Promise<void>;
+  getCloudBackupPreview: () => Promise<{ backupDate: string | undefined, noteCount: number, payload: NoteVaultData } | null>;
+  applyCloudBackup: (backup: NoteVaultData) => void;
   loadAllNotes: () => void;
   areAllNotesLoaded: boolean;
   isSyncing: boolean;
@@ -143,24 +143,8 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const { user } = useAuth();
-  const { cloudNotes } = useFirebaseConnection();
   const [history, setHistory] = useState<NoteVaultData[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
-
-  useEffect(() => {
-    // Realtime merge cloudNotes
-    if (cloudNotes.length > 0 && isInitialized) {
-      setData((prev) => {
-        const localIds = new Set(prev.notes.map(n => n.id));
-        const newNotes = cloudNotes.filter(cn => !localIds.has(cn.id));
-        if (newNotes.length === 0) return prev;
-        return {
-           ...prev,
-           notes: [...prev.notes, ...newNotes]
-        };
-      });
-    }
-  }, [cloudNotes, isInitialized]);
 
   const [data, setData] = useState<NoteVaultData>(() => ({
     ...DEFAULT_DATA,
@@ -488,79 +472,61 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [user, data]);
 
-  const syncFromCloud = useCallback(async () => {
-    if (!user) return;
+  const getCloudBackupPreview = useCallback(async () => {
+    if (!user) return null;
     setIsSyncing(true);
     try {
-      const settingsSnap = await getDocs(
-        collection(db, `users/${user.uid}/settings`),
-      );
-      const workspacesSnap = await getDocs(
-        collection(db, `users/${user.uid}/workspaces`),
-      );
-      const collectionsSnap = await getDocs(
-        collection(db, `users/${user.uid}/collections`),
-      );
-      const notesSnap = await getDocs(
-        collection(db, `users/${user.uid}/notes`),
-      );
-      const reviewNotesSnap = await getDocs(
-        collection(db, `users/${user.uid}/reviewNotes`),
-      );
+      const settingsSnap = await getDocs(collection(db, `users/${user.uid}/settings`));
+      const workspacesSnap = await getDocs(collection(db, `users/${user.uid}/workspaces`));
+      const collectionsSnap = await getDocs(collection(db, `users/${user.uid}/collections`));
+      const notesSnap = await getDocs(collection(db, `users/${user.uid}/notes`));
+      const reviewNotesSnap = await getDocs(collection(db, `users/${user.uid}/reviewNotes`));
 
       const cloudSettings = settingsSnap.docs[0]?.data();
       const workspaces = workspacesSnap.docs.map((d) => d.data() as Workspace);
-      const collections = collectionsSnap.docs.map(
-        (d) => d.data() as Collection,
-      );
+      const collections = collectionsSnap.docs.map((d) => d.data() as Collection);
       const notes = notesSnap.docs.map((d) => d.data() as Note);
       const reviewNotes = reviewNotesSnap.docs.map((d) => d.data() as ReviewNote);
 
       if (workspaces.length === 0 && notes.length === 0) {
-        showToast("No cloud data found. Uploading local data...");
-        await syncToCloud();
-        return;
+        showToast("No cloud backup found.");
+        return null;
       }
 
-      // Merge avoiding duplicates by ID, cloud takes precedence
-      const mergeArrays = <T extends { id: string }>(
-        local: T[],
-        remote: T[],
-      ) => {
-        const map = new Map<string, T>();
-        local.forEach((i) => map.set(i.id, i));
-        remote.forEach((i) => map.set(i.id, i)); // remote overrides
-        return Array.from(map.values());
-      };
+      const backupDate = cloudSettings?.updatedAt || undefined;
 
       const mergedData: NoteVaultData = {
         ...data,
         settings: cloudSettings?.settings || data.settings,
         tags: cloudSettings?.tags || data.tags,
-        workspaces: mergeArrays(data.workspaces, workspaces),
-        collections: mergeArrays(data.collections, collections),
-        notes: mergeArrays(data.notes, notes),
-        reviewNotes: mergeArrays((data.reviewNotes || []), reviewNotes),
+        workspaces: workspaces.length > 0 ? workspaces : data.workspaces,
+        collections: collections.length > 0 ? collections : data.collections,
+        notes: notes.length > 0 ? notes : data.notes,
+        reviewNotes: reviewNotes.length > 0 ? reviewNotes : data.reviewNotes,
       };
 
-      saveData(mergedData);
-      showToast("Data downloaded from cloud");
+      return {
+        backupDate,
+        noteCount: notes.length,
+        payload: mergedData
+      };
     } catch (e) {
       console.error(e);
-      showToast("Failed to download from cloud");
+      showToast("Failed to fetch cloud backup preview");
+      return null;
     } finally {
       setIsSyncing(false);
     }
-  }, [user, data, saveData, syncToCloud]);
+  }, [user, data, showToast]);
+
+  const applyCloudBackup = useCallback((backup: NoteVaultData) => {
+    saveData(backup);
+    showToast("Local vault restored from cloud backup.");
+  }, [saveData, showToast]);
 
   // Rest of the methods...
 
-  // Auto-sync when user signs in
-  useEffect(() => {
-    if (user) {
-      syncFromCloud();
-    }
-  }, [user]);
+  // Removed Auto-sync when user signs in
 
   const updateSettings = useCallback(
     (updates: Partial<Settings>) => {
@@ -1276,7 +1242,8 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
         clearAllData,
         importData,
         syncToCloud,
-        syncFromCloud,
+        getCloudBackupPreview,
+        applyCloudBackup,
         loadAllNotes,
         areAllNotesLoaded,
         isSyncing,

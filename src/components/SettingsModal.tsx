@@ -59,7 +59,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     data,
     updateSettings,
     clearAllData,
-    syncFromCloud,
+    getCloudBackupPreview,
+    applyCloudBackup,
     syncToCloud,
     isSyncing,
     importData,
@@ -82,6 +83,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [importPendingFile, setImportPendingFile] = useState<{
     name: string;
     content: string;
+  } | null>(null);
+
+  const [cloudPreview, setCloudPreview] = useState<{
+    backupDate: string | undefined;
+    noteCount: number;
+    payload: any;
   } | null>(null);
   const [importTargetWorkspace, setImportTargetWorkspace] = useState(
     data.workspaces[0]?.id || "",
@@ -1557,7 +1564,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                 <Cloud size={14} /> Backup Now
                               </button>
                               <button
-                                onClick={() => syncFromCloud()}
+                                onClick={async () => {
+                                  const preview = await getCloudBackupPreview();
+                                  if (preview) {
+                                    setCloudPreview(preview);
+                                  }
+                                }}
                                 disabled={isSyncing}
                                 className="flex-1 bg-background hover:bg-surface-active border border-border disabled:opacity-50 text-xs py-1.5 rounded transition-colors flex items-center justify-center gap-1.5 font-medium"
                               >
@@ -1778,6 +1790,52 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             Apply Settings
           </button>
         </div>
+
+        {cloudPreview && (
+          <div className="absolute inset-0 bg-background/90 backdrop-blur-[2px] rounded-2xl z-50 flex items-center justify-center p-6">
+            <div className="bg-surface border border-border rounded-xl shadow-2xl p-5 w-full max-w-sm border-l-4 border-l-accent">
+              <h3 className="text-lg font-bold text-text-primary mb-3 flex items-center gap-2">
+                <Cloud size={18} className="text-accent" /> Restore Backup
+              </h3>
+              <p className="text-sm text-text-secondary mb-4 leading-relaxed">
+                You are about to completely override your local vault with a backup from Firebase. This action cannot be easily undone.
+              </p>
+
+              <div className="bg-surface-active rounded-lg p-3 mb-5 border border-border grid grid-cols-2 gap-4">
+                 <div>
+                    <span className="text-[10px] uppercase text-text-muted font-semibold tracking-wider block">Backup Date</span>
+                    <span className="text-xs font-medium text-text-primary break-all">
+                       {cloudPreview.backupDate ? new Date(cloudPreview.backupDate).toLocaleString() : 'Unknown'}
+                    </span>
+                 </div>
+                 <div>
+                    <span className="text-[10px] uppercase text-text-muted font-semibold tracking-wider block">Total Notes</span>
+                    <span className="text-xs font-medium text-text-primary">
+                       {cloudPreview.noteCount}
+                    </span>
+                 </div>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-4">
+                <button
+                  onClick={() => setCloudPreview(null)}
+                  className="px-4 py-2 rounded-md hover:bg-surface-active transition-colors text-sm font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    applyCloudBackup(cloudPreview.payload);
+                    setCloudPreview(null);
+                  }}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-md transition-colors text-sm flex items-center gap-1"
+                >
+                  <RefreshCw size={14} /> Restore Now
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {importPendingFile && (
           <div className="absolute inset-0 bg-background/90 backdrop-blur-[2px] rounded-2xl z-50 flex items-center justify-center p-6">
