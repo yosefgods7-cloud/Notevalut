@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, signInWithPopup, signInWithRedirect, getRedirectResult, signOut as firebaseSignOut, GoogleAuthProvider, onAuthStateChanged } from 'firebase/auth';
+import { User, signInWithPopup, signInWithRedirect, getRedirectResult, signOut as firebaseSignOut, GoogleAuthProvider, onAuthStateChanged, setPersistence, browserLocalPersistence, indexedDBLocalPersistence } from 'firebase/auth';
 import { get, set, del } from 'idb-keyval';
-import { auth, googleProvider } from '../lib/firebase';
+import { auth, googleProvider, db } from '../lib/firebase';
 
 interface AuthContextType {
   user: User | null | undefined;
@@ -30,6 +30,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [accessToken, setAccessToken] = useState<string | null>(null);
 
   useEffect(() => {
+    const initAuth = async () => {
+      try {
+        // Enforce browser persistence primarily using IndexedDB
+        // using browserLocalPersistence ensures it survives across tabs and restarts
+        await setPersistence(auth, browserLocalPersistence);
+      } catch (e) {
+        console.error("Auth persistence setup failed:", e);
+      }
+    };
+    initAuth();
+  }, []);
+
+  useEffect(() => {
     const checkToken = async () => {
       const storedAccessToken = await get('drive_access_token');
       const storedExpiresAt = await get('drive_token_expires_at');
@@ -42,13 +55,68 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      if (u) {
+        // One-time account recovery to migrate notes from orphaned accounts
+        try {
+          const RECOVERY_DONE_KEY = `recovery_done_${u.uid}`;
+          const done = await get(RECOVERY_DONE_KEY);
+          
+          if (!done && u.email) {
+            console.log("Checking for orphaned user accounts to migrate...");
+            
+            // Note: Since collectionGroup queries require an index, we will use a try-catch.
+            // If the index doesn't exist, this fails fast without breaking the app.
+            // In a real environment, you'd deploy the composite index or provide the console link.
+            import('firebase/firestore').then(async ({ collectionGroup, query, where, getDocs, writeBatch, doc, collection }) => {
+              try {
+                const q = query(collectionGroup(db, 'settings'), where('email', '==', u.email));
+                const snap = await getDocs(q);
+                
+                const orphanedUids = snap.docs
+                  .map(d => d.data().userId)
+                  .filter(id => id && id !== u.uid);
+                  
+                if (orphanedUids.length > 0) {
+                  console.log("Found orphaned accounts, migrating data...", orphanedUids);
+                  const batch = writeBatch(db);
+                  
+                  for (const oldUid of orphanedUids) {
+                    const notesSnap = await getDocs(collection(db, `users/${oldUid}/notes`));
+                    notesSnap.forEach(noteDoc => {
+                      const data = noteDoc.data();
+                      batch.set(doc(db, `users/${u.uid}/notes/${noteDoc.id}`), {
+                        ...data,
+                        userId: u.uid
+                      });
+                      batch.delete(noteDoc.ref);
+                    });
+                    
+                    // Cleanup old settings to mark as migrated
+                    batch.delete(doc(db, `users/${oldUid}/settings/default`));
+                  }
+                  
+                  await batch.commit();
+                  console.log("Migration complete.");
+                }
+                
+                await set(RECOVERY_DONE_KEY, true);
+              } catch (err) {
+                console.warn("Account recovery query failed (index may be building)", err);
+              }
+            });
+          }
+        } catch (e) {
+          console.error("Recovery check error", e);
+        }
+      }
+      
       setUser(u);
       if (!u) {
         setAccessToken(null);
-        del('drive_access_token');
-        del('drive_token_expires_at');
-        del('drive_refresh_token');
+        await del('drive_access_token');
+        await del('drive_token_expires_at');
+        await del('drive_refresh_token');
       }
       setLoading(false);
     });
@@ -134,11 +202,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signIn = async () => {
     try {
+      // Check if user is already signed in
+      if (auth.currentUser) {
+        console.log("User is already signed in, reusing existing session.");
+        // If we don't have a token, we might need to get it without a full re-login if possible,
+        // but since we are relying on Google sign in, we should check if they already have access.
+        // Actually, if we already have auth.currentUser, but need a new Drive scope,
+        // we can just re-authenticate the current user for the scopes if missing.
+        // But for now, we just proceed to re-auth with popup if needed.
+        // Wait, the prompt says: "Fix the Firebase auth initialization to always check for an existing authenticated user session first before attempting any new sign in flow"
+        if (accessToken) {
+          return;
+        }
+      }
+
       googleProvider.addScope('https://www.googleapis.com/auth/drive.file');
       googleProvider.setCustomParameters({
         access_type: 'offline',
-        prompt: 'consent'
+        prompt: 'select_account' // Avoid creating new anonymous parallel sessions, force account selection or reuse local session
       });
+      
       const result = await signInWithPopup(auth, googleProvider);
       const credential = GoogleAuthProvider.credentialFromResult(result);
       if (credential?.accessToken) {

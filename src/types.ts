@@ -220,7 +220,7 @@ export interface ReviewNote {
   id: string;
   type: ReviewNoteType;
   periodStart: string; // ISO date
-  periodEnd: string;   // ISO date
+  periodEnd: string; // ISO date
   title: string;
   content: string;
   topLessons: string;
@@ -334,6 +334,8 @@ export const DEFAULT_SETTINGS: Settings = {
     "h1",
     "h2",
     "h3",
+    "h4",
+    "h5",
     "|",
     "bold",
     "italic",

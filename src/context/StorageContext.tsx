@@ -392,6 +392,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
         doc(db, `users/${user.uid}/settings/default`),
         {
           userId: user.uid,
+          email: user.email,
           settings: updatedSettings,
           tags: data.tags,
           updatedAt: timestamp,

@@ -7,7 +7,7 @@
   --color-surface-active: var(--surface-active);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
-  
+
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
   --color-accent-transparent: var(--accent-transparent);
@@ -16,19 +16,20 @@
   --color-text-secondary: var(--text-secondary);
   --color-text-muted: var(--text-muted);
 
-  --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-serif: 'Lora', ui-serif, Georgia, serif;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Lora", ui-serif, Georgia, serif;
 }
 
 @layer base {
-  :root, .dark {
+  :root,
+  .dark {
     --bg: #0f0f0f;
     --surface: #1a1a1f;
     --surface-hover: #212128;
     --surface-active: #2b2b35;
     --border: rgba(255, 255, 255, 0.07);
     --border-strong: rgba(255, 255, 255, 0.15);
-    
+
     --accent: #7c6af7;
     --accent-hover: #9182f8;
     --accent-transparent: rgba(124, 106, 247, 0.15);
@@ -36,7 +37,7 @@
     --text-primary: #ededed;
     --text-secondary: #a0a0ab;
     --text-muted: #6b6b76;
-    
+
     /* Document defaults for dark mode */
     --doc-text: #d4d4d8;
     --doc-h1: #f4f4f5;
@@ -51,7 +52,7 @@
     --surface-active: #d4d4d8;
     --border: rgba(0, 0, 0, 0.1);
     --border-strong: rgba(0, 0, 0, 0.2);
-    
+
     --accent: #7c6af7;
     --accent-hover: #6352ce;
     --accent-transparent: rgba(124, 106, 247, 0.15);
@@ -59,7 +60,7 @@
     --text-primary: #111114;
     --text-secondary: #3f3f46;
     --text-muted: #71717a;
-    
+
     /* Document defaults for light mode */
     --doc-text: #3f3f46;
     --doc-h1: #111114;
@@ -70,7 +71,7 @@
   body {
     @apply bg-background text-text-primary font-sans antialiased text-sm overflow-hidden;
   }
-  
+
   /* Scrollbar styling */
   ::-webkit-scrollbar {
     width: 6px;
@@ -91,24 +92,32 @@
     --note-h1-size: 1.5rem;
     --note-h2-size: 1.25rem;
     --note-h3-size: 1.125rem;
+    --note-h4-size: 1rem;
+    --note-h5-size: 0.875rem;
   }
   .editor-size-medium {
     --note-base-size: 1rem;
     --note-h1-size: 1.875rem;
     --note-h2-size: 1.5rem;
     --note-h3-size: 1.25rem;
+    --note-h4-size: 1.125rem;
+    --note-h5-size: 1rem;
   }
   .editor-size-large {
     --note-base-size: 1.125rem;
     --note-h1-size: 2.25rem;
     --note-h2-size: 1.875rem;
     --note-h3-size: 1.5rem;
+    --note-h4-size: 1.25rem;
+    --note-h5-size: 1.125rem;
   }
   .editor-size-ultralarge {
     --note-base-size: 1.25rem;
     --note-h1-size: 2.75rem;
     --note-h2-size: 2.25rem;
     --note-h3-size: 1.75rem;
+    --note-h4-size: 1.5rem;
+    --note-h5-size: 1.25rem;
   }
 
   /* Tiptap styles */
@@ -117,7 +126,7 @@
     @apply font-serif leading-[1.8] text-[var(--doc-text)];
     font-size: var(--note-base-size, 1rem);
   }
-  
+
   .ProseMirror p.is-editor-empty:first-child::before {
     content: attr(data-placeholder);
     float: left;
@@ -138,6 +147,14 @@
   .ProseMirror h3 {
     @apply font-sans font-semibold mb-2 mt-5 leading-snug text-[var(--doc-h3)];
     font-size: var(--note-h3-size, 1.25rem);
+  }
+  .ProseMirror h4 {
+    @apply font-sans font-medium mb-2 mt-4 leading-snug text-[var(--doc-h3)];
+    font-size: var(--note-h4-size, 1.125rem);
+  }
+  .ProseMirror h5 {
+    @apply font-sans font-medium mb-1 mt-4 leading-normal text-text-muted;
+    font-size: var(--note-h5-size, 1rem);
   }
   .ProseMirror p {
     @apply mb-4;
@@ -194,7 +211,8 @@
   .ProseMirror table {
     @apply border-collapse table-auto w-full my-4 border border-border;
   }
-  .ProseMirror th, .ProseMirror td {
+  .ProseMirror th,
+  .ProseMirror td {
     @apply border border-border p-2 text-left align-top min-w-[3em];
   }
   .ProseMirror th {
@@ -226,17 +244,23 @@
     padding: 20px !important;
     min-height: 100vh;
   }
-  .pdf-export-mode, .pdf-export-mode * {
+  .pdf-export-mode,
+  .pdf-export-mode * {
     color: black !important;
   }
-  .pdf-export-mode h1, .pdf-export-mode h2, .pdf-export-mode h3 {
+  .pdf-export-mode h1,
+  .pdf-export-mode h2,
+  .pdf-export-mode h3,
+  .pdf-export-mode h4,
+  .pdf-export-mode h5 {
     color: black !important;
   }
   .pdf-export-mode .ProseMirror {
     font-family: serif;
     font-size: 11pt;
   }
-  .pdf-export-mode .bg-surface, .pdf-export-mode .bg-surface-active {
+  .pdf-export-mode .bg-surface,
+  .pdf-export-mode .bg-surface-active {
     background-color: #f8f8f8 !important;
     border-color: #e0e0e0 !important;
   }

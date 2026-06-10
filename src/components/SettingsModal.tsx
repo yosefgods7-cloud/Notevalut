@@ -27,13 +27,18 @@ import {
   Activity,
   Upload,
   FolderPlus,
-  BookText
+  BookText,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { Settings as SettingsType, DEFAULT_SETTINGS } from "../types";
 import { uploadToDrive } from "../lib/drive";
 import { appPrompt, appConfirm } from "./GlobalDialogs";
-import { getPersonalDictionary, addWordToDictionary, removeWordFromDictionary, clearPersonalDictionary } from "../lib/dictionary";
+import {
+  getPersonalDictionary,
+  addWordToDictionary,
+  removeWordFromDictionary,
+  clearPersonalDictionary,
+} from "../lib/dictionary";
 
 import { AISearchScopeSettings } from "./AISearchScopeSettings";
 
@@ -230,7 +235,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   }, [isOpen, data.settings]);
 
   const [isManualBackingUp, setIsManualBackingUp] = useState(false);
-  const [manualBackupProgress, setManualBackupProgress] = useState<{current: number; total: number} | null>(null);
+  const [manualBackupProgress, setManualBackupProgress] = useState<{
+    current: number;
+    total: number;
+  } | null>(null);
 
   const handleManualDriveBackup = async () => {
     if (!accessToken) {
@@ -239,12 +247,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
     setIsManualBackingUp(true);
     setManualBackupProgress({ current: 0, total: 0 });
-    
+
     try {
       const { get } = await import("idb-keyval");
       const storedDataStr = await get("notevault_data");
       const fullData = storedDataStr ? JSON.parse(storedDataStr) : data;
-      
+
       const totalNotes = fullData.notes?.length || 0;
       setManualBackupProgress({ current: 0, total: totalNotes });
 
@@ -252,11 +260,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       for (let i = 0; i < totalNotes; i++) {
         setManualBackupProgress({ current: i + 1, total: totalNotes });
         if (i % 10 === 0) {
-          await new Promise(r => setTimeout(r, 0)); // yield
+          await new Promise((r) => setTimeout(r, 0)); // yield
         }
       }
 
-      await uploadToDrive(accessToken, fullData, undefined, `NoteVault_Manual_Backup_${new Date().toISOString().replace(/:/g, '-')}.json`);
+      await uploadToDrive(
+        accessToken,
+        fullData,
+        undefined,
+        `NoteVault_Manual_Backup_${new Date().toISOString().replace(/:/g, "-")}.json`,
+      );
       setManualBackupProgress({ current: totalNotes, total: totalNotes });
       alert("Manual Backup completed successfully.");
     } catch (err: any) {
@@ -374,19 +387,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </h3>
                 <div className="flex flex-col gap-6 w-full">
                   <div className="flex items-center justify-between pointer-events-auto">
-                    <h4 className="text-sm font-semibold text-text-primary">Holders & Folders</h4>
+                    <h4 className="text-sm font-semibold text-text-primary">
+                      Holders & Folders
+                    </h4>
                     <button
                       onClick={async () => {
                         const name = await appPrompt("New Holder Name:");
                         if (name) {
-                          const icon = await appPrompt("New Holder Icon/Emoji:", "🧠");
+                          const icon = await appPrompt(
+                            "New Holder Icon/Emoji:",
+                            "🧠",
+                          );
                           const newWs = addWorkspace(name, icon || "🧠");
-                          if (data.settings.driveBackup?.enabled && accessToken) {
+                          if (
+                            data.settings.driveBackup?.enabled &&
+                            accessToken
+                          ) {
                             const newData = {
                               ...data,
                               workspaces: [...data.workspaces, newWs],
                             };
-                            uploadToDrive(accessToken, newData, data.settings.driveBackup.fileId).catch(console.error);
+                            uploadToDrive(
+                              accessToken,
+                              newData,
+                              data.settings.driveBackup.fileId,
+                            ).catch(console.error);
                           }
                         }
                       }}
@@ -399,7 +424,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                   <div className="space-y-6">
                     {data.workspaces.map((w) => {
-                      const wsCollections = data.collections.filter((c) => c.workspaceId === w.id);
+                      const wsCollections = data.collections.filter(
+                        (c) => c.workspaceId === w.id,
+                      );
                       return (
                         <div key={w.id} className="flex flex-col gap-3">
                           {/* Workspace Row */}
@@ -413,13 +440,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             <div className="flex items-center gap-1.5">
                               <button
                                 onClick={async () => {
-                                  const name = await appPrompt(`New Folder inside ${w.name}:`);
+                                  const name = await appPrompt(
+                                    `New Folder inside ${w.name}:`,
+                                  );
                                   if (name) {
-                                    const icon = await appPrompt("New Folder Icon/Emoji:", "📁");
-                                    const newCol = addCollection(w.id, name, icon || "📁");
-                                    if (data.settings.driveBackup?.enabled && accessToken) {
-                                      const newData = { ...data, collections: [...data.collections, newCol] };
-                                      uploadToDrive(accessToken, newData, data.settings.driveBackup.fileId).catch(console.error);
+                                    const icon = await appPrompt(
+                                      "New Folder Icon/Emoji:",
+                                      "📁",
+                                    );
+                                    const newCol = addCollection(
+                                      w.id,
+                                      name,
+                                      icon || "📁",
+                                    );
+                                    if (
+                                      data.settings.driveBackup?.enabled &&
+                                      accessToken
+                                    ) {
+                                      const newData = {
+                                        ...data,
+                                        collections: [
+                                          ...data.collections,
+                                          newCol,
+                                        ],
+                                      };
+                                      uploadToDrive(
+                                        accessToken,
+                                        newData,
+                                        data.settings.driveBackup.fileId,
+                                      ).catch(console.error);
                                     }
                                   }
                                 }}
@@ -430,38 +479,79 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               </button>
                               <button
                                 onClick={async () => {
-                                  const newName = await appPrompt("Update Holder Name:", w.name);
+                                  const newName = await appPrompt(
+                                    "Update Holder Name:",
+                                    w.name,
+                                  );
                                   if (newName === null) return;
-                                  const newIcon = await appPrompt("Update Holder Icon:", w.icon);
-                                  updateWorkspace(w.id, { name: newName || w.name, icon: newIcon || w.icon });
-                                  if (data.settings.driveBackup?.enabled && accessToken) {
+                                  const newIcon = await appPrompt(
+                                    "Update Holder Icon:",
+                                    w.icon,
+                                  );
+                                  updateWorkspace(w.id, {
+                                    name: newName || w.name,
+                                    icon: newIcon || w.icon,
+                                  });
+                                  if (
+                                    data.settings.driveBackup?.enabled &&
+                                    accessToken
+                                  ) {
                                     const newData = {
                                       ...data,
                                       workspaces: data.workspaces.map((ws) =>
-                                        ws.id === w.id ? { ...ws, name: newName || w.name, icon: newIcon || w.icon } : ws
+                                        ws.id === w.id
+                                          ? {
+                                              ...ws,
+                                              name: newName || w.name,
+                                              icon: newIcon || w.icon,
+                                            }
+                                          : ws,
                                       ),
                                     };
-                                    uploadToDrive(accessToken, newData, data.settings.driveBackup.fileId).catch(console.error);
+                                    uploadToDrive(
+                                      accessToken,
+                                      newData,
+                                      data.settings.driveBackup.fileId,
+                                    ).catch(console.error);
                                   }
                                 }}
                                 className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-active rounded transition-colors"
                                 title="Edit Holder"
                               >
                                 <Code size={16} className="hidden" />
-                                <span className="text-xs font-medium">Edit</span>
+                                <span className="text-xs font-medium">
+                                  Edit
+                                </span>
                               </button>
                               <button
                                 onClick={async () => {
-                                  if (await appConfirm(`Are you sure you want to completely delete the holder "${w.name}" and ALL its folders and notes? This cannot be undone.`)) {
+                                  if (
+                                    await appConfirm(
+                                      `Are you sure you want to completely delete the holder "${w.name}" and ALL its folders and notes? This cannot be undone.`,
+                                    )
+                                  ) {
                                     deleteWorkspace(w.id);
-                                    if (data.settings.driveBackup?.enabled && accessToken) {
+                                    if (
+                                      data.settings.driveBackup?.enabled &&
+                                      accessToken
+                                    ) {
                                       const newData = {
                                         ...data,
-                                        workspaces: data.workspaces.filter((ws) => ws.id !== w.id),
-                                        collections: data.collections.filter((c) => c.workspaceId !== w.id),
-                                        notes: data.notes.filter((n) => n.workspaceId !== w.id),
+                                        workspaces: data.workspaces.filter(
+                                          (ws) => ws.id !== w.id,
+                                        ),
+                                        collections: data.collections.filter(
+                                          (c) => c.workspaceId !== w.id,
+                                        ),
+                                        notes: data.notes.filter(
+                                          (n) => n.workspaceId !== w.id,
+                                        ),
                                       };
-                                      uploadToDrive(accessToken, newData, data.settings.driveBackup.fileId).catch(console.error);
+                                      uploadToDrive(
+                                        accessToken,
+                                        newData,
+                                        data.settings.driveBackup.fileId,
+                                      ).catch(console.error);
                                     }
                                   }
                                 }}
@@ -482,7 +572,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                   className="flex items-center justify-between bg-surface border border-border rounded-lg p-2.5 hover:border-accent/30 transition-colors"
                                 >
                                   <div className="flex items-center gap-3 overflow-hidden">
-                                    <span className="text-lg shrink-0">{c.icon}</span>
+                                    <span className="text-lg shrink-0">
+                                      {c.icon}
+                                    </span>
                                     <span className="text-sm font-medium text-text-primary truncate">
                                       {c.name}
                                     </span>
@@ -490,36 +582,78 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                   <div className="flex items-center gap-1 shrink-0">
                                     <button
                                       onClick={async () => {
-                                        const newName = await appPrompt("Update Folder Name:", c.name);
+                                        const newName = await appPrompt(
+                                          "Update Folder Name:",
+                                          c.name,
+                                        );
                                         if (newName === null) return;
-                                        const newIcon = await appPrompt("Update Folder Icon:", c.icon);
-                                        updateCollection(c.id, { name: newName || c.name, icon: newIcon || c.icon });
-                                        if (data.settings.driveBackup?.enabled && accessToken) {
+                                        const newIcon = await appPrompt(
+                                          "Update Folder Icon:",
+                                          c.icon,
+                                        );
+                                        updateCollection(c.id, {
+                                          name: newName || c.name,
+                                          icon: newIcon || c.icon,
+                                        });
+                                        if (
+                                          data.settings.driveBackup?.enabled &&
+                                          accessToken
+                                        ) {
                                           const newData = {
                                             ...data,
-                                            collections: data.collections.map((col) =>
-                                              col.id === c.id ? { ...col, name: newName || c.name, icon: newIcon || c.icon } : col
+                                            collections: data.collections.map(
+                                              (col) =>
+                                                col.id === c.id
+                                                  ? {
+                                                      ...col,
+                                                      name: newName || c.name,
+                                                      icon: newIcon || c.icon,
+                                                    }
+                                                  : col,
                                             ),
                                           };
-                                          uploadToDrive(accessToken, newData, data.settings.driveBackup.fileId).catch(console.error);
+                                          uploadToDrive(
+                                            accessToken,
+                                            newData,
+                                            data.settings.driveBackup.fileId,
+                                          ).catch(console.error);
                                         }
                                       }}
                                       className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-active rounded transition-colors"
                                       title="Edit Folder"
                                     >
-                                      <span className="text-xs font-medium">Edit</span>
+                                      <span className="text-xs font-medium">
+                                        Edit
+                                      </span>
                                     </button>
                                     <button
                                       onClick={async () => {
-                                        if (await appConfirm(`Are you sure you want to completely delete the folder "${c.name}" and ALL its notes? This cannot be undone.`)) {
+                                        if (
+                                          await appConfirm(
+                                            `Are you sure you want to completely delete the folder "${c.name}" and ALL its notes? This cannot be undone.`,
+                                          )
+                                        ) {
                                           deleteCollection(c.id);
-                                          if (data.settings.driveBackup?.enabled && accessToken) {
+                                          if (
+                                            data.settings.driveBackup
+                                              ?.enabled &&
+                                            accessToken
+                                          ) {
                                             const newData = {
                                               ...data,
-                                              collections: data.collections.filter((col) => col.id !== c.id),
-                                              notes: data.notes.filter((n) => n.collectionId !== c.id),
+                                              collections:
+                                                data.collections.filter(
+                                                  (col) => col.id !== c.id,
+                                                ),
+                                              notes: data.notes.filter(
+                                                (n) => n.collectionId !== c.id,
+                                              ),
                                             };
-                                            uploadToDrive(accessToken, newData, data.settings.driveBackup.fileId).catch(console.error);
+                                            uploadToDrive(
+                                              accessToken,
+                                              newData,
+                                              data.settings.driveBackup.fileId,
+                                            ).catch(console.error);
                                           }
                                         }
                                       }}
@@ -586,96 +720,165 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                   <div className="flex flex-col bg-surface border border-border p-3 rounded-xl hover:border-accent transition-colors gap-2">
                     <div className="flex justify-between items-center">
-                       <span className="text-sm">Navigation Bar Size</span>
-                       <span className="text-xs text-text-secondary capitalize">{localSettings.navBarSize === 'xlarge' ? 'Extra Large' : localSettings.navBarSize || 'medium'}</span>
+                      <span className="text-sm">Navigation Bar Size</span>
+                      <span className="text-xs text-text-secondary capitalize">
+                        {localSettings.navBarSize === "xlarge"
+                          ? "Extra Large"
+                          : localSettings.navBarSize || "medium"}
+                      </span>
                     </div>
-                    <input 
-                      type="range" 
-                      min="0" max="3" step="1" 
-                      value={["small", "medium", "large", "xlarge"].indexOf(localSettings.navBarSize || "medium")}
+                    <input
+                      type="range"
+                      min="0"
+                      max="3"
+                      step="1"
+                      value={["small", "medium", "large", "xlarge"].indexOf(
+                        localSettings.navBarSize || "medium",
+                      )}
                       onChange={(e) => {
-                        const val = ["small", "medium", "large", "xlarge"][parseInt(e.target.value)];
-                        const newSettings = { ...localSettings, navBarSize: val as any };
+                        const val = ["small", "medium", "large", "xlarge"][
+                          parseInt(e.target.value)
+                        ];
+                        const newSettings = {
+                          ...localSettings,
+                          navBarSize: val as any,
+                        };
                         setLocalSettings(newSettings);
                         updateSettings(newSettings);
                       }}
                       className="w-full accent-accent"
                     />
                     <div className="flex justify-between text-[10px] text-text-muted px-1">
-                      <span>S</span><span>M</span><span>L</span><span>XL</span>
+                      <span>S</span>
+                      <span>M</span>
+                      <span>L</span>
+                      <span>XL</span>
                     </div>
                   </div>
 
                   <div className="flex flex-col bg-surface border border-border p-3 rounded-xl hover:border-accent transition-colors gap-2">
                     <div className="flex justify-between items-center">
-                       <span className="text-sm">Toolbar Bar Size</span>
-                       <span className="text-xs text-text-secondary capitalize">{localSettings.toolbarSize === 'xlarge' ? 'Extra Large' : localSettings.toolbarSize || 'medium'}</span>
+                      <span className="text-sm">Toolbar Bar Size</span>
+                      <span className="text-xs text-text-secondary capitalize">
+                        {localSettings.toolbarSize === "xlarge"
+                          ? "Extra Large"
+                          : localSettings.toolbarSize || "medium"}
+                      </span>
                     </div>
-                    <input 
-                      type="range" 
-                      min="0" max="3" step="1" 
-                      value={["small", "medium", "large", "xlarge"].indexOf(localSettings.toolbarSize || "medium")}
+                    <input
+                      type="range"
+                      min="0"
+                      max="3"
+                      step="1"
+                      value={["small", "medium", "large", "xlarge"].indexOf(
+                        localSettings.toolbarSize || "medium",
+                      )}
                       onChange={(e) => {
-                        const val = ["small", "medium", "large", "xlarge"][parseInt(e.target.value)];
-                        const newSettings = { ...localSettings, toolbarSize: val as any };
+                        const val = ["small", "medium", "large", "xlarge"][
+                          parseInt(e.target.value)
+                        ];
+                        const newSettings = {
+                          ...localSettings,
+                          toolbarSize: val as any,
+                        };
                         setLocalSettings(newSettings);
                         updateSettings(newSettings);
                       }}
                       className="w-full accent-accent"
                     />
                     <div className="flex justify-between text-[10px] text-text-muted px-1">
-                      <span>S</span><span>M</span><span>L</span><span>XL</span>
+                      <span>S</span>
+                      <span>M</span>
+                      <span>L</span>
+                      <span>XL</span>
                     </div>
                   </div>
 
                   <div className="flex flex-col bg-surface border border-border p-3 rounded-xl hover:border-accent transition-colors gap-2">
                     <div className="flex justify-between items-center">
-                       <span className="text-sm">Float Buttons Size</span>
-                       <span className="text-xs text-text-secondary capitalize">{localSettings.floatBtnSize === 'xlarge' ? 'Extra Large' : localSettings.floatBtnSize || 'medium'}</span>
+                      <span className="text-sm">Float Buttons Size</span>
+                      <span className="text-xs text-text-secondary capitalize">
+                        {localSettings.floatBtnSize === "xlarge"
+                          ? "Extra Large"
+                          : localSettings.floatBtnSize || "medium"}
+                      </span>
                     </div>
-                    <input 
-                      type="range" 
-                      min="0" max="3" step="1" 
-                      value={["small", "medium", "large", "xlarge"].indexOf(localSettings.floatBtnSize || "medium")}
+                    <input
+                      type="range"
+                      min="0"
+                      max="3"
+                      step="1"
+                      value={["small", "medium", "large", "xlarge"].indexOf(
+                        localSettings.floatBtnSize || "medium",
+                      )}
                       onChange={(e) => {
-                        const val = ["small", "medium", "large", "xlarge"][parseInt(e.target.value)];
-                        const newSettings = { ...localSettings, floatBtnSize: val as any };
+                        const val = ["small", "medium", "large", "xlarge"][
+                          parseInt(e.target.value)
+                        ];
+                        const newSettings = {
+                          ...localSettings,
+                          floatBtnSize: val as any,
+                        };
                         setLocalSettings(newSettings);
                         updateSettings(newSettings);
                       }}
                       className="w-full accent-accent"
                     />
                     <div className="flex justify-between text-[10px] text-text-muted px-1">
-                      <span>S</span><span>M</span><span>L</span><span>XL</span>
+                      <span>S</span>
+                      <span>M</span>
+                      <span>L</span>
+                      <span>XL</span>
                     </div>
                   </div>
 
                   <div className="flex flex-col bg-surface border border-border p-3 rounded-xl hover:border-accent transition-colors gap-2">
                     <div className="flex justify-between items-center">
-                       <span className="text-sm">System Bars Size</span>
-                       <span className="text-xs text-text-secondary capitalize">{localSettings.systemBarSize === 'xlarge' ? 'Extra Large' : localSettings.systemBarSize || 'medium'}</span>
+                      <span className="text-sm">System Bars Size</span>
+                      <span className="text-xs text-text-secondary capitalize">
+                        {localSettings.systemBarSize === "xlarge"
+                          ? "Extra Large"
+                          : localSettings.systemBarSize || "medium"}
+                      </span>
                     </div>
-                    <input 
-                      type="range" 
-                      min="0" max="3" step="1" 
-                      value={["small", "medium", "large", "xlarge"].indexOf(localSettings.systemBarSize || "medium")}
+                    <input
+                      type="range"
+                      min="0"
+                      max="3"
+                      step="1"
+                      value={["small", "medium", "large", "xlarge"].indexOf(
+                        localSettings.systemBarSize || "medium",
+                      )}
                       onChange={(e) => {
-                        const val = ["small", "medium", "large", "xlarge"][parseInt(e.target.value)];
-                        const newSettings = { ...localSettings, systemBarSize: val as any };
+                        const val = ["small", "medium", "large", "xlarge"][
+                          parseInt(e.target.value)
+                        ];
+                        const newSettings = {
+                          ...localSettings,
+                          systemBarSize: val as any,
+                        };
                         setLocalSettings(newSettings);
                         updateSettings(newSettings);
                       }}
                       className="w-full accent-accent"
                     />
                     <div className="flex justify-between text-[10px] text-text-muted px-1">
-                      <span>S</span><span>M</span><span>L</span><span>XL</span>
+                      <span>S</span>
+                      <span>M</span>
+                      <span>L</span>
+                      <span>XL</span>
                     </div>
                   </div>
-                  
+
                   {/* Custom Colors */}
                   <div className="border border-border rounded-xl p-4 mt-6 bg-surface">
-                    <h4 className="font-semibold text-sm mb-4">Custom Theme Colors</h4>
-                    <p className="text-xs text-text-muted mb-4">Set specific colors to override the selected theme. Leave empty to use theme defaults.</p>
+                    <h4 className="font-semibold text-sm mb-4">
+                      Custom Theme Colors
+                    </h4>
+                    <p className="text-xs text-text-muted mb-4">
+                      Set specific colors to override the selected theme. Leave
+                      empty to use theme defaults.
+                    </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {[
                         { key: "--bg", label: "Background" },
@@ -686,48 +889,69 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         { key: "--text-muted", label: "Muted Text" },
                         { key: "--accent", label: "Accent/Underline/Charts" },
                         { key: "--doc-h1", label: "Editor Headlines" },
-                      ].map(colorVar => (
-                        <div key={colorVar.key} className="flex flex-col gap-1.5">
-                          <label className="text-xs font-medium">{colorVar.label} <span className="text-text-muted/50">({colorVar.key})</span></label>
+                      ].map((colorVar) => (
+                        <div
+                          key={colorVar.key}
+                          className="flex flex-col gap-1.5"
+                        >
+                          <label className="text-xs font-medium">
+                            {colorVar.label}{" "}
+                            <span className="text-text-muted/50">
+                              ({colorVar.key})
+                            </span>
+                          </label>
                           <div className="flex gap-2 items-center">
                             <input
                               type="color"
                               className="w-8 h-8 rounded border-0 p-0 cursor-pointer bg-transparent"
-                              value={localSettings.customColors?.[colorVar.key] || "#000000"}
-                              onChange={(e) => setLocalSettings(s => ({
-                                ...s,
-                                customColors: {
-                                  ...(s.customColors || {}),
-                                  [colorVar.key]: e.target.value
-                                }
-                              }))}
+                              value={
+                                localSettings.customColors?.[colorVar.key] ||
+                                "#000000"
+                              }
+                              onChange={(e) =>
+                                setLocalSettings((s) => ({
+                                  ...s,
+                                  customColors: {
+                                    ...(s.customColors || {}),
+                                    [colorVar.key]: e.target.value,
+                                  },
+                                }))
+                              }
                               title={`Pick ${colorVar.label} Color`}
                             />
                             <input
                               type="text"
                               placeholder="e.g. #000000 or rgb(...)"
                               className="flex-1 bg-background border border-border rounded-md px-2 py-1 text-xs focus:outline-none focus:border-accent"
-                              value={localSettings.customColors?.[colorVar.key] || ""}
-                              onChange={(e) => setLocalSettings(s => ({
-                                ...s,
-                                customColors: {
-                                  ...(s.customColors || {}),
-                                  [colorVar.key]: e.target.value
-                                }
-                              }))}
+                              value={
+                                localSettings.customColors?.[colorVar.key] || ""
+                              }
+                              onChange={(e) =>
+                                setLocalSettings((s) => ({
+                                  ...s,
+                                  customColors: {
+                                    ...(s.customColors || {}),
+                                    [colorVar.key]: e.target.value,
+                                  },
+                                }))
+                              }
                             />
                             {localSettings.customColors?.[colorVar.key] && (
-                               <button 
-                                 title="Clear color override"
-                                 onClick={() => setLocalSettings(s => {
-                                   const newColors = { ...(s.customColors || {}) };
-                                   delete newColors[colorVar.key];
-                                   return { ...s, customColors: newColors };
-                                 })}
-                                 className="text-text-muted hover:text-red-500 p-1 font-bold text-lg leading-none flex items-center justify-center w-6 h-6 rounded-full hover:bg-red-500/10"
-                               >
-                                 &times;
-                               </button>
+                              <button
+                                title="Clear color override"
+                                onClick={() =>
+                                  setLocalSettings((s) => {
+                                    const newColors = {
+                                      ...(s.customColors || {}),
+                                    };
+                                    delete newColors[colorVar.key];
+                                    return { ...s, customColors: newColors };
+                                  })
+                                }
+                                className="text-text-muted hover:text-red-500 p-1 font-bold text-lg leading-none flex items-center justify-center w-6 h-6 rounded-full hover:bg-red-500/10"
+                              >
+                                &times;
+                              </button>
                             )}
                           </div>
                         </div>
@@ -928,7 +1152,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <div className="relative inline-flex items-center cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={localSettings.plugins?.smartLinking?.enabled ?? true}
+                        checked={
+                          localSettings.plugins?.smartLinking?.enabled ?? true
+                        }
                         onChange={(e) => {
                           const checked = e.target.checked;
                           setLocalSettings((s) => ({
@@ -940,7 +1166,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                   maxSuggestions: 5,
                                   triggerMode: "typing",
                                   minWordCount: 10,
-                                  sources: { keywordMatching: true, tagOverlap: true, embeddingSimilarity: false }
+                                  sources: {
+                                    keywordMatching: true,
+                                    tagOverlap: true,
+                                    embeddingSimilarity: false,
+                                  },
                                 }),
                                 enabled: checked,
                               },
@@ -957,40 +1187,77 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <div className="space-y-4 pl-2 pr-2">
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-xs font-medium text-text-secondary mb-1">Max Suggestions</label>
+                          <label className="block text-xs font-medium text-text-secondary mb-1">
+                            Max Suggestions
+                          </label>
                           <input
                             type="number"
                             min={1}
                             max={20}
                             className="bg-surface border border-border rounded px-2 py-1.5 text-sm w-full"
-                            value={localSettings.plugins.smartLinking.maxSuggestions}
-                            onChange={(e) => setLocalSettings(s => ({
-                              ...s, plugins: { ...s.plugins, smartLinking: { ...s.plugins!.smartLinking!, maxSuggestions: Number(e.target.value) } }
-                            }))}
+                            value={
+                              localSettings.plugins.smartLinking.maxSuggestions
+                            }
+                            onChange={(e) =>
+                              setLocalSettings((s) => ({
+                                ...s,
+                                plugins: {
+                                  ...s.plugins,
+                                  smartLinking: {
+                                    ...s.plugins!.smartLinking!,
+                                    maxSuggestions: Number(e.target.value),
+                                  },
+                                },
+                              }))
+                            }
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-text-secondary mb-1">Min Word Count</label>
+                          <label className="block text-xs font-medium text-text-secondary mb-1">
+                            Min Word Count
+                          </label>
                           <input
                             type="number"
                             min={0}
                             className="bg-surface border border-border rounded px-2 py-1.5 text-sm w-full"
-                            value={localSettings.plugins.smartLinking.minWordCount}
-                            onChange={(e) => setLocalSettings(s => ({
-                              ...s, plugins: { ...s.plugins, smartLinking: { ...s.plugins!.smartLinking!, minWordCount: Number(e.target.value) } }
-                            }))}
+                            value={
+                              localSettings.plugins.smartLinking.minWordCount
+                            }
+                            onChange={(e) =>
+                              setLocalSettings((s) => ({
+                                ...s,
+                                plugins: {
+                                  ...s.plugins,
+                                  smartLinking: {
+                                    ...s.plugins!.smartLinking!,
+                                    minWordCount: Number(e.target.value),
+                                  },
+                                },
+                              }))
+                            }
                           />
                         </div>
                       </div>
 
                       <div>
-                        <label className="block text-xs font-medium text-text-secondary mb-1">Trigger Mode</label>
+                        <label className="block text-xs font-medium text-text-secondary mb-1">
+                          Trigger Mode
+                        </label>
                         <select
                           className="bg-surface border border-border rounded px-2 py-1.5 text-sm w-full"
                           value={localSettings.plugins.smartLinking.triggerMode}
-                          onChange={(e) => setLocalSettings(s => ({
-                            ...s, plugins: { ...s.plugins, smartLinking: { ...s.plugins!.smartLinking!, triggerMode: e.target.value as any } }
-                          }))}
+                          onChange={(e) =>
+                            setLocalSettings((s) => ({
+                              ...s,
+                              plugins: {
+                                ...s.plugins,
+                                smartLinking: {
+                                  ...s.plugins!.smartLinking!,
+                                  triggerMode: e.target.value as any,
+                                },
+                              },
+                            }))
+                          }
                         >
                           <option value="typing">While Typing</option>
                           <option value="button">On Demand (Button)</option>
@@ -998,15 +1265,32 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       </div>
 
                       <div className="pt-2">
-                        <label className="block text-xs font-medium text-text-secondary mb-2">Suggestion Sources</label>
+                        <label className="block text-xs font-medium text-text-secondary mb-2">
+                          Suggestion Sources
+                        </label>
                         <div className="space-y-2">
                           <label className="flex items-center gap-2 cursor-pointer">
                             <input
                               type="checkbox"
-                              checked={localSettings.plugins.smartLinking.sources.keywordMatching}
-                              onChange={(e) => setLocalSettings(s => ({
-                                ...s, plugins: { ...s.plugins, smartLinking: { ...s.plugins!.smartLinking!, sources: { ...s.plugins!.smartLinking!.sources, keywordMatching: e.target.checked } } }
-                              }))}
+                              checked={
+                                localSettings.plugins.smartLinking.sources
+                                  .keywordMatching
+                              }
+                              onChange={(e) =>
+                                setLocalSettings((s) => ({
+                                  ...s,
+                                  plugins: {
+                                    ...s.plugins,
+                                    smartLinking: {
+                                      ...s.plugins!.smartLinking!,
+                                      sources: {
+                                        ...s.plugins!.smartLinking!.sources,
+                                        keywordMatching: e.target.checked,
+                                      },
+                                    },
+                                  },
+                                }))
+                              }
                               className="rounded border-border text-pink-500 focus:ring-pink-500"
                             />
                             <span className="text-sm">Keyword Matching</span>
@@ -1014,10 +1298,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           <label className="flex items-center gap-2 cursor-pointer">
                             <input
                               type="checkbox"
-                              checked={localSettings.plugins.smartLinking.sources.tagOverlap}
-                              onChange={(e) => setLocalSettings(s => ({
-                                ...s, plugins: { ...s.plugins, smartLinking: { ...s.plugins!.smartLinking!, sources: { ...s.plugins!.smartLinking!.sources, tagOverlap: e.target.checked } } }
-                              }))}
+                              checked={
+                                localSettings.plugins.smartLinking.sources
+                                  .tagOverlap
+                              }
+                              onChange={(e) =>
+                                setLocalSettings((s) => ({
+                                  ...s,
+                                  plugins: {
+                                    ...s.plugins,
+                                    smartLinking: {
+                                      ...s.plugins!.smartLinking!,
+                                      sources: {
+                                        ...s.plugins!.smartLinking!.sources,
+                                        tagOverlap: e.target.checked,
+                                      },
+                                    },
+                                  },
+                                }))
+                              }
                               className="rounded border-border text-pink-500 focus:ring-pink-500"
                             />
                             <span className="text-sm">Tag Overlap</span>
@@ -1025,43 +1324,83 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           <label className="flex items-center gap-2 cursor-pointer">
                             <input
                               type="checkbox"
-                              checked={localSettings.plugins.smartLinking.sources.embeddingSimilarity}
-                              onChange={(e) => setLocalSettings(s => ({
-                                ...s, plugins: { ...s.plugins, smartLinking: { ...s.plugins!.smartLinking!, sources: { ...s.plugins!.smartLinking!.sources, embeddingSimilarity: e.target.checked } } }
-                              }))}
+                              checked={
+                                localSettings.plugins.smartLinking.sources
+                                  .embeddingSimilarity
+                              }
+                              onChange={(e) =>
+                                setLocalSettings((s) => ({
+                                  ...s,
+                                  plugins: {
+                                    ...s.plugins,
+                                    smartLinking: {
+                                      ...s.plugins!.smartLinking!,
+                                      sources: {
+                                        ...s.plugins!.smartLinking!.sources,
+                                        embeddingSimilarity: e.target.checked,
+                                      },
+                                    },
+                                  },
+                                }))
+                              }
                               className="rounded border-border text-pink-500 focus:ring-pink-500"
                             />
-                            <span className="text-sm">Embedding Similarity (IndexedDB)</span>
+                            <span className="text-sm">
+                              Embedding Similarity (IndexedDB)
+                            </span>
                           </label>
                         </div>
                       </div>
                     </div>
                   )}
-                  
-                  <AutoStructureSettingsPanel 
-                     settings={localSettings} 
-                     onUpdate={setLocalSettings} 
-                     collections={data.collections} 
+
+                  <AutoStructureSettingsPanel
+                    settings={localSettings}
+                    onUpdate={setLocalSettings}
+                    collections={data.collections}
                   />
-                  <BrainMapSettingsPanel settings={localSettings} onUpdate={setLocalSettings} />
-                  <AskYourVaultSettingsPanel 
-                     settings={localSettings} 
-                     onUpdate={setLocalSettings} 
-                     apiUsage={(() => {
-                       const keyId = localSettings.featureApiConfigs?.chatKeyId || (localSettings.apiKeys && localSettings.apiKeys[0]?.id) || 'legacy';
-                       return data.settings.apiUsageByKey?.[keyId] || (keyId === 'legacy' ? data.settings.apiUsage : undefined);
-                     })()} 
+                  <BrainMapSettingsPanel
+                    settings={localSettings}
+                    onUpdate={setLocalSettings}
                   />
-                  <DailyDigestSettingsPanel 
-                     settings={localSettings} 
-                     onUpdate={setLocalSettings} 
-                     apiUsageCount={(() => {
-                       const keyId = localSettings.featureApiConfigs?.digestKeyId || (localSettings.apiKeys && localSettings.apiKeys[0]?.id) || 'legacy';
-                       const u = data.settings.apiUsageByKey?.[keyId] || (keyId === 'legacy' ? data.settings.apiUsage : undefined);
-                       return u?.date === new Date().toISOString().split('T')[0]
-                         ? (u.embeddingCount || 0) + (u.answerCount || 0) + (u.digestCount || 0) + (u.editorCount || 0) 
-                         : 0;
-                     })()} 
+                  <AskYourVaultSettingsPanel
+                    settings={localSettings}
+                    onUpdate={setLocalSettings}
+                    apiUsage={(() => {
+                      const keyId =
+                        localSettings.featureApiConfigs?.chatKeyId ||
+                        (localSettings.apiKeys &&
+                          localSettings.apiKeys[0]?.id) ||
+                        "legacy";
+                      return (
+                        data.settings.apiUsageByKey?.[keyId] ||
+                        (keyId === "legacy"
+                          ? data.settings.apiUsage
+                          : undefined)
+                      );
+                    })()}
+                  />
+                  <DailyDigestSettingsPanel
+                    settings={localSettings}
+                    onUpdate={setLocalSettings}
+                    apiUsageCount={(() => {
+                      const keyId =
+                        localSettings.featureApiConfigs?.digestKeyId ||
+                        (localSettings.apiKeys &&
+                          localSettings.apiKeys[0]?.id) ||
+                        "legacy";
+                      const u =
+                        data.settings.apiUsageByKey?.[keyId] ||
+                        (keyId === "legacy"
+                          ? data.settings.apiUsage
+                          : undefined);
+                      return u?.date === new Date().toISOString().split("T")[0]
+                        ? (u.embeddingCount || 0) +
+                            (u.answerCount || 0) +
+                            (u.digestCount || 0) +
+                            (u.editorCount || 0)
+                        : 0;
+                    })()}
                   />
                 </div>
               </div>
@@ -1121,7 +1460,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </label>
 
                   <div className="border-t border-border pt-4">
-                    <div className="text-sm font-medium mb-1">Highlight Colors</div>
+                    <div className="text-sm font-medium mb-1">
+                      Highlight Colors
+                    </div>
                     <div className="text-xs text-text-muted mb-4">
                       Customize the background color for ==highlighted text==.
                     </div>
@@ -1131,12 +1472,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         { name: "Green", value: "#4ade80" },
                         { name: "Blue", value: "#60a5fa" },
                         { name: "Pink", value: "#f472b6" },
-                        { name: "Orange", value: "#fb923c" }
-                      ].map(color => (
+                        { name: "Orange", value: "#fb923c" },
+                      ].map((color) => (
                         <button
                           key={color.value}
-                          onClick={() => setLocalSettings(s => ({ ...s, highlightColor: color.value }))}
-                          className={`w-8 h-8 rounded-full border-2 ${localSettings.highlightColor === color.value ? 'border-primary' : 'border-transparent'}`}
+                          onClick={() =>
+                            setLocalSettings((s) => ({
+                              ...s,
+                              highlightColor: color.value,
+                            }))
+                          }
+                          className={`w-8 h-8 rounded-full border-2 ${localSettings.highlightColor === color.value ? "border-primary" : "border-transparent"}`}
                           style={{ backgroundColor: color.value }}
                           title={color.name}
                         />
@@ -1145,67 +1491,117 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
 
                   <div className="border-t border-border pt-4">
-                    <div className="text-sm font-medium mb-1">Callout Styles</div>
+                    <div className="text-sm font-medium mb-1">
+                      Callout Styles
+                    </div>
                     <div className="text-xs text-text-muted mb-4">
                       Customize colors and icons for each callout type.
                     </div>
                     <div className="space-y-3">
-                      {Object.keys(localSettings.calloutStyles || DEFAULT_SETTINGS.calloutStyles || {}).map(type => {
-                        const style = (localSettings.calloutStyles || DEFAULT_SETTINGS.calloutStyles || {})[type];
+                      {Object.keys(
+                        localSettings.calloutStyles ||
+                          DEFAULT_SETTINGS.calloutStyles ||
+                          {},
+                      ).map((type) => {
+                        const style = (localSettings.calloutStyles ||
+                          DEFAULT_SETTINGS.calloutStyles ||
+                          {})[type];
                         return (
                           <div key={type} className="flex items-center gap-3">
-                            <div className="w-24 text-sm font-semibold">{type}</div>
-                            <input 
-                              type="color" 
-                              value={style?.color || "#000000"} 
-                              onChange={(e) => setLocalSettings(s => ({
-                                ...s,
-                                calloutStyles: {
-                                  ...(s.calloutStyles || DEFAULT_SETTINGS.calloutStyles || {}),
-                                  [type]: { ...((s.calloutStyles || DEFAULT_SETTINGS.calloutStyles || {})[type] || { icon: "Info", color: "#000" }), color: e.target.value }
-                                }
-                              }))}
+                            <div className="w-24 text-sm font-semibold">
+                              {type}
+                            </div>
+                            <input
+                              type="color"
+                              value={style?.color || "#000000"}
+                              onChange={(e) =>
+                                setLocalSettings((s) => ({
+                                  ...s,
+                                  calloutStyles: {
+                                    ...(s.calloutStyles ||
+                                      DEFAULT_SETTINGS.calloutStyles ||
+                                      {}),
+                                    [type]: {
+                                      ...((s.calloutStyles ||
+                                        DEFAULT_SETTINGS.calloutStyles ||
+                                        {})[type] || {
+                                        icon: "Info",
+                                        color: "#000",
+                                      }),
+                                      color: e.target.value,
+                                    },
+                                  },
+                                }))
+                              }
                               className="w-8 h-8 rounded shrink-0 border border-border bg-transparent p-0 overflow-hidden cursor-pointer"
                             />
                             <select
                               value={style?.icon || "Info"}
-                              onChange={(e) => setLocalSettings(s => ({
-                                ...s,
-                                calloutStyles: {
-                                  ...(s.calloutStyles || DEFAULT_SETTINGS.calloutStyles || {}),
-                                  [type]: { ...((s.calloutStyles || DEFAULT_SETTINGS.calloutStyles || {})[type] || { color: "#000", icon: "Info" }), icon: e.target.value }
-                                }
-                              }))}
+                              onChange={(e) =>
+                                setLocalSettings((s) => ({
+                                  ...s,
+                                  calloutStyles: {
+                                    ...(s.calloutStyles ||
+                                      DEFAULT_SETTINGS.calloutStyles ||
+                                      {}),
+                                    [type]: {
+                                      ...((s.calloutStyles ||
+                                        DEFAULT_SETTINGS.calloutStyles ||
+                                        {})[type] || {
+                                        color: "#000",
+                                        icon: "Info",
+                                      }),
+                                      icon: e.target.value,
+                                    },
+                                  },
+                                }))
+                              }
                               className="flex-1 bg-surface-active border border-border rounded px-2 py-1.5 text-sm"
                             >
                               <option value="Info">Info</option>
                               <option value="BookOpen">BookOpen</option>
                               <option value="AlertCircle">AlertCircle</option>
                               <option value="HelpCircle">HelpCircle</option>
-                              <option value="AlertTriangle">AlertTriangle</option>
+                              <option value="AlertTriangle">
+                                AlertTriangle
+                              </option>
                               <option value="Lightbulb">Lightbulb</option>
                               <option value="Star">Star</option>
                               <option value="Zap">Zap</option>
                               <option value="Flag">Flag</option>
                             </select>
                           </div>
-                        )
+                        );
                       })}
                     </div>
                   </div>
 
                   <div className="border-t border-border pt-4">
-                    <div className="text-sm font-medium mb-1">Default Callout</div>
+                    <div className="text-sm font-medium mb-1">
+                      Default Callout
+                    </div>
                     <div className="text-xs text-text-muted mb-2">
-                      Select which callout type is used by default when clicking the Callout button.
+                      Select which callout type is used by default when clicking
+                      the Callout button.
                     </div>
                     <select
                       value={localSettings.defaultCallout || "NOTE"}
-                      onChange={e => setLocalSettings(s => ({ ...s, defaultCallout: e.target.value }))}
+                      onChange={(e) =>
+                        setLocalSettings((s) => ({
+                          ...s,
+                          defaultCallout: e.target.value,
+                        }))
+                      }
                       className="w-full bg-surface-active border border-border rounded px-3 py-2 text-sm"
                     >
-                      {Object.keys(localSettings.calloutStyles || DEFAULT_SETTINGS.calloutStyles || {}).map(type => (
-                         <option key={type} value={type}>{type}</option>
+                      {Object.keys(
+                        localSettings.calloutStyles ||
+                          DEFAULT_SETTINGS.calloutStyles ||
+                          {},
+                      ).map((type) => (
+                        <option key={type} value={type}>
+                          {type}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -1305,6 +1701,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         "h1",
                         "h2",
                         "h3",
+                        "h4",
+                        "h5",
                         "bold",
                         "italic",
                         "underline",
@@ -1338,6 +1736,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             "h1",
                             "h2",
                             "h3",
+                            "h4",
+                            "h5",
                             "bold",
                             "italic",
                             "underline",
@@ -1405,9 +1805,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </h3>
                 <div className="bg-surface border border-border p-4 rounded-xl">
                   <p className="text-sm text-text-muted mb-4">
-                    Manage your personal vocabulary. These words will not be flagged as misspellings by the editor spell checker.
+                    Manage your personal vocabulary. These words will not be
+                    flagged as misspellings by the editor spell checker.
                   </p>
-                  
+
                   <div className="flex gap-2 items-center mb-4">
                     <input
                       type="text"
@@ -1416,10 +1817,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       value={newDictWord}
                       onChange={(e) => setNewDictWord(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter' && newDictWord.trim()) {
+                        if (e.key === "Enter" && newDictWord.trim()) {
                           addWordToDictionary(newDictWord.trim()).then(() => {
-                             setNewDictWord("");
-                             getPersonalDictionary().then(setPersonalDictionary);
+                            setNewDictWord("");
+                            getPersonalDictionary().then(setPersonalDictionary);
                           });
                         }
                       }}
@@ -1429,25 +1830,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       disabled={!newDictWord.trim()}
                       onClick={() => {
                         addWordToDictionary(newDictWord.trim()).then(() => {
-                           setNewDictWord("");
-                           getPersonalDictionary().then(setPersonalDictionary);
+                          setNewDictWord("");
+                          getPersonalDictionary().then(setPersonalDictionary);
                         });
                       }}
                     >
                       Add
                     </button>
                   </div>
-                  
+
                   <div className="mb-4">
-                     <input
-                        type="text"
-                        className="w-full bg-surface rounded border border-border px-3 py-1.5 text-sm focus:outline-none focus:border-accent text-text-primary placeholder:text-text-muted/50"
-                        placeholder="Search your dictionary..."
-                        value={dictSearchTerm}
-                        onChange={(e) => setDictSearchTerm(e.target.value)}
-                     />
+                    <input
+                      type="text"
+                      className="w-full bg-surface rounded border border-border px-3 py-1.5 text-sm focus:outline-none focus:border-accent text-text-primary placeholder:text-text-muted/50"
+                      placeholder="Search your dictionary..."
+                      value={dictSearchTerm}
+                      onChange={(e) => setDictSearchTerm(e.target.value)}
+                    />
                   </div>
-                  
+
                   {personalDictionary.length === 0 ? (
                     <div className="text-center text-text-muted text-sm py-4 italic">
                       Your personal dictionary is currently empty.
@@ -1455,38 +1856,60 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   ) : (
                     <div className="max-h-60 overflow-y-auto border border-border rounded-lg bg-surface divide-y divide-border/50">
                       {personalDictionary
-                        .filter(w => dictSearchTerm ? w.toLowerCase().includes(dictSearchTerm.toLowerCase()) : true)
-                        .map(word => (
-                        <div key={word} className="flex justify-between items-center px-3 py-2 text-sm text-text-primary group">
-                           <span>{word}</span>
-                           <button
-                             className="text-text-muted hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                             onClick={() => {
-                               removeWordFromDictionary(word).then(() => {
-                                  getPersonalDictionary().then(setPersonalDictionary);
-                               });
-                             }}
-                             title="Remove word"
-                           >
-                             <Minus size={14} />
-                           </button>
-                        </div>
-                      ))}
-                      {dictSearchTerm && personalDictionary.filter(w => w.toLowerCase().includes(dictSearchTerm.toLowerCase())).length === 0 && (
-                         <div className="px-3 py-2 text-sm text-text-muted italic">No words match your search.</div>
-                      )}
+                        .filter((w) =>
+                          dictSearchTerm
+                            ? w
+                                .toLowerCase()
+                                .includes(dictSearchTerm.toLowerCase())
+                            : true,
+                        )
+                        .map((word) => (
+                          <div
+                            key={word}
+                            className="flex justify-between items-center px-3 py-2 text-sm text-text-primary group"
+                          >
+                            <span>{word}</span>
+                            <button
+                              className="text-text-muted hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => {
+                                removeWordFromDictionary(word).then(() => {
+                                  getPersonalDictionary().then(
+                                    setPersonalDictionary,
+                                  );
+                                });
+                              }}
+                              title="Remove word"
+                            >
+                              <Minus size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      {dictSearchTerm &&
+                        personalDictionary.filter((w) =>
+                          w
+                            .toLowerCase()
+                            .includes(dictSearchTerm.toLowerCase()),
+                        ).length === 0 && (
+                          <div className="px-3 py-2 text-sm text-text-muted italic">
+                            No words match your search.
+                          </div>
+                        )}
                     </div>
                   )}
-                  
+
                   {personalDictionary.length > 0 && (
                     <div className="mt-4 flex justify-end">
                       <button
                         className="text-xs text-red-500 font-medium hover:underline px-2 py-1 transition-colors"
                         onClick={() => {
-                          if (confirm("Are you sure you want to clear your entire personal dictionary?")) {
-                             clearPersonalDictionary().then(() => {
-                                setPersonalDictionary([]);
-                             });
+                          if (
+                            confirm(
+                              "Are you sure you want to clear your entire personal dictionary?",
+                            )
+                          ) {
+                            clearPersonalDictionary().then(() => {
+                              setPersonalDictionary([]);
+                            });
                           }
                         }}
                       >
@@ -1505,10 +1928,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <Cpu className="text-blue-500" /> AI Features
                 </h3>
                 <div className="space-y-4">
-                  <ApiKeysSettingsPanel localSettings={localSettings} setLocalSettings={setLocalSettings} />
-                  
+                  <ApiKeysSettingsPanel
+                    localSettings={localSettings}
+                    setLocalSettings={setLocalSettings}
+                  />
+
                   {/* Search Scope */}
-                  <AISearchScopeSettings localSettings={localSettings} setLocalSettings={setLocalSettings} />
+                  <AISearchScopeSettings
+                    localSettings={localSettings}
+                    setLocalSettings={setLocalSettings}
+                  />
                 </div>
               </div>
             )}
@@ -1681,10 +2110,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           </div>
                         </div>
                       )}
-                      
+
                       <div className="pt-3 mt-3 border-t border-border flex flex-col gap-3">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs text-text-secondary">Manual Full Backup</span>
+                          <span className="text-xs text-text-secondary">
+                            Manual Full Backup
+                          </span>
                           <button
                             onClick={handleManualDriveBackup}
                             disabled={isManualBackingUp}
@@ -1694,15 +2125,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           </button>
                         </div>
                         {isManualBackingUp && manualBackupProgress && (
-                           <div className="space-y-1 mt-1">
-                             <div className="flex justify-between text-[10px] text-text-muted">
-                               <span>Backing up...</span>
-                               <span>{manualBackupProgress.current} / {manualBackupProgress.total} notes</span>
-                             </div>
-                             <div className="w-full bg-surface-active rounded-full h-1.5">
-                               <div className="bg-green-500 h-1.5 rounded-full transition-all duration-300" style={{ width: `${(manualBackupProgress.current / (manualBackupProgress.total || 1)) * 100}%` }}></div>
-                             </div>
-                           </div>
+                          <div className="space-y-1 mt-1">
+                            <div className="flex justify-between text-[10px] text-text-muted">
+                              <span>Backing up...</span>
+                              <span>
+                                {manualBackupProgress.current} /{" "}
+                                {manualBackupProgress.total} notes
+                              </span>
+                            </div>
+                            <div className="w-full bg-surface-active rounded-full h-1.5">
+                              <div
+                                className="bg-green-500 h-1.5 rounded-full transition-all duration-300"
+                                style={{
+                                  width: `${(manualBackupProgress.current / (manualBackupProgress.total || 1)) * 100}%`,
+                                }}
+                              ></div>
+                            </div>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -1769,9 +2208,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             )}
 
             {/* Vault Health */}
-            {expandedSection === "Health" && (
-              <VaultHealthDashboard />
-            )}
+            {expandedSection === "Health" && <VaultHealthDashboard />}
           </div>
         </div>
 
@@ -1798,22 +2235,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <Cloud size={18} className="text-accent" /> Restore Backup
               </h3>
               <p className="text-sm text-text-secondary mb-4 leading-relaxed">
-                You are about to completely override your local vault with a backup from Firebase. This action cannot be easily undone.
+                You are about to completely override your local vault with a
+                backup from Firebase. This action cannot be easily undone.
               </p>
 
               <div className="bg-surface-active rounded-lg p-3 mb-5 border border-border grid grid-cols-2 gap-4">
-                 <div>
-                    <span className="text-[10px] uppercase text-text-muted font-semibold tracking-wider block">Backup Date</span>
-                    <span className="text-xs font-medium text-text-primary break-all">
-                       {cloudPreview.backupDate ? new Date(cloudPreview.backupDate).toLocaleString() : 'Unknown'}
-                    </span>
-                 </div>
-                 <div>
-                    <span className="text-[10px] uppercase text-text-muted font-semibold tracking-wider block">Total Notes</span>
-                    <span className="text-xs font-medium text-text-primary">
-                       {cloudPreview.noteCount}
-                    </span>
-                 </div>
+                <div>
+                  <span className="text-[10px] uppercase text-text-muted font-semibold tracking-wider block">
+                    Backup Date
+                  </span>
+                  <span className="text-xs font-medium text-text-primary break-all">
+                    {cloudPreview.backupDate
+                      ? new Date(cloudPreview.backupDate).toLocaleString()
+                      : "Unknown"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase text-text-muted font-semibold tracking-wider block">
+                    Total Notes
+                  </span>
+                  <span className="text-xs font-medium text-text-primary">
+                    {cloudPreview.noteCount}
+                  </span>
+                </div>
               </div>
 
               <div className="flex justify-end gap-3 mt-4">

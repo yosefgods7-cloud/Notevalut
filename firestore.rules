@@ -14,6 +14,7 @@ service cloud.firestore {
     function isValidUserSetting(data) {
       return data.keys().hasAll(['userId', 'settings', 'tags', 'updatedAt']) &&
              data.userId is string &&
+             (data.keys().hasAll(['email']) == false || data.email is string) &&
              data.settings is map &&
              data.tags is list && data.tags.size() <= 100 &&
              data.updatedAt is string;
@@ -62,12 +63,14 @@ service cloud.firestore {
              (data.keys().hasAll(['charts']) == false || data.charts is list);
     }
 
+    function isSameEmail(emailStr) { return isSignedIn() && request.auth.token.email != null && request.auth.token.email == emailStr; }
+    
     match /users/{userId} {
       match /settings/{settingId} {
-        allow get, list: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidId(settingId) && isValidUserSetting(incoming()) && incoming().userId == userId && incoming().keys().size() <= 5;
-        allow update: if isOwner(userId) && isValidId(settingId) && isValidUserSetting(incoming()) && incoming().userId == existing().userId && incoming().diff(existing()).affectedKeys().hasOnly(['settings', 'tags', 'updatedAt', 'userId']);
-        allow delete: if isOwner(userId);
+        allow read: if isOwner(userId) || isSameEmail(resource.data.email);
+        allow create: if isOwner(userId) && isValidId(settingId) && isValidUserSetting(incoming()) && incoming().userId == userId && incoming().keys().size() <= 6;
+        allow update: if isOwner(userId) && isValidId(settingId) && isValidUserSetting(incoming()) && incoming().userId == existing().userId && incoming().diff(existing()).affectedKeys().hasOnly(['settings', 'tags', 'updatedAt', 'userId', 'email']);
+        allow delete: if isOwner(userId) || isSameEmail(existing().email);
       }
       
       match /workspaces/{workspaceId} {
@@ -83,12 +86,12 @@ service cloud.firestore {
         allow update: if isOwner(userId) && isValidId(collectionId) && isValidCollection(incoming()) && incoming().userId == existing().userId && incoming().id == existing().id && incoming().workspaceId == existing().workspaceId && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'icon', 'order', 'userId']);
         allow delete: if isOwner(userId);
       }
-
+      
       match /notes/{noteId} {
-        allow get, list: if isOwner(userId);
+        allow read: if isOwner(userId) || (isSignedIn() && exists(/databases/$(database)/documents/users/$(userId)/settings/default) && isSameEmail(get(/databases/$(database)/documents/users/$(userId)/settings/default).data.email));
         allow create: if isOwner(userId) && isValidId(noteId) && isValidNote(incoming()) && incoming().userId == userId && incoming().keys().size() <= 17;
         allow update: if isOwner(userId) && isValidId(noteId) && isValidNote(incoming()) && incoming().userId == existing().userId && incoming().id == existing().id && incoming().diff(existing()).affectedKeys().hasOnly(['workspaceId', 'collectionId', 'title', 'content', 'tags', 'pinned', 'starred', 'isDeleted', 'deletedAt', 'updatedAt', 'wordCount', 'headerMeta', 'images', 'attachments', 'charts', 'userId']);
-        allow delete: if isOwner(userId);
+        allow delete: if isOwner(userId) || (isSignedIn() && exists(/databases/$(database)/documents/users/$(userId)/settings/default) && isSameEmail(get(/databases/$(database)/documents/users/$(userId)/settings/default).data.email));
       }
     }
   }

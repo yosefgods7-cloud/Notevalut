@@ -1,5 +1,11 @@
-import React, { useEffect, useState, useCallback, useRef, useMemo } from "react";
-import { Note } from '../types';
+import React, {
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
+import { Note } from "../types";
 import { useStorage } from "../context/StorageContext";
 import { useAuth } from "../context/AuthContext";
 import { uploadToDrive } from "../lib/drive";
@@ -26,8 +32,17 @@ import { CalloutBlockquote } from "../lib/CalloutExtension";
 import { FoldableBlock } from "../lib/FoldableExtension";
 import { FontSize } from "../lib/FontSize";
 import { WikiLink } from "../lib/WikiLink";
-import { SpellCheckExtension, SpellCheckPluginKey, setSpellCheckEnabled } from "../lib/SpellCheckExtension";
-import { loadSpellchecker, unloadSpellchecker, getSuggestions, addWordToDictionary } from "../lib/dictionary";
+import {
+  SpellCheckExtension,
+  SpellCheckPluginKey,
+  setSpellCheckEnabled,
+} from "../lib/SpellCheckExtension";
+import {
+  loadSpellchecker,
+  unloadSpellchecker,
+  getSuggestions,
+  addWordToDictionary,
+} from "../lib/dictionary";
 import { cleanAIPaste } from "../lib/paste-cleaner";
 import { getSelectedApiKey } from "../hooks/useAI";
 import { NoteHistoryModal } from "./NoteHistoryModal";
@@ -37,9 +52,11 @@ import { ChartRenderer } from "./ChartRenderer";
 import { TableControls } from "./TableControls";
 import { TaskDashboard } from "./TaskDashboard";
 import { appPrompt } from "./GlobalDialogs";
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense } from "react";
 
-const SmartSearchPanel = lazy(() => import('./SmartSearchPanel').then(m => ({ default: m.SmartSearchPanel })));
+const SmartSearchPanel = lazy(() =>
+  import("./SmartSearchPanel").then((m) => ({ default: m.SmartSearchPanel })),
+);
 import {
   Bold,
   Italic,
@@ -47,6 +64,8 @@ import {
   Heading1,
   Heading2,
   Heading3,
+  Heading4,
+  Heading5,
   List,
   ListOrdered,
   CheckSquare,
@@ -92,7 +111,7 @@ import {
   Minimize,
   Highlighter,
   MessageSquareWarning,
-  FoldVertical
+  FoldVertical,
 } from "lucide-react";
 import { cn, generateId } from "../lib/utils";
 import { format } from "date-fns";
@@ -132,7 +151,10 @@ import html2pdf from "html2pdf.js";
 
 const preprocessWikilinks = (html: string) => {
   if (!html) return html;
-  return html.replace(/\[\[([^\]<>]+)\]\]/g, '<span data-wiki-link="true" data-target="$1"><span class="wiki-bracket text-accent/50">[[</span>$1<span class="wiki-bracket text-accent/50">]]</span></span>');
+  return html.replace(
+    /\[\[([^\]<>]+)\]\]/g,
+    '<span data-wiki-link="true" data-target="$1"><span class="wiki-bracket text-accent/50">[[</span>$1<span class="wiki-bracket text-accent/50">]]</span></span>',
+  );
 };
 
 const turndownService = new TurndownService();
@@ -215,18 +237,22 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
 
   const tagFrequencies = useMemo(() => {
     const freqs: Record<string, number> = {};
-    data.notes.forEach(n => {
-      n.tags?.forEach(t => {
+    data.notes.forEach((n) => {
+      n.tags?.forEach((t) => {
         freqs[t] = (freqs[t] || 0) + 1;
       });
     });
-    return Object.entries(freqs).sort((a, b) => b[1] - a[1]).map(e => e[0]);
+    return Object.entries(freqs)
+      .sort((a, b) => b[1] - a[1])
+      .map((e) => e[0]);
   }, [data.notes]);
 
   const tagSuggestions = useMemo(() => {
     if (!tagInput.trim()) return [];
     const search = tagInput.toLowerCase().replace(/^#+/, "");
-    return tagFrequencies.filter(t => t.toLowerCase().includes(search) && !tags.includes(t));
+    return tagFrequencies.filter(
+      (t) => t.toLowerCase().includes(search) && !tags.includes(t),
+    );
   }, [tagInput, tagFrequencies, tags]);
 
   useEffect(() => {
@@ -253,7 +279,13 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const pdfContainerRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
-  const [spellCheckPopup, setSpellCheckPopup] = useState<{ x: number, y: number, word: string, suggestions: string[], pos: number } | null>(null);
+  const [spellCheckPopup, setSpellCheckPopup] = useState<{
+    x: number;
+    y: number;
+    word: string;
+    suggestions: string[];
+    pos: number;
+  } | null>(null);
   const [isDictating, setIsDictating] = useState(false);
   const [isSmartSearchOpen, setIsSmartSearchOpen] = useState(false);
   const recognitionRef = useRef<any>(null);
@@ -265,7 +297,9 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
   }>({ loading: false, text: null, open: false });
 
   const [isCalloutDropdownOpen, setCalloutDropdownOpen] = useState(false);
-  const [smartLinkingSuggestions, setSmartLinkingSuggestions] = useState<Note[]>([]);
+  const [smartLinkingSuggestions, setSmartLinkingSuggestions] = useState<
+    Note[]
+  >([]);
 
   const backlinks = React.useMemo(() => {
     if (!note) return [];
@@ -291,33 +325,43 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
 
   // Helper
   const checkAndIncrementAPI = (keyId: string) => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toISOString().split("T")[0];
     const keyUsageMap = data.settings.apiUsageByKey || {};
-    const u = keyUsageMap[keyId] || (keyId === "legacy" ? data.settings.apiUsage : undefined);
-    
-    const current = u?.date === today ? (u.embeddingCount || 0) + (u.answerCount || 0) + (u.digestCount || 0) + (u.editorCount || 0) : 0;
+    const u =
+      keyUsageMap[keyId] ||
+      (keyId === "legacy" ? data.settings.apiUsage : undefined);
+
+    const current =
+      u?.date === today
+        ? (u.embeddingCount || 0) +
+          (u.answerCount || 0) +
+          (u.digestCount || 0) +
+          (u.editorCount || 0)
+        : 0;
     if (current >= 1400) {
-      throw new Error(`Daily API limit reached (1400/1500 limit) for key: ${keyId}`);
+      throw new Error(
+        `Daily API limit reached (1400/1500 limit) for key: ${keyId}`,
+      );
     }
-    
+
     const newUsage = {
       date: today,
-      embeddingCount: u?.date === today ? (u.embeddingCount || 0) : 0,
-      answerCount: u?.date === today ? (u.answerCount || 0) : 0,
-      digestCount: u?.date === today ? (u.digestCount || 0) : 0,
-      editorCount: (u?.date === today ? (u.editorCount || 0) : 0) + 1,
+      embeddingCount: u?.date === today ? u.embeddingCount || 0 : 0,
+      answerCount: u?.date === today ? u.answerCount || 0 : 0,
+      digestCount: u?.date === today ? u.digestCount || 0 : 0,
+      editorCount: (u?.date === today ? u.editorCount || 0 : 0) + 1,
     };
-    
+
     const updatedMap = { ...keyUsageMap, [keyId]: newUsage };
     const updates: any = { apiUsageByKey: updatedMap };
-    if (keyId === 'legacy') updates.apiUsage = newUsage;
+    if (keyId === "legacy") updates.apiUsage = newUsage;
 
     updateSettings(updates);
   };
 
   const handleSummarizeNote = async () => {
     if (!editor) return;
-    const keyInfo = getSelectedApiKey(data.settings, 'editor');
+    const keyInfo = getSelectedApiKey(data.settings, "editor");
     if (!keyInfo) {
       showToast("AI features require an API key to be set");
       return;
@@ -329,7 +373,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
 
     try {
       checkAndIncrementAPI(keyInfo.id);
-      
+
       const response = await ai!.models.generateContent({
         model: "gemini-3.5-flash",
         contents: `Please summarize the following note in a concise but comprehensive way:\n\n${textContent}`,
@@ -387,9 +431,12 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
         // Try to pick a local voice if populated
         const voices = window.speechSynthesis.getVoices();
         if (voices.length > 0) {
-          const localVoice = voices.find(v => v.localService && (v.lang === utterance.lang || v.default)) || voices[0];
+          const localVoice =
+            voices.find(
+              (v) => v.localService && (v.lang === utterance.lang || v.default),
+            ) || voices[0];
           if (localVoice) {
-             utterance.voice = localVoice;
+            utterance.voice = localVoice;
           }
         }
 
@@ -493,7 +540,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
       const base64Data = base64.split(",")[1];
       const mimeType = base64.split(";")[0].split(":")[1];
 
-      const keyInfo = getSelectedApiKey(data.settings, 'editor');
+      const keyInfo = getSelectedApiKey(data.settings, "editor");
       if (!keyInfo) {
         showToast("AI features require an API key to be set");
         return;
@@ -690,10 +737,16 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
         .filter((n) => n.score > 0)
         .sort((a, b) => b.score - a.score);
       setSmartLinkingSuggestions(
-        filtered.slice(0, slSettings.maxSuggestions).map((n) => n.note)
+        filtered.slice(0, slSettings.maxSuggestions).map((n) => n.note),
       );
     },
-    [data.settings.plugins?.smartLinking, data.notes, note?.id, note?.embedding, tags]
+    [
+      data.settings.plugins?.smartLinking,
+      data.notes,
+      note?.id,
+      note?.embedding,
+      tags,
+    ],
   );
 
   const editor = useEditor({
@@ -711,7 +764,9 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
       TableRow,
       TableHeader,
       TableCell,
-      TextAlign.configure({ types: ['heading', 'paragraph', 'tableCell', 'tableHeader'] }),
+      TextAlign.configure({
+        types: ["heading", "paragraph", "tableCell", "tableHeader"],
+      }),
       CharacterCount,
       ImageResize,
       Highlight,
@@ -732,36 +787,38 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
       handleDOMEvents: {
         contextmenu: (view, event) => {
           const target = event.target as HTMLElement;
-          if (target && target.classList.contains('spell-error')) {
+          if (target && target.classList.contains("spell-error")) {
             event.preventDefault();
-            const word = target.getAttribute('data-word');
+            const word = target.getAttribute("data-word");
             if (word) {
               addWordToDictionary(word).then(() => {
-                editor?.view.dispatch(editor.state.tr.setMeta(SpellCheckPluginKey, 'force-update'));
+                editor?.view.dispatch(
+                  editor.state.tr.setMeta(SpellCheckPluginKey, "force-update"),
+                );
               });
             }
             return true;
           }
           return false;
-        }
+        },
       },
       handleClick: (view, pos, event) => {
         const target = event.target as HTMLElement;
-        if (target && target.classList.contains('spell-error')) {
-           const word = target.getAttribute('data-word');
-           if (word) {
-              const suggestions = getSuggestions(word);
-              setSpellCheckPopup({
-                 x: event.clientX,
-                 y: event.clientY,
-                 word,
-                 suggestions,
-                 pos
-              });
-           }
-           // Do not prevent default so cursor still moves
+        if (target && target.classList.contains("spell-error")) {
+          const word = target.getAttribute("data-word");
+          if (word) {
+            const suggestions = getSuggestions(word);
+            setSpellCheckPopup({
+              x: event.clientX,
+              y: event.clientY,
+              word,
+              suggestions,
+              pos,
+            });
+          }
+          // Do not prevent default so cursor still moves
         } else {
-           setSpellCheckPopup(null);
+          setSpellCheckPopup(null);
         }
 
         const wikiLinkNode = target.closest('[data-wiki-link="true"]');
@@ -863,19 +920,25 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
   useEffect(() => {
     let mounted = true;
     if (data.settings.spellCheckEnabled !== false) {
-       setSpellCheckEnabled(true);
-       loadSpellchecker().then(() => {
-         if (mounted && editor) {
-            editor.view.dispatch(editor.state.tr.setMeta(SpellCheckPluginKey, 'force-update'));
-         }
-       }).catch(console.error);
+      setSpellCheckEnabled(true);
+      loadSpellchecker()
+        .then(() => {
+          if (mounted && editor) {
+            editor.view.dispatch(
+              editor.state.tr.setMeta(SpellCheckPluginKey, "force-update"),
+            );
+          }
+        })
+        .catch(console.error);
     } else {
-       setSpellCheckEnabled(false);
-       if (editor) {
-         editor.view.dispatch(editor.state.tr.setMeta(SpellCheckPluginKey, 'force-update'));
-       }
+      setSpellCheckEnabled(false);
+      if (editor) {
+        editor.view.dispatch(
+          editor.state.tr.setMeta(SpellCheckPluginKey, "force-update"),
+        );
+      }
     }
-    
+
     return () => {
       mounted = false;
       unloadSpellchecker();
@@ -884,7 +947,9 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
 
   useEffect(() => {
     // Only init if supported
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SpeechRecognition =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
     if (SpeechRecognition) {
       const recognition = new SpeechRecognition();
       recognition.continuous = true;
@@ -911,8 +976,10 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
       };
 
       recognition.onerror = (event: any) => {
-        if (event.error === 'not-allowed') {
-          showToast("Microphone access denied. Please allow microphone permissions.");
+        if (event.error === "not-allowed") {
+          showToast(
+            "Microphone access denied. Please allow microphone permissions.",
+          );
         } else {
           showToast(`Speech recognition error: ${event.error}`);
         }
@@ -928,7 +995,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
       return () => {
         try {
           recognition.stop();
-        } catch(e) {}
+        } catch (e) {}
         recognition.onstart = null;
         recognition.onresult = null;
         recognition.onerror = null;
@@ -964,13 +1031,15 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
   useEffect(() => {
     if (note && editor) {
       if (editor.getHTML() !== note.content) {
-        editor.commands.setContent(preprocessWikilinks(note.content), { emitUpdate: false });
+        editor.commands.setContent(preprocessWikilinks(note.content), {
+          emitUpdate: false,
+        });
       }
       setTitle(note.title);
       setSource(note.headerMeta?.source || "");
       setSummary(note.headerMeta?.summary || "");
       setTags(note.tags || []);
-      
+
       if (note.isDeleted && isEditing) {
         setIsEditing(false);
       }
@@ -1084,7 +1153,10 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
       reader.onload = async (event) => {
         const content = event.target?.result as string;
         if (file.name.endsWith(".md")) {
-          const preprocessed = content.replace(/==([^=]+)==/g, '<mark>$1</mark>');
+          const preprocessed = content.replace(
+            /==([^=]+)==/g,
+            "<mark>$1</mark>",
+          );
           const html = await marked.parse(preprocessed);
           editor.commands.setContent(preprocessWikilinks(html));
           showToast("✓ Markdown imported");
@@ -1195,10 +1267,14 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
               const updatedData = {
                 ...data,
                 notes: data.notes.map((n) =>
-                  n.id === noteId ? { ...n, content, wordCount } : n
+                  n.id === noteId ? { ...n, content, wordCount } : n,
                 ),
               };
-              uploadToDrive(accessToken, updatedData, data.settings.driveBackup.fileId);
+              uploadToDrive(
+                accessToken,
+                updatedData,
+                data.settings.driveBackup.fileId,
+              );
             } catch (e) {
               console.error("Failed to sync to Drive", e);
             }
@@ -1223,7 +1299,16 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
       window.removeEventListener("beforeunload", handleBeforeUnload);
       handleBeforeUnload(); // Save on unmount
     };
-  }, [editor, noteId, updateNote, showToast, settings.smartPaste, savedStatus, accessToken, data]);
+  }, [
+    editor,
+    noteId,
+    updateNote,
+    showToast,
+    settings.smartPaste,
+    savedStatus,
+    accessToken,
+    data,
+  ]);
 
   const handleSmartPasteClick = async () => {
     try {
@@ -1242,35 +1327,43 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
     if (!editor) return;
     const { state } = editor;
     const { from, to } = state.selection;
-    
+
     // Check if the current selection contains or is inside a wikiLink node
     let isWikiNode = false;
     let targetText = "";
     let nodeRange = { from: 0, to: 0 };
-    
+
     state.doc.nodesBetween(Math.max(0, from - 1), to + 1, (node, pos) => {
-      if (node.type.name === 'wikiLink' && !isWikiNode) {
+      if (node.type.name === "wikiLink" && !isWikiNode) {
         // If the selection touches or wraps this node
-        if (Math.max(from, pos) < Math.min(to, pos + node.nodeSize) || (from === to && from >= pos && from <= pos + node.nodeSize)) {
-           isWikiNode = true;
-           targetText = node.attrs.target;
-           nodeRange = { from: pos, to: pos + node.nodeSize };
+        if (
+          Math.max(from, pos) < Math.min(to, pos + node.nodeSize) ||
+          (from === to && from >= pos && from <= pos + node.nodeSize)
+        ) {
+          isWikiNode = true;
+          targetText = node.attrs.target;
+          nodeRange = { from: pos, to: pos + node.nodeSize };
         }
       }
     });
 
-    if (editor.isActive('wikiLink') && !isWikiNode) {
-       // fallback
-       isWikiNode = true;
-       targetText = editor.getAttributes('wikiLink').target;
-       // if we don't have range, we just replace current selection
-       nodeRange = { from, to };
+    if (editor.isActive("wikiLink") && !isWikiNode) {
+      // fallback
+      isWikiNode = true;
+      targetText = editor.getAttributes("wikiLink").target;
+      // if we don't have range, we just replace current selection
+      nodeRange = { from, to };
     }
 
     if (isWikiNode) {
-       // We should remove the [[ and ]] and just insert the core text
-       editor.chain().focus().deleteRange(nodeRange).insertContent(targetText).run();
-       return;
+      // We should remove the [[ and ]] and just insert the core text
+      editor
+        .chain()
+        .focus()
+        .deleteRange(nodeRange)
+        .insertContent(targetText)
+        .run();
+      return;
     }
 
     const selectedText = state.doc.textBetween(from, to, " ");
@@ -1281,8 +1374,8 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
 
     const literalMatch = selectedText.trim().match(/^\[\[(.*)\]\]$/);
     if (literalMatch) {
-       editor.chain().focus().insertContent(literalMatch[1]).run();
-       return;
+      editor.chain().focus().insertContent(literalMatch[1]).run();
+      return;
     }
 
     editor
@@ -1328,10 +1421,12 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
       }
     } else if (e.key === "ArrowDown") {
       e.preventDefault();
-      setSelectedTagIndex(prev => Math.min(prev + 1, Math.max(tagSuggestions.length - 1, 0)));
+      setSelectedTagIndex((prev) =>
+        Math.min(prev + 1, Math.max(tagSuggestions.length - 1, 0)),
+      );
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setSelectedTagIndex(prev => Math.max(prev - 1, 0));
+      setSelectedTagIndex((prev) => Math.max(prev - 1, 0));
     } else if (e.key === "Escape") {
       e.preventDefault();
       setTagInput("");
@@ -1384,10 +1479,15 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
                     key={sn.id}
                     className="w-full text-left px-2 py-1.5 border border-transparent hover:border-white/10 rounded-lg text-sm hover:bg-surface-active transition-all flex flex-col gap-0.5 group"
                     onClick={() => {
-                      editor?.chain().focus().insertContent({
-                        type: "wikiLink",
-                        attrs: { target: sn.title.trim() },
-                      }).insertContent(" ").run();
+                      editor
+                        ?.chain()
+                        .focus()
+                        .insertContent({
+                          type: "wikiLink",
+                          attrs: { target: sn.title.trim() },
+                        })
+                        .insertContent(" ")
+                        .run();
                       setSmartLinkingSuggestions([]);
                     }}
                   >
@@ -1408,687 +1508,735 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
             className="w-full max-w-[720px] px-8 print:px-0"
             ref={pdfContainerRef}
           >
-          {note?.isDeleted && (
-            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center justify-between text-red-400 text-sm">
-              <div className="flex items-center gap-2">
-                <Trash2 size={16} />
-                <span>This note is in the trash. It's read-only and will be permanently deleted after 30 days.</span>
-              </div>
-              <button
-                onClick={() => restoreNote(note.id)}
-                className="px-3 py-1 bg-surface rounded shadow-sm hover:text-green-400 transition-colors border border-border"
-              >
-                Restore Note
-              </button>
-            </div>
-          )}
-          {/* Note Metadata Header */}
-          <div className="mb-8 p-6 bg-surface border border-border rounded-xl">
-            <input
-              type="text"
-              value={title}
-              readOnly={!isEditing || note?.isDeleted}
-              onChange={(e) => {
-                setTitle(e.target.value);
-                handleSaveMetadata({ title: e.target.value });
-              }}
-              placeholder="Note Title"
-              className="w-full text-3xl font-bold bg-transparent border-none outline-none mb-4 text-text-primary placeholder:text-text-muted"
-            />
-
-            <div className="w-full h-px bg-border-strong mb-4"></div>
-
-            <div className="grid grid-cols-[100px_1fr] gap-y-3 gap-x-4 items-center text-sm">
-              <span className="text-text-muted font-medium flex items-center gap-2">
-                <span className="text-[1.1em]">📅</span> Date
-              </span>
-              <div className="flex justify-between items-center w-full">
-                <span className="text-text-primary">
-                  {format(new Date(note.createdAt), "MMMM d, yyyy")}
-                </span>
+            {note?.isDeleted && (
+              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center justify-between text-red-400 text-sm">
+                <div className="flex items-center gap-2">
+                  <Trash2 size={16} />
+                  <span>
+                    This note is in the trash. It's read-only and will be
+                    permanently deleted after 30 days.
+                  </span>
+                </div>
                 <button
-                  onClick={() => setHistoryOpen(true)}
-                  className="text-xs text-text-muted hover:text-accent flex items-center gap-1"
+                  onClick={() => restoreNote(note.id)}
+                  className="px-3 py-1 bg-surface rounded shadow-sm hover:text-green-400 transition-colors border border-border"
                 >
-                  <Clock size={12} /> History
+                  Restore Note
                 </button>
               </div>
-
-              <span className="text-text-muted font-medium flex items-center gap-2">
-                <span className="text-[1.1em]">🔗</span> Source
-              </span>
+            )}
+            {/* Note Metadata Header */}
+            <div className="mb-8 p-6 bg-surface border border-border rounded-xl">
               <input
                 type="text"
-                value={source}
-                readOnly={!isEditing}
+                value={title}
+                readOnly={!isEditing || note?.isDeleted}
                 onChange={(e) => {
-                  setSource(e.target.value);
-                  handleSaveMetadata({
-                    headerMeta: {
-                      ...(note.headerMeta || { date: "", summary: "" }),
-                      source: e.target.value,
-                    },
-                  });
+                  setTitle(e.target.value);
+                  handleSaveMetadata({ title: e.target.value });
                 }}
-                placeholder="ChatGPT, Meeting, URL..."
-                className="bg-transparent border-none outline-none text-text-primary placeholder:text-surface-active w-full"
+                placeholder="Note Title"
+                className="w-full text-3xl font-bold bg-transparent border-none outline-none mb-4 text-text-primary placeholder:text-text-muted"
               />
 
-              <span className="text-text-muted font-medium flex items-center gap-2">
-                <span className="text-[1.1em]">📌</span> Summary
-              </span>
-              <input
-                type="text"
-                value={summary}
-                readOnly={!isEditing}
-                onChange={(e) => {
-                  setSummary(e.target.value);
-                  handleSaveMetadata({
-                    headerMeta: {
-                      ...(note.headerMeta || { date: "", source: "" }),
-                      summary: e.target.value,
-                    },
-                  });
-                }}
-                placeholder="One-line summary..."
-                className="bg-transparent border-none outline-none text-text-primary placeholder:text-surface-active w-full"
-              />
+              <div className="w-full h-px bg-border-strong mb-4"></div>
 
-              <span className="text-text-muted font-medium flex items-center gap-2 pt-1">
-                <span className="text-[1.1em]">🏷️</span> Tags
-              </span>
-              <div className="flex flex-wrap gap-2 items-center min-h-7">
-                {(tags || []).map((tag) => (
-                  <span
-                    key={tag}
-                    className="flex items-center gap-1 bg-surface-active px-2 py-0.5 rounded-md text-xs text-text-primary border border-border"
-                  >
-                    {tag}
-                    {isEditing && (
-                      <button
-                        onClick={() => removeTag(tag)}
-                        className="text-text-muted hover:text-white"
-                      >
-                        <X size={10} />
-                      </button>
-                    )}
+              <div className="grid grid-cols-[100px_1fr] gap-y-3 gap-x-4 items-center text-sm">
+                <span className="text-text-muted font-medium flex items-center gap-2">
+                  <span className="text-[1.1em]">📅</span> Date
+                </span>
+                <div className="flex justify-between items-center w-full">
+                  <span className="text-text-primary">
+                    {format(new Date(note.createdAt), "MMMM d, yyyy")}
                   </span>
-                ))}
-                {isEditing && (
-                  <div className="relative flex items-center h-full">
-                    <input
-                      type="text"
-                      value={tagInput}
-                      onChange={(e) => setTagInput(e.target.value)}
-                      onKeyDown={handleAddTag}
-                      onFocus={() => setIsTagInputFocused(true)}
-                      onBlur={() => {
-                        setIsTagInputFocused(false);
-                        addTagsFromInput(tagInput);
-                      }}
-                      placeholder="+ Add tag..."
-                      className="bg-transparent border-none outline-none text-text-muted placeholder:text-surface-active text-xs w-24"
-                    />
-                    {isTagInputFocused && tagSuggestions.length > 0 && (
-                      <div className="absolute top-full left-0 mt-1 max-h-48 overflow-y-auto w-48 bg-surface-header border border-border rounded-md shadow-xl z-50">
-                        {tagSuggestions.map((tag, idx) => (
-                           <button
-                             key={tag}
-                             onMouseDown={(e) => {
-                               e.preventDefault(); // prevent blur
-                               addTagsFromInput(tag);
-                             }}
-                             onTouchStart={(e) => {
-                               e.preventDefault();
-                               addTagsFromInput(tag);
-                             }}
-                             onMouseEnter={() => setSelectedTagIndex(idx)}
-                             className={cn(
-                               "w-full text-left px-3 py-1.5 text-xs transition-colors truncate",
-                               idx === selectedTagIndex 
-                                 ? "bg-accent/20 text-accent" 
-                                 : "text-text-primary hover:bg-surface"
-                             )}
-                           >
+                  <button
+                    onClick={() => setHistoryOpen(true)}
+                    className="text-xs text-text-muted hover:text-accent flex items-center gap-1"
+                  >
+                    <Clock size={12} /> History
+                  </button>
+                </div>
+
+                <span className="text-text-muted font-medium flex items-center gap-2">
+                  <span className="text-[1.1em]">🔗</span> Source
+                </span>
+                <input
+                  type="text"
+                  value={source}
+                  readOnly={!isEditing}
+                  onChange={(e) => {
+                    setSource(e.target.value);
+                    handleSaveMetadata({
+                      headerMeta: {
+                        ...(note.headerMeta || { date: "", summary: "" }),
+                        source: e.target.value,
+                      },
+                    });
+                  }}
+                  placeholder="ChatGPT, Meeting, URL..."
+                  className="bg-transparent border-none outline-none text-text-primary placeholder:text-surface-active w-full"
+                />
+
+                <span className="text-text-muted font-medium flex items-center gap-2">
+                  <span className="text-[1.1em]">📌</span> Summary
+                </span>
+                <input
+                  type="text"
+                  value={summary}
+                  readOnly={!isEditing}
+                  onChange={(e) => {
+                    setSummary(e.target.value);
+                    handleSaveMetadata({
+                      headerMeta: {
+                        ...(note.headerMeta || { date: "", source: "" }),
+                        summary: e.target.value,
+                      },
+                    });
+                  }}
+                  placeholder="One-line summary..."
+                  className="bg-transparent border-none outline-none text-text-primary placeholder:text-surface-active w-full"
+                />
+
+                <span className="text-text-muted font-medium flex items-center gap-2 pt-1">
+                  <span className="text-[1.1em]">🏷️</span> Tags
+                </span>
+                <div className="flex flex-wrap gap-2 items-center min-h-7">
+                  {(tags || []).map((tag) => (
+                    <span
+                      key={tag}
+                      className="flex items-center gap-1 bg-surface-active px-2 py-0.5 rounded-md text-xs text-text-primary border border-border"
+                    >
+                      {tag}
+                      {isEditing && (
+                        <button
+                          onClick={() => removeTag(tag)}
+                          className="text-text-muted hover:text-white"
+                        >
+                          <X size={10} />
+                        </button>
+                      )}
+                    </span>
+                  ))}
+                  {isEditing && (
+                    <div className="relative flex items-center h-full">
+                      <input
+                        type="text"
+                        value={tagInput}
+                        onChange={(e) => setTagInput(e.target.value)}
+                        onKeyDown={handleAddTag}
+                        onFocus={() => setIsTagInputFocused(true)}
+                        onBlur={() => {
+                          setIsTagInputFocused(false);
+                          addTagsFromInput(tagInput);
+                        }}
+                        placeholder="+ Add tag..."
+                        className="bg-transparent border-none outline-none text-text-muted placeholder:text-surface-active text-xs w-24"
+                      />
+                      {isTagInputFocused && tagSuggestions.length > 0 && (
+                        <div className="absolute top-full left-0 mt-1 max-h-48 overflow-y-auto w-48 bg-surface-header border border-border rounded-md shadow-xl z-50">
+                          {tagSuggestions.map((tag, idx) => (
+                            <button
+                              key={tag}
+                              onMouseDown={(e) => {
+                                e.preventDefault(); // prevent blur
+                                addTagsFromInput(tag);
+                              }}
+                              onTouchStart={(e) => {
+                                e.preventDefault();
+                                addTagsFromInput(tag);
+                              }}
+                              onMouseEnter={() => setSelectedTagIndex(idx)}
+                              className={cn(
+                                "w-full text-left px-3 py-1.5 text-xs transition-colors truncate",
+                                idx === selectedTagIndex
+                                  ? "bg-accent/20 text-accent"
+                                  : "text-text-primary hover:bg-surface",
+                              )}
+                            >
                               #{tag}
-                           </button>
-                        ))}
-                      </div>
-                    )}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* AI Summary Section */}
+            {aiSummary.open && (
+              <div className="mb-8 p-5 bg-accent/10 border border-accent/20 rounded-xl relative shadow-sm">
+                <button
+                  onClick={() =>
+                    setAiSummary((prev) => ({ ...prev, open: false }))
+                  }
+                  className="absolute top-4 right-4 text-text-muted hover:text-text-primary transition-colors p-1"
+                  title="Close summary"
+                >
+                  <X size={16} />
+                </button>
+                <h4 className="text-accent font-semibold flex items-center gap-2 mb-3">
+                  <Bot size={18} /> AI Summary
+                </h4>
+                {aiSummary.loading ? (
+                  <div className="flex items-center gap-3 text-text-muted animate-pulse text-sm py-2">
+                    <div className="w-4 h-4 border-2 border-accent/50 border-t-accent rounded-full animate-spin" />
+                    Generating summary...
+                  </div>
+                ) : (
+                  <div className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap">
+                    {aiSummary.text}
                   </div>
                 )}
               </div>
-            </div>
-          </div>
+            )}
 
-          {/* AI Summary Section */}
-          {aiSummary.open && (
-            <div className="mb-8 p-5 bg-accent/10 border border-accent/20 rounded-xl relative shadow-sm">
-              <button
-                onClick={() =>
-                  setAiSummary((prev) => ({ ...prev, open: false }))
+            {isEditing && editor && (
+              <BubbleMenu
+                editor={editor}
+                pluginKey="imageMenu"
+                shouldShow={({ editor }) =>
+                  editor.isActive("image") || editor.isActive("imageResize")
                 }
-                className="absolute top-4 right-4 text-text-muted hover:text-text-primary transition-colors p-1"
-                title="Close summary"
               >
-                <X size={16} />
-              </button>
-              <h4 className="text-accent font-semibold flex items-center gap-2 mb-3">
-                <Bot size={18} /> AI Summary
-              </h4>
-              {aiSummary.loading ? (
-                <div className="flex items-center gap-3 text-text-muted animate-pulse text-sm py-2">
-                  <div className="w-4 h-4 border-2 border-accent/50 border-t-accent rounded-full animate-spin" />
-                  Generating summary...
-                </div>
-              ) : (
-                <div className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap">
-                  {aiSummary.text}
-                </div>
-              )}
-            </div>
-          )}
-
-          {isEditing && editor && (
-            <BubbleMenu
-              editor={editor}
-              pluginKey="imageMenu"
-              shouldShow={({ editor }) =>
-                editor.isActive("image") || editor.isActive("imageResize")
-              }
-            >
-              <div className="bg-surface-header border border-border shadow-xl rounded-lg overflow-hidden flex flex-col p-1 gap-1 relative z-10">
-                <button
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => editor.chain().focus().deleteSelection().run()}
-                  className="flex items-center gap-2 px-3 py-1.5 text-sm text-red-400 hover:bg-surface hover:text-red-500 rounded-md transition-colors"
-                >
-                  <Trash2 size={14} /> Remove Image
-                </button>
-              </div>
-            </BubbleMenu>
-          )}
-
-          {isEditing && editor && (
-            <BubbleMenu
-              editor={editor}
-              pluginKey="textBubbleMenu"
-              shouldShow={({ editor, from, to }) => {
-                return (
-                  from !== to &&
-                  !editor.isActive("image") &&
-                  !editor.isActive("imageResize")
-                );
-              }}
-            >
-              <div className="bg-surface-header border border-border shadow-xl rounded-lg overflow-visible flex items-center p-1.5 gap-2 relative z-50">
-                <div className="flex items-center gap-1 bg-background border border-border rounded-md shadow-sm p-1">
+                <div className="bg-surface-header border border-border shadow-xl rounded-lg overflow-hidden flex flex-col p-1 gap-1 relative z-10">
                   <button
                     onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => editor.chain().focus().toggleBold().run()}
-                    className={cn(
-                      "p-1.5 rounded-md transition-colors",
-                      editor.isActive("bold")
-                        ? "bg-accent/20 text-accent"
-                        : "text-text-muted hover:text-text-primary hover:bg-surface-active",
-                    )}
+                    onClick={() =>
+                      editor.chain().focus().deleteSelection().run()
+                    }
+                    className="flex items-center gap-2 px-3 py-1.5 text-sm text-red-400 hover:bg-surface hover:text-red-500 rounded-md transition-colors"
                   >
-                    <Bold size={14} />
-                  </button>
-                  <button
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => editor.chain().focus().toggleItalic().run()}
-                    className={cn(
-                      "p-1.5 rounded-md transition-colors",
-                      editor.isActive("italic")
-                        ? "bg-accent/20 text-accent"
-                        : "text-text-muted hover:text-text-primary hover:bg-surface-active",
-                    )}
-                  >
-                    <Italic size={14} />
-                  </button>
-                  <button
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={handleWikiLink}
-                    className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-active rounded-md transition-colors"
-                    title="Wiki Link Note"
-                  >
-                    <LinkIcon size={14} />
+                    <Trash2 size={14} /> Remove Image
                   </button>
                 </div>
+              </BubbleMenu>
+            )}
 
-                <div className="w-px h-5 bg-border mx-0.5"></div>
+            {isEditing && editor && (
+              <BubbleMenu
+                editor={editor}
+                pluginKey="textBubbleMenu"
+                shouldShow={({ editor, from, to }) => {
+                  return (
+                    from !== to &&
+                    !editor.isActive("image") &&
+                    !editor.isActive("imageResize")
+                  );
+                }}
+              >
+                <div className="bg-surface-header border border-border shadow-xl rounded-lg overflow-visible flex items-center p-1.5 gap-2 relative z-50">
+                  <div className="flex items-center gap-1 bg-background border border-border rounded-md shadow-sm p-1">
+                    <button
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => editor.chain().focus().toggleBold().run()}
+                      className={cn(
+                        "p-1.5 rounded-md transition-colors",
+                        editor.isActive("bold")
+                          ? "bg-accent/20 text-accent"
+                          : "text-text-muted hover:text-text-primary hover:bg-surface-active",
+                      )}
+                    >
+                      <Bold size={14} />
+                    </button>
+                    <button
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() =>
+                        editor.chain().focus().toggleItalic().run()
+                      }
+                      className={cn(
+                        "p-1.5 rounded-md transition-colors",
+                        editor.isActive("italic")
+                          ? "bg-accent/20 text-accent"
+                          : "text-text-muted hover:text-text-primary hover:bg-surface-active",
+                      )}
+                    >
+                      <Italic size={14} />
+                    </button>
+                    <button
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={handleWikiLink}
+                      className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-active rounded-md transition-colors"
+                      title="Wiki Link Note"
+                    >
+                      <LinkIcon size={14} />
+                    </button>
+                  </div>
 
-                <div className="flex items-center bg-background border border-border rounded-md shadow-sm">
-                  <button
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => {
-                      const currentSize = parseInt(
-                        editor.getAttributes("textStyle").fontSize || "16",
-                        10,
-                      );
-                      editor
-                        .chain()
-                        .focus()
-                        .setFontSize(`${Math.max(8, currentSize - 2)}px`)
-                        .run();
-                    }}
-                    className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-active rounded-l-md transition-colors"
-                    title="Decrease Font Size"
-                  >
-                    <Minus size={14} />
-                  </button>
-                  <span className="text-xs font-mono font-medium px-2 py-1 text-text-primary min-w-[36px] text-center border-x border-border">
-                    {parseInt(
-                      editor.getAttributes("textStyle").fontSize || "16",
-                      10,
-                    )}
-                  </span>
-                  <button
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => {
-                      const currentSize = parseInt(
-                        editor.getAttributes("textStyle").fontSize || "16",
-                        10,
-                      );
-                      editor
-                        .chain()
-                        .focus()
-                        .setFontSize(`${Math.min(72, currentSize + 2)}px`)
-                        .run();
-                    }}
-                    className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-active rounded-r-md transition-colors"
-                    title="Increase Font Size"
-                  >
-                    <Plus size={14} />
-                  </button>
-                </div>
-                <div className="w-px h-5 bg-border mx-0.5"></div>
-                <div className="relative group">
-                  <button className="flex items-center gap-1 p-1.5 text-text-primary hover:bg-surface-active rounded-md transition-colors">
-                    <Palette
-                      size={14}
-                      style={{
-                        color:
-                          editor.getAttributes("textStyle").color ||
-                          "currentColor",
+                  <div className="w-px h-5 bg-border mx-0.5"></div>
+
+                  <div className="flex items-center bg-background border border-border rounded-md shadow-sm">
+                    <button
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        const currentSize = parseInt(
+                          editor.getAttributes("textStyle").fontSize || "16",
+                          10,
+                        );
+                        editor
+                          .chain()
+                          .focus()
+                          .setFontSize(`${Math.max(8, currentSize - 2)}px`)
+                          .run();
                       }}
-                    />
-                  </button>
-                  <div className="absolute top-full left-0 mt-1 bg-surface border border-border rounded-lg shadow-xl p-2 hidden group-hover:grid grid-cols-4 gap-1 z-50 min-w-[120px]">
-                    {[
-                      { name: "Default", value: "" },
-                      { name: "Red", value: "#ef4444" },
-                      { name: "Orange", value: "#f97316" },
-                      { name: "Yellow", value: "#eab308" },
-                      { name: "Green", value: "#22c55e" },
-                      { name: "Blue", value: "#3b82f6" },
-                      { name: "Purple", value: "#a855f7" },
-                      { name: "Pink", value: "#ec4899" },
-                      { name: "White", value: "#ffffff" },
-                      { name: "Gray", value: "#9ca3af" },
-                      { name: "Black", value: "#000000" },
-                    ].map((color) => (
-                      <button
-                        key={color.name}
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => {
-                          if (color.value) {
-                            editor.chain().focus().setColor(color.value).run();
-                          } else {
-                            editor.chain().focus().unsetColor().run();
-                          }
-                        }}
-                        className="w-6 h-6 rounded-md border border-border/50 hover:scale-110 transition-transform relative overflow-hidden"
+                      className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-active rounded-l-md transition-colors"
+                      title="Decrease Font Size"
+                    >
+                      <Minus size={14} />
+                    </button>
+                    <span className="text-xs font-mono font-medium px-2 py-1 text-text-primary min-w-[36px] text-center border-x border-border">
+                      {parseInt(
+                        editor.getAttributes("textStyle").fontSize || "16",
+                        10,
+                      )}
+                    </span>
+                    <button
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        const currentSize = parseInt(
+                          editor.getAttributes("textStyle").fontSize || "16",
+                          10,
+                        );
+                        editor
+                          .chain()
+                          .focus()
+                          .setFontSize(`${Math.min(72, currentSize + 2)}px`)
+                          .run();
+                      }}
+                      className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-active rounded-r-md transition-colors"
+                      title="Increase Font Size"
+                    >
+                      <Plus size={14} />
+                    </button>
+                  </div>
+                  <div className="w-px h-5 bg-border mx-0.5"></div>
+                  <div className="relative group">
+                    <button className="flex items-center gap-1 p-1.5 text-text-primary hover:bg-surface-active rounded-md transition-colors">
+                      <Palette
+                        size={14}
                         style={{
-                          backgroundColor: color.value || "transparent",
+                          color:
+                            editor.getAttributes("textStyle").color ||
+                            "currentColor",
                         }}
-                        title={color.name}
-                      >
-                        {!color.value && (
-                          <div className="absolute inset-x-0 inset-y-1/2 h-px bg-red-500 -rotate-45" />
-                        )}
-                      </button>
-                    ))}
+                      />
+                    </button>
+                    <div className="absolute top-full left-0 mt-1 bg-surface border border-border rounded-lg shadow-xl p-2 hidden group-hover:grid grid-cols-4 gap-1 z-50 min-w-[120px]">
+                      {[
+                        { name: "Default", value: "" },
+                        { name: "Red", value: "#ef4444" },
+                        { name: "Orange", value: "#f97316" },
+                        { name: "Yellow", value: "#eab308" },
+                        { name: "Green", value: "#22c55e" },
+                        { name: "Blue", value: "#3b82f6" },
+                        { name: "Purple", value: "#a855f7" },
+                        { name: "Pink", value: "#ec4899" },
+                        { name: "White", value: "#ffffff" },
+                        { name: "Gray", value: "#9ca3af" },
+                        { name: "Black", value: "#000000" },
+                      ].map((color) => (
+                        <button
+                          key={color.name}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            if (color.value) {
+                              editor
+                                .chain()
+                                .focus()
+                                .setColor(color.value)
+                                .run();
+                            } else {
+                              editor.chain().focus().unsetColor().run();
+                            }
+                          }}
+                          className="w-6 h-6 rounded-md border border-border/50 hover:scale-110 transition-transform relative overflow-hidden"
+                          style={{
+                            backgroundColor: color.value || "transparent",
+                          }}
+                          title={color.name}
+                        >
+                          {!color.value && (
+                            <div className="absolute inset-x-0 inset-y-1/2 h-px bg-red-500 -rotate-45" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </BubbleMenu>
-          )}
+              </BubbleMenu>
+            )}
 
-          <div
-            className={`relative editor-size-${settings.fontSize}`}
-            id="editor-container-relative"
-          >
-            {isEditing && <TableControls editor={editor} />}
-            <EditorContent editor={editor} className="min-h-[400px]" />
-            
-            {spellCheckPopup && (
-              <>
-                <div className="fixed inset-0 z-[90]" onClick={() => setSpellCheckPopup(null)} onContextMenu={(e) => { e.preventDefault(); setSpellCheckPopup(null); }} />
-                <div 
-                  className="fixed z-[100] bg-surface border border-border shadow-xl rounded-lg py-1 w-48 text-sm flex flex-col overflow-hidden"
-                  style={{ top: spellCheckPopup.y + 10, left: spellCheckPopup.x }}
-                >
-                  <div className="px-3 py-1 text-xs text-text-muted font-bold break-words">{spellCheckPopup.word}</div>
-                  {spellCheckPopup.suggestions.length > 0 ? (
-                    spellCheckPopup.suggestions.map(s => (
-                       <button
-                         key={s}
-                         className="w-full text-left px-3 py-1.5 hover:bg-surface-hover text-accent font-medium transition-colors"
-                         onClick={() => {
+            <div
+              className={`relative editor-size-${settings.fontSize}`}
+              id="editor-container-relative"
+            >
+              {isEditing && <TableControls editor={editor} />}
+              <EditorContent editor={editor} className="min-h-[400px]" />
+
+              {spellCheckPopup && (
+                <>
+                  <div
+                    className="fixed inset-0 z-[90]"
+                    onClick={() => setSpellCheckPopup(null)}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setSpellCheckPopup(null);
+                    }}
+                  />
+                  <div
+                    className="fixed z-[100] bg-surface border border-border shadow-xl rounded-lg py-1 w-48 text-sm flex flex-col overflow-hidden"
+                    style={{
+                      top: spellCheckPopup.y + 10,
+                      left: spellCheckPopup.x,
+                    }}
+                  >
+                    <div className="px-3 py-1 text-xs text-text-muted font-bold break-words">
+                      {spellCheckPopup.word}
+                    </div>
+                    {spellCheckPopup.suggestions.length > 0 ? (
+                      spellCheckPopup.suggestions.map((s) => (
+                        <button
+                          key={s}
+                          className="w-full text-left px-3 py-1.5 hover:bg-surface-hover text-accent font-medium transition-colors"
+                          onClick={() => {
                             if (!editor) return;
                             const { state, view } = editor;
                             const $pos = state.doc.resolve(spellCheckPopup.pos);
                             const textNode = $pos.parent;
                             const textOffset = $pos.parentOffset;
                             const text = textNode.textContent;
-                            
+
                             // Find the word bounds around textOffset
                             const wordRegex = /([a-zA-Z]+(?:'[a-zA-Z]+)?)/g;
                             let match;
                             let replaced = false;
                             while ((match = wordRegex.exec(text)) !== null) {
-                               const start = match.index;
-                               const end = start + match[0].length;
-                               if (textOffset >= start && textOffset <= end && match[0] === spellCheckPopup.word) {
-                                  const nodeStart = spellCheckPopup.pos - textOffset;
-                                  const replaceStart = nodeStart + start;
-                                  const replaceEnd = nodeStart + end;
-                                  view.dispatch(state.tr.replaceWith(replaceStart, replaceEnd, state.schema.text(s)));
-                                  replaced = true;
-                                  break;
-                               }
+                              const start = match.index;
+                              const end = start + match[0].length;
+                              if (
+                                textOffset >= start &&
+                                textOffset <= end &&
+                                match[0] === spellCheckPopup.word
+                              ) {
+                                const nodeStart =
+                                  spellCheckPopup.pos - textOffset;
+                                const replaceStart = nodeStart + start;
+                                const replaceEnd = nodeStart + end;
+                                view.dispatch(
+                                  state.tr.replaceWith(
+                                    replaceStart,
+                                    replaceEnd,
+                                    state.schema.text(s),
+                                  ),
+                                );
+                                replaced = true;
+                                break;
+                              }
                             }
-                            
+
                             // If regex failed due to mismatch, fallback
                             if (!replaced) {
-                               // simple fallback if textOffset didn't match perfectly
+                              // simple fallback if textOffset didn't match perfectly
                             }
 
                             setSpellCheckPopup(null);
-                         }}
-                       >
-                         {s}
-                       </button>
-                    ))
-                  ) : (
-                    <div className="px-3 py-1 text-text-muted italic">No suggestions</div>
-                  )}
-                  <div className="h-px bg-border my-1" />
-                  <button
-                    className="w-full text-left px-3 py-1.5 hover:bg-surface-hover flex items-center gap-2 transition-colors text-text-primary"
-                    onClick={() => {
+                          }}
+                        >
+                          {s}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-3 py-1 text-text-muted italic">
+                        No suggestions
+                      </div>
+                    )}
+                    <div className="h-px bg-border my-1" />
+                    <button
+                      className="w-full text-left px-3 py-1.5 hover:bg-surface-hover flex items-center gap-2 transition-colors text-text-primary"
+                      onClick={() => {
                         addWordToDictionary(spellCheckPopup.word).then(() => {
-                           editor?.view.dispatch(editor.state.tr.setMeta(SpellCheckPluginKey, 'force-update'));
-                           setSpellCheckPopup(null);
+                          editor?.view.dispatch(
+                            editor.state.tr.setMeta(
+                              SpellCheckPluginKey,
+                              "force-update",
+                            ),
+                          );
+                          setSpellCheckPopup(null);
                         });
-                    }}
-                  >
-                    <Plus size={14} /> Add to Dictionary
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+                      }}
+                    >
+                      <Plus size={14} /> Add to Dictionary
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
 
-          {/* Attachments Section */}
-          <div className="mt-12 pt-8 border-t border-border">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
-              <h3 className="text-sm font-semibold text-text-muted uppercase tracking-wider flex items-center gap-2">
-                <Paperclip size={16} /> Files & Attachments
-              </h3>
-              <div className="flex items-center gap-2">
+            {/* Attachments Section */}
+            <div className="mt-12 pt-8 border-t border-border">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
+                <h3 className="text-sm font-semibold text-text-muted uppercase tracking-wider flex items-center gap-2">
+                  <Paperclip size={16} /> Files & Attachments
+                </h3>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => attachmentInputRef.current?.click()}
+                    className="text-xs bg-surface-active hover:bg-border text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5"
+                  >
+                    + Add File
+                  </button>
+                  <input
+                    type="file"
+                    ref={attachmentInputRef}
+                    className="hidden"
+                    onChange={handleFileUpload}
+                  />
+                </div>
+              </div>
+
+              {note.attachments && note.attachments.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
+                  {note.attachments.map((att) => (
+                    <div
+                      key={att.id}
+                      className="flex items-center gap-3 p-3 bg-surface border border-border rounded-lg group"
+                    >
+                      <div className="p-2 bg-surface-active rounded-md text-accent">
+                        <FileText size={20} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p
+                          className="text-sm font-medium text-text-primary truncate"
+                          title={att.name}
+                        >
+                          {att.name}
+                        </p>
+                        <p className="text-xs text-text-muted">
+                          {(att.size / 1024).toFixed(1)} KB
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <a
+                          href={att.base64}
+                          download={att.name}
+                          className="p-1.5 text-text-muted hover:text-accent rounded-md hover:bg-surface-active transition-colors"
+                          title="Download"
+                        >
+                          <Download size={14} />
+                        </a>
+                        <button
+                          onClick={() => removeAttachment(att.id)}
+                          className="p-1.5 text-text-muted hover:text-red-400 rounded-md hover:bg-surface-active transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between mb-4 mt-8">
+                <h3 className="text-sm font-semibold text-text-muted uppercase tracking-wider flex items-center gap-2">
+                  <BarChart3 size={16} /> Charts & Data
+                </h3>
                 <button
-                  onClick={() => attachmentInputRef.current?.click()}
+                  onClick={() => {
+                    setEditingChart(undefined);
+                    setIsChartBuilderOpen(true);
+                  }}
                   className="text-xs bg-surface-active hover:bg-border text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5"
                 >
-                  + Add File
+                  + Build Chart
+                </button>
+              </div>
+
+              {note.charts && note.charts.length > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                  {note.charts.map((chart) => (
+                    <div
+                      key={chart.id}
+                      className="bg-surface border border-border rounded-xl shadow-sm overflow-hidden flex flex-col pt-4"
+                    >
+                      <div className="px-4 pb-2 flex items-center justify-between">
+                        <h4 className="font-semibold text-text-primary flex items-center gap-2">
+                          {chart.type === "bar" ? (
+                            <BarChart3 size={18} />
+                          ) : chart.type === "line" ? (
+                            <LineChart size={18} />
+                          ) : chart.type === "pie" ? (
+                            <PieChart size={18} />
+                          ) : chart.type === "area" ? (
+                            <AreaChartIcon size={18} />
+                          ) : (
+                            <Hexagon size={18} />
+                          )}
+                          {chart.title}
+                        </h4>
+                        {isEditing && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => {
+                                setEditingChart(chart);
+                                setIsChartBuilderOpen(true);
+                              }}
+                              className="p-1.5 text-text-muted hover:text-accent rounded-md hover:bg-surface-active transition-colors"
+                              title="Edit Chart"
+                            >
+                              <Pen size={14} />
+                            </button>
+                            <button
+                              onClick={() => deleteChart(chart.id)}
+                              className="p-1.5 text-text-muted hover:text-red-400 rounded-md hover:bg-surface-active transition-colors"
+                              title="Delete Chart"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 w-full p-2 relative bg-background/50">
+                        {renderChartPreview(chart)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between mb-4 mt-8">
+                <h3 className="text-sm font-semibold text-text-muted uppercase tracking-wider flex items-center gap-2">
+                  <ImageIcon size={16} /> Images
+                  {isEditing && (
+                    <span className="text-[10px] bg-accent/20 text-accent px-2 py-0.5 rounded-full normal-case font-medium ml-2">
+                      Drag into text ↑
+                    </span>
+                  )}
+                </h3>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isProcessingImage}
+                  className="text-xs bg-surface-active hover:bg-border text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {isProcessingImage ? "Loading..." : "+ Add Photo"}
                 </button>
                 <input
                   type="file"
-                  ref={attachmentInputRef}
+                  ref={fileInputRef}
                   className="hidden"
-                  onChange={handleFileUpload}
+                  accept="image/*"
+                  onChange={handleImageUpload}
                 />
               </div>
-            </div>
 
-            {note.attachments && note.attachments.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
-                {note.attachments.map((att) => (
-                  <div
-                    key={att.id}
-                    className="flex items-center gap-3 p-3 bg-surface border border-border rounded-lg group"
-                  >
-                    <div className="p-2 bg-surface-active rounded-md text-accent">
-                      <FileText size={20} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p
-                        className="text-sm font-medium text-text-primary truncate"
-                        title={att.name}
-                      >
-                        {att.name}
-                      </p>
-                      <p className="text-xs text-text-muted">
-                        {(att.size / 1024).toFixed(1)} KB
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <a
-                        href={att.base64}
-                        download={att.name}
-                        className="p-1.5 text-text-muted hover:text-accent rounded-md hover:bg-surface-active transition-colors"
-                        title="Download"
-                      >
-                        <Download size={14} />
-                      </a>
-                      <button
-                        onClick={() => removeAttachment(att.id)}
-                        className="p-1.5 text-text-muted hover:text-red-400 rounded-md hover:bg-surface-active transition-colors"
-                        title="Delete"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+              {note.images && note.images.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {note.images.map((img) => (
+                    <div
+                      key={img.id}
+                      className="group relative bg-surface border border-border rounded-lg overflow-hidden cursor-grab active:cursor-grabbing"
+                      draggable={true}
+                      onDragStart={(e) => {
+                        draggedImageData = {
+                          id: img.id,
+                          src: img.base64,
+                          alt: img.name,
+                        };
+                        // Set both plain URL and HTML to be super compatible with Tiptap
+                        e.dataTransfer.setData(
+                          "text/plain",
+                          `[Image: ${img.name}]`,
+                        );
+                        e.dataTransfer.effectAllowed = "copyMove";
+                      }}
+                      onDragEnd={() => {
+                        draggedImageData = null;
+                      }}
+                    >
+                      <img
+                        src={img.base64}
+                        alt={img.name}
+                        className="w-full h-48 object-cover"
+                      />
 
-            <div className="flex items-center justify-between mb-4 mt-8">
-              <h3 className="text-sm font-semibold text-text-muted uppercase tracking-wider flex items-center gap-2">
-                <BarChart3 size={16} /> Charts & Data
-              </h3>
-              <button
-                onClick={() => {
-                  setEditingChart(undefined);
-                  setIsChartBuilderOpen(true);
-                }}
-                className="text-xs bg-surface-active hover:bg-border text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5"
-              >
-                + Build Chart
-              </button>
-            </div>
-
-            {note.charts && note.charts.length > 0 && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                {note.charts.map((chart) => (
-                  <div
-                    key={chart.id}
-                    className="bg-surface border border-border rounded-xl shadow-sm overflow-hidden flex flex-col pt-4"
-                  >
-                    <div className="px-4 pb-2 flex items-center justify-between">
-                      <h4 className="font-semibold text-text-primary flex items-center gap-2">
-                        {chart.type === "bar" ? (
-                          <BarChart3 size={18} />
-                        ) : chart.type === "line" ? (
-                          <LineChart size={18} />
-                        ) : chart.type === "pie" ? (
-                          <PieChart size={18} />
-                        ) : chart.type === "area" ? (
-                          <AreaChartIcon size={18} />
-                        ) : (
-                          <Hexagon size={18} />
-                        )}
-                        {chart.title}
-                      </h4>
-                      {isEditing && (
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => {
-                              setEditingChart(chart);
-                              setIsChartBuilderOpen(true);
-                            }}
-                            className="p-1.5 text-text-muted hover:text-accent rounded-md hover:bg-surface-active transition-colors"
-                            title="Edit Chart"
-                          >
-                            <Pen size={14} />
-                          </button>
-                          <button
-                            onClick={() => deleteChart(chart.id)}
-                            className="p-1.5 text-text-muted hover:text-red-400 rounded-md hover:bg-surface-active transition-colors"
-                            title="Delete Chart"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1 w-full p-2 relative bg-background/50">
-                      {renderChartPreview(chart)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="flex items-center justify-between mb-4 mt-8">
-              <h3 className="text-sm font-semibold text-text-muted uppercase tracking-wider flex items-center gap-2">
-                <ImageIcon size={16} /> Images
-                {isEditing && (
-                  <span className="text-[10px] bg-accent/20 text-accent px-2 py-0.5 rounded-full normal-case font-medium ml-2">
-                    Drag into text ↑
-                  </span>
-                )}
-              </h3>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isProcessingImage}
-                className="text-xs bg-surface-active hover:bg-border text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5 disabled:opacity-50"
-              >
-                {isProcessingImage ? "Loading..." : "+ Add Photo"}
-              </button>
-              <input
-                type="file"
-                ref={fileInputRef}
-                className="hidden"
-                accept="image/*"
-                onChange={handleImageUpload}
-              />
-            </div>
-
-            {note.images && note.images.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {note.images.map((img) => (
-                  <div
-                    key={img.id}
-                    className="group relative bg-surface border border-border rounded-lg overflow-hidden cursor-grab active:cursor-grabbing"
-                    draggable={true}
-                    onDragStart={(e) => {
-                      draggedImageData = {
-                        id: img.id,
-                        src: img.base64,
-                        alt: img.name,
-                      };
-                      // Set both plain URL and HTML to be super compatible with Tiptap
-                      e.dataTransfer.setData(
-                        "text/plain",
-                        `[Image: ${img.name}]`,
-                      );
-                      e.dataTransfer.effectAllowed = "copyMove";
-                    }}
-                    onDragEnd={() => {
-                      draggedImageData = null;
-                    }}
-                  >
-                    <img
-                      src={img.base64}
-                      alt={img.name}
-                      className="w-full h-48 object-cover"
-                    />
-
-                    {isEditing && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setImageToDelete(img.id);
-                        }}
-                        className="absolute top-2 right-2 bg-red-500/90 hover:bg-red-600 text-white p-2 rounded-full shadow-lg md:opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-auto"
-                        title="Delete Image"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
-
-                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-3 no-print pointer-events-none">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          explainImage(img.base64);
-                        }}
-                        className="pointer-events-auto bg-accent text-white px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2 hover:bg-accent/80 transition-colors"
-                      >
-                        <Bot size={16} /> Ask AI
-                      </button>
                       {isEditing && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setImageToCrop({ id: img.id, base64: img.base64 });
+                            setImageToDelete(img.id);
                           }}
-                          className="pointer-events-auto bg-surface text-text-primary px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2 hover:bg-surface-active transition-colors border border-border"
+                          className="absolute top-2 right-2 bg-red-500/90 hover:bg-red-600 text-white p-2 rounded-full shadow-lg md:opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-auto"
+                          title="Delete Image"
                         >
-                          <Crop size={16} /> Crop Image
+                          <Trash2 size={14} />
                         </button>
                       )}
+
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-3 no-print pointer-events-none">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            explainImage(img.base64);
+                          }}
+                          className="pointer-events-auto bg-accent text-white px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2 hover:bg-accent/80 transition-colors"
+                        >
+                          <Bot size={16} /> Ask AI
+                        </button>
+                        {isEditing && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setImageToCrop({
+                                id: img.id,
+                                base64: img.base64,
+                              });
+                            }}
+                            className="pointer-events-auto bg-surface text-text-primary px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2 hover:bg-surface-active transition-colors border border-border"
+                          >
+                            <Crop size={16} /> Crop Image
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Backlinks Section */}
+            {backlinks.length > 0 && (
+              <div className="mt-12 pt-8 border-t border-border">
+                <h3 className="text-sm font-semibold text-text-muted uppercase tracking-wider flex items-center gap-2 mb-4">
+                  <LinkIcon size={16} /> Backlinks
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {backlinks.map((bl) => (
+                    <div
+                      key={bl.id}
+                      onClick={() =>
+                        onNavigateToNote?.(
+                          bl.id,
+                          bl.collectionId,
+                          bl.workspaceId,
+                        )
+                      }
+                      className="p-3 bg-surface border border-border hover:border-accent hover:bg-surface-active rounded-lg cursor-pointer transition-colors"
+                    >
+                      <h4 className="font-medium text-sm text-text-primary mb-1">
+                        {bl.title || "Untitled Note"}
+                      </h4>
+                      <p className="text-xs text-text-muted line-clamp-2">
+                        {bl.content.replace(/<[^>]+>/g, "") || "No content..."}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
-
-          {/* Backlinks Section */}
-          {backlinks.length > 0 && (
-            <div className="mt-12 pt-8 border-t border-border">
-              <h3 className="text-sm font-semibold text-text-muted uppercase tracking-wider flex items-center gap-2 mb-4">
-                <LinkIcon size={16} /> Backlinks
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {backlinks.map((bl) => (
-                  <div
-                    key={bl.id}
-                    onClick={() =>
-                      onNavigateToNote?.(bl.id, bl.collectionId, bl.workspaceId)
-                    }
-                    className="p-3 bg-surface border border-border hover:border-accent hover:bg-surface-active rounded-lg cursor-pointer transition-colors"
-                  >
-                    <h4 className="font-medium text-sm text-text-primary mb-1">
-                      {bl.title || "Untitled Note"}
-                    </h4>
-                    <p className="text-xs text-text-muted line-clamp-2">
-                      {bl.content.replace(/<[^>]+>/g, "") || "No content..."}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
-      </div>
-      <TaskDashboard editor={editor} />
+        <TaskDashboard editor={editor} />
       </div>
 
       {/* Bottom Toolbar replacing Footer Info */}
@@ -2118,7 +2266,12 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
           {onToggleFocusMode && (
             <button
               onClick={onToggleFocusMode}
-              className={cn("p-1.5 rounded-md transition-colors shrink-0", isFocusMode ? "bg-accent/20 text-accent" : "bg-surface hover:bg-surface-hover text-text-secondary")}
+              className={cn(
+                "p-1.5 rounded-md transition-colors shrink-0",
+                isFocusMode
+                  ? "bg-accent/20 text-accent"
+                  : "bg-surface hover:bg-surface-hover text-text-secondary",
+              )}
               title={isFocusMode ? "Exit Focus Mode" : "Enter Focus Mode"}
             >
               {isFocusMode ? <Minimize size={18} /> : <Maximize size={18} />}
@@ -2208,6 +2361,36 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
                           icon={<Heading3 size={16} />}
                         />
                       );
+                    case "h4":
+                      return (
+                        <ToolbarButton
+                          key={item}
+                          onClick={() =>
+                            editor
+                              .chain()
+                              .focus()
+                              .toggleHeading({ level: 4 })
+                              .run()
+                          }
+                          active={editor.isActive("heading", { level: 4 })}
+                          icon={<Heading4 size={16} />}
+                        />
+                      );
+                    case "h5":
+                      return (
+                        <ToolbarButton
+                          key={item}
+                          onClick={() =>
+                            editor
+                              .chain()
+                              .focus()
+                              .toggleHeading({ level: 5 })
+                              .run()
+                          }
+                          active={editor.isActive("heading", { level: 5 })}
+                          icon={<Heading5 size={16} />}
+                        />
+                      );
                     case "bold":
                       return (
                         <ToolbarButton
@@ -2234,7 +2417,9 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
                       return (
                         <ToolbarButton
                           key={item}
-                          onClick={() => editor.chain().focus().toggleHighlight().run()}
+                          onClick={() =>
+                            editor.chain().focus().toggleHighlight().run()
+                          }
                           active={editor.isActive("highlight")}
                           icon={<Highlighter size={16} />}
                           title="Highlight (==text==)"
@@ -2242,31 +2427,55 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
                       );
                     case "callout":
                       return (
-                        <div key={item} className="relative inline-flex items-center">
+                        <div
+                          key={item}
+                          className="relative inline-flex items-center"
+                        >
                           <ToolbarButton
                             onClick={() => {
-                               const defaultCallout = data.settings.defaultCallout || "NOTE";
-                               editor.chain().focus().insertContent(`\n> [!${defaultCallout}] \n> `).run();
+                              const defaultCallout =
+                                data.settings.defaultCallout || "NOTE";
+                              editor
+                                .chain()
+                                .focus()
+                                .insertContent(`\n> [!${defaultCallout}] \n> `)
+                                .run();
                             }}
                             icon={<MessageSquareWarning size={16} />}
                             title="Insert Callout"
                           />
-                          <button 
-                            className="absolute -right-1 top-1 bottom-1 w-3 flex items-center justify-center hover:bg-surface-hover rounded" 
-                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setCalloutDropdownOpen(!isCalloutDropdownOpen); }}
-                           >
+                          <button
+                            className="absolute -right-1 top-1 bottom-1 w-3 flex items-center justify-center hover:bg-surface-hover rounded"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setCalloutDropdownOpen(!isCalloutDropdownOpen);
+                            }}
+                          >
                             <ChevronDown size={10} />
                           </button>
                           {isCalloutDropdownOpen && (
                             <div className="absolute top-10 left-0 bg-surface border border-border rounded shadow-xl z-50 p-2 flex flex-col gap-1 w-32">
-                               {Object.keys(data.settings.calloutStyles || DEFAULT_SETTINGS.calloutStyles || {}).map(type => (
-                                 <button key={type} className="text-left text-xs font-semibold px-2 py-1.5 hover:bg-surface-active rounded transition-colors" onClick={() => {
-                                    editor.chain().focus().insertContent(`\n> [!${type}] \n> `).run();
+                              {Object.keys(
+                                data.settings.calloutStyles ||
+                                  DEFAULT_SETTINGS.calloutStyles ||
+                                  {},
+                              ).map((type) => (
+                                <button
+                                  key={type}
+                                  className="text-left text-xs font-semibold px-2 py-1.5 hover:bg-surface-active rounded transition-colors"
+                                  onClick={() => {
+                                    editor
+                                      .chain()
+                                      .focus()
+                                      .insertContent(`\n> [!${type}] \n> `)
+                                      .run();
                                     setCalloutDropdownOpen(false);
-                                 }}>
-                                   {type}
-                                 </button>
-                               ))}
+                                  }}
+                                >
+                                  {type}
+                                </button>
+                              ))}
                             </div>
                           )}
                         </div>
@@ -2275,7 +2484,9 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
                       return (
                         <ToolbarButton
                           key={item}
-                          onClick={() => editor.chain().focus().setFoldableBlock().run()}
+                          onClick={() =>
+                            editor.chain().focus().setFoldableBlock().run()
+                          }
                           active={editor.isActive("foldableBlock")}
                           icon={<FoldVertical size={16} />}
                           title="Foldable text block"
@@ -2402,7 +2613,16 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
                           key={item}
                           onClick={toggleDictation}
                           active={isDictating}
-                          icon={isDictating ? <Mic size={16} className="text-red-500 animate-pulse" /> : <MicOff size={16} />}
+                          icon={
+                            isDictating ? (
+                              <Mic
+                                size={16}
+                                className="text-red-500 animate-pulse"
+                              />
+                            ) : (
+                              <MicOff size={16} />
+                            )
+                          }
                           title="Voice to Text"
                         />
                       );
@@ -2476,11 +2696,27 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
               </span>
             </div>
             <div className="flex items-center text-xs text-text-muted select-none w-20 text-left">
-              {(savedStatus === "saving" || isSaving) ? (
+              {savedStatus === "saving" || isSaving ? (
                 <>
-                  <svg className="animate-spin -ml-1 mr-2 h-3 w-3 text-text-muted" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  <svg
+                    className="animate-spin -ml-1 mr-2 h-3 w-3 text-text-muted"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
                   </svg>
                   Saving...
                 </>
@@ -2513,15 +2749,18 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
               />
             </label>
 
-            {data.settings.plugins?.smartLinking?.enabled && data.settings.plugins?.smartLinking?.triggerMode === "button" && (
-              <button
-                onClick={() => updateSmartLinkingSuggestions(editor.getText())}
-                className="flex items-center justify-center px-2 py-1 text-sm bg-surface-active text-text-primary hover:bg-border rounded-md font-medium transition-colors h-8 w-8"
-                title="Find Related Notes"
-              >
-                <Network size={14} />
-              </button>
-            )}
+            {data.settings.plugins?.smartLinking?.enabled &&
+              data.settings.plugins?.smartLinking?.triggerMode === "button" && (
+                <button
+                  onClick={() =>
+                    updateSmartLinkingSuggestions(editor.getText())
+                  }
+                  className="flex items-center justify-center px-2 py-1 text-sm bg-surface-active text-text-primary hover:bg-border rounded-md font-medium transition-colors h-8 w-8"
+                  title="Find Related Notes"
+                >
+                  <Network size={14} />
+                </button>
+              )}
 
             <div className="relative group/templates">
               <button
@@ -2543,7 +2782,9 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
                     >
                       <button
                         onClick={() => {
-                          editor?.commands.setContent(preprocessWikilinks(t.content));
+                          editor?.commands.setContent(
+                            preprocessWikilinks(t.content),
+                          );
                           showToast(`Applied template: ${t.name}`);
                         }}
                         className="text-left px-2 py-2 text-sm flex-1 truncate"
@@ -2633,7 +2874,9 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
         onClose={() => setHistoryOpen(false)}
         noteId={noteId}
         onRestore={(content) => {
-          editor.commands.setContent(preprocessWikilinks(content), { emitUpdate: false });
+          editor.commands.setContent(preprocessWikilinks(content), {
+            emitUpdate: false,
+          });
           updateNote(noteId, { content });
           showToast("✓ Resorted from history");
         }}
@@ -2678,7 +2921,8 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
               <Trash2 className="text-red-400" size={20} /> Delete Note?
             </h3>
             <p className="text-sm text-text-muted mb-6">
-              Are you sure you want to permanently delete this note from local storage, Firebase, and Google Drive? This action cannot be undone.
+              Are you sure you want to permanently delete this note from local
+              storage, Firebase, and Google Drive? This action cannot be undone.
             </p>
             <div className="flex items-center justify-end gap-3">
               <button
@@ -2692,7 +2936,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
                 onClick={async () => {
                   setIsDeletingInfo(true);
                   deleteNote(noteId);
-                  
+
                   if (data.settings.driveBackup?.enabled && accessToken) {
                     try {
                       const newData = {
@@ -2711,7 +2955,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
                   } else {
                     showToast("✓ Deleted successfully");
                   }
-                  
+
                   setIsDeletingInfo(false);
                   setShowDeleteConfirm(false);
                   onDeleteNote?.();
@@ -2719,7 +2963,9 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
                 disabled={isDeletingInfo}
                 className="px-4 py-2 text-sm font-medium bg-red-500/90 hover:bg-red-600 text-white rounded-md transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
               >
-                {isDeletingInfo && <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin"></div>}
+                {isDeletingInfo && (
+                  <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin"></div>
+                )}
                 Delete Permanently
               </button>
             </div>
@@ -2741,7 +2987,9 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
         <button
           onClick={() => setIsEditing(!isEditing)}
           className="fixed bottom-[8.5rem] right-24 w-14 h-14 bg-surface hover:bg-surface-hover text-text-primary border border-border shadow-[0_8px_30px_rgba(0,0,0,0.1)] rounded-full flex items-center justify-center z-40 transition-transform hover:scale-105 active:scale-95 no-print"
-          title={isEditing ? "Switch to Reading Mode" : "Switch to Editing Mode"}
+          title={
+            isEditing ? "Switch to Reading Mode" : "Switch to Editing Mode"
+          }
         >
           {isEditing ? <BookOpen size={20} /> : <Pen size={20} />}
         </button>
@@ -2765,7 +3013,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
 
       <Suspense fallback={null}>
         {isSmartSearchOpen && (
-          <SmartSearchPanel 
+          <SmartSearchPanel
             isOpen={isSmartSearchOpen}
             onClose={() => setIsSmartSearchOpen(false)}
             noteId={noteId}
@@ -2795,10 +3043,27 @@ const ToolbarButton: React.FC<{
         ? "bg-accent/20 text-accent"
         : "text-text-secondary hover:bg-surface-active hover:text-text-primary",
     )}
-    style={{ width: "var(--toolbar-size, 2rem)", height: "var(--toolbar-size, 2rem)" }}
+    style={{
+      width: "var(--toolbar-size, 2rem)",
+      height: "var(--toolbar-size, 2rem)",
+    }}
   >
-    <div style={{ width: "var(--toolbar-icon-size, 1rem)", height: "var(--toolbar-icon-size, 1rem)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-       {React.isValidElement(icon) ? React.cloneElement(icon, { size: "100%", width: "100%", height: "100%" } as any) : icon}
+    <div
+      style={{
+        width: "var(--toolbar-icon-size, 1rem)",
+        height: "var(--toolbar-icon-size, 1rem)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {React.isValidElement(icon)
+        ? React.cloneElement(icon, {
+            size: "100%",
+            width: "100%",
+            height: "100%",
+          } as any)
+        : icon}
     </div>
   </button>
 );
