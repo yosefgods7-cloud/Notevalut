@@ -54,6 +54,7 @@ import { DailyDigestSettingsPanel } from "./DailyDigestSettingsPanel";
 import { AskYourVaultSettingsPanel } from "./AskYourVaultSettingsPanel";
 import { ApiKeysSettingsPanel } from "./ApiKeysSettingsPanel";
 import { VaultHealthDashboard } from "./VaultHealthDashboard";
+import { GithubSyncSettingsPanel } from "./GithubSyncSettingsPanel";
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
@@ -956,6 +957,97 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           </div>
                         </div>
                       ))}
+                    </div>
+                  </div>
+
+                  {/* Font Management */}
+                  <div className="border border-border rounded-xl p-4 mt-6 bg-surface">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h4 className="font-semibold text-sm">Font Management</h4>
+                        <p className="text-xs text-text-muted">
+                          Choose fonts for the interface, note text, and code blocks.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const newSettings = {
+                            ...localSettings,
+                            fonts: {
+                              interface: "DM Sans",
+                              note: "Lora",
+                              monospace: "Courier New"
+                            }
+                          };
+                          setLocalSettings(newSettings);
+                          updateSettings(newSettings);
+                        }}
+                        className="px-3 py-1 text-xs border border-border rounded-lg hover:bg-surface-active"
+                      >
+                        Reset Fonts
+                      </button>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-medium">Interface Font</label>
+                        <select
+                          value={localSettings.fonts?.interface || "DM Sans"}
+                          onChange={(e) => {
+                            const newSettings = {
+                              ...localSettings,
+                              fonts: { ...(localSettings.fonts || { note: "Lora", monospace: "Courier New" }), interface: e.target.value }
+                            };
+                            setLocalSettings(newSettings);
+                            updateSettings(newSettings);
+                          }}
+                          className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-accent"
+                        >
+                          {["DM Sans", "Inter", "Roboto", "Open Sans", "Poppins", "Outfit", "Space Grotesk", "Plus Jakarta Sans", "Work Sans", "Montserrat"].map(f => (
+                            <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-medium">Note Body Font</label>
+                        <select
+                          value={localSettings.fonts?.note || "Lora"}
+                          onChange={(e) => {
+                            const newSettings = {
+                              ...localSettings,
+                              fonts: { ...(localSettings.fonts || { interface: "DM Sans", monospace: "Courier New" }), note: e.target.value }
+                            };
+                            setLocalSettings(newSettings);
+                            updateSettings(newSettings);
+                          }}
+                          className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-accent"
+                        >
+                          {["Lora", "Merriweather", "Playfair Display", "EB Garamond", "PT Serif", "Noto Serif", "Crimson Pro", "Frank Ruhl Libre", "Literata", "Zilla Slab"].map(f => (
+                            <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-medium">Monospace Font (Code)</label>
+                        <select
+                          value={localSettings.fonts?.monospace || "Courier New"}
+                          onChange={(e) => {
+                            const newSettings = {
+                              ...localSettings,
+                              fonts: { ...(localSettings.fonts || { interface: "DM Sans", note: "Lora" }), monospace: e.target.value }
+                            };
+                            setLocalSettings(newSettings);
+                            updateSettings(newSettings);
+                          }}
+                          className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-accent"
+                        >
+                          {["Courier New", "JetBrains Mono", "Fira Code", "Space Mono", "Roboto Mono", "Source Code Pro", "IBM Plex Mono", "Inconsolata", "Ubuntu Mono", "PT Mono"].map(f => (
+                            <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2203,6 +2295,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       </div>
                     </div>
                   </div>
+                  
+                  <GithubSyncSettingsPanel settings={localSettings} updateSettings={(s) => setLocalSettings((prev) => ({ ...prev, ...s }))} />
 
                   {/* Local Backup */}
                   <div>

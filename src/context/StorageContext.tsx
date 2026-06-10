@@ -74,6 +74,7 @@ import { marked } from "marked";
 
 interface StorageContextType {
   data: NoteVaultData;
+  totalLocalNotes: number;
   saveData: (newData: NoteVaultData) => void;
   updateSettings: (settings: Partial<Settings>) => void;
   // Workspaces
@@ -247,17 +248,56 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
         console.error("Failed to read from IndexedDB", e);
       }
 
-      // Migrate from localStorage to IndexedDB
-      if (!storedData) {
-        const localStored = safeStorage.getItem(STORAGE_KEY);
-        if (localStored) {
-          storedData = localStored;
-          try {
-            await set(STORAGE_KEY, localStored);
-            safeStorage.removeItem(STORAGE_KEY);
-            console.log("Migrated data from localStorage to IndexedDB");
-          } catch (e) {}
+      // Silent automatic migration and recovery from localStorage and sessionStorage
+      try {
+        const localStored = localStorage.getItem(STORAGE_KEY);
+        const sessionStored = sessionStorage.getItem(STORAGE_KEY);
+
+        let mergedNotes: any[] = [];
+        let needsMigration = false;
+        let baseData: any = null;
+
+        if (storedData) {
+          try { baseData = JSON.parse(storedData); mergedNotes = baseData.notes || []; } catch(e){}
         }
+
+        const mergeFrom = (sourceStr: string | null) => {
+          if (!sourceStr) return;
+          try {
+            const parsed = JSON.parse(sourceStr);
+            if (parsed && parsed.notes && Array.isArray(parsed.notes)) {
+              const existingIds = new Set(mergedNotes.map(n => n.id));
+              parsed.notes.forEach((n: any) => {
+                if (!existingIds.has(n.id)) {
+                  mergedNotes.push(n);
+                  needsMigration = true;
+                }
+              });
+              if (!baseData && parsed.workspaces) {
+                baseData = parsed;
+                needsMigration = true;
+              }
+            }
+          } catch(e) {}
+        };
+
+        mergeFrom(localStored);
+        mergeFrom(sessionStored);
+        
+        // Also check caches for any raw note data if possible (simplified approach: just checking LS/SS covers 99% of synchronous storage gaps)
+        
+        if (needsMigration && baseData) {
+          baseData.notes = mergedNotes;
+          storedData = JSON.stringify(baseData);
+          await set(STORAGE_KEY, storedData);
+          console.log("Silently migrated and merged orphaned data from localStorage/sessionStorage into IndexedDB.");
+        }
+        
+        // Cleanup old storage so it doesn't try to migrate again later
+        if (localStored) localStorage.removeItem(STORAGE_KEY);
+        if (sessionStored) sessionStorage.removeItem(STORAGE_KEY);
+      } catch (e) {
+        console.warn("Migration check failed", e);
       }
 
       const now = new Date().toISOString();
@@ -1218,6 +1258,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
     <StorageContext.Provider
       value={{
         data,
+        totalLocalNotes: data.notes.length + hiddenNotesRef.current.length,
         saveData,
         updateSettings,
         addWorkspace,

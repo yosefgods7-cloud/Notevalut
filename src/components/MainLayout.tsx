@@ -10,7 +10,9 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { useStorage } from "../context/StorageContext";
 import { useAuth } from "../context/AuthContext";
+import { useFirebaseConnection } from "../context/FirebaseConnectionManager";
 import { DEFAULT_SETTINGS } from "../types";
+import { pullFromGithub, pushToGithub } from "../lib/githubSync";
 import {
   shouldRunBackup,
   uploadToDrive,
@@ -32,9 +34,26 @@ const SecondBrainSidebar = lazy(() => import("./SecondBrainSidebar").then(module
 const DailyDigestCard = lazy(() => import("./DailyDigestCard").then(module => ({ default: module.DailyDigestCard })));
 
 export const MainLayout: React.FC = () => {
-  const { data, addNote, updateSettings } = useStorage();
+  const { data, totalLocalNotes, addNote, updateSettings, saveData } = useStorage();
   const { accessToken } = useAuth();
+  const { cloudNotes, isConnected } = useFirebaseConnection();
   const dataRef = React.useRef(data);
+  const [showMissingAlert, setShowMissingAlert] = useState(false);
+
+  useEffect(() => {
+    // Perform quiet background verification on first load after deployment
+    const verifyKey = "firebase_verification_done_v2";
+    const verified = localStorage.getItem(verifyKey);
+    if (!verified && isConnected && cloudNotes.length > 0) {
+      setTimeout(() => {
+        if (cloudNotes.length > totalLocalNotes) {
+           console.warn(`Local note count (${totalLocalNotes}) is lower than Firebase (${cloudNotes.length}).`);
+           setShowMissingAlert(true);
+        }
+        localStorage.setItem(verifyKey, "true");
+      }, 5000);
+    }
+  }, [isConnected, cloudNotes.length, totalLocalNotes]);
 
   useEffect(() => {
     dataRef.current = data;
@@ -86,6 +105,74 @@ export const MainLayout: React.FC = () => {
 
     return () => clearInterval(interval);
   }, [accessToken, updateSettings]);
+
+  // GitHub Sync: Pull on startup
+  useEffect(() => {
+    const runGithubPull = async () => {
+      const ghSettings = dataRef.current.settings.githubSync;
+      if (ghSettings?.enabled && ghSettings?.pullOnStartup) {
+        try {
+          const updatedNotes = await pullFromGithub(dataRef.current, ghSettings);
+          if (updatedNotes.length > 0) {
+            // Merge updated notes into data
+            const newNotes = [...dataRef.current.notes];
+            let changed = false;
+            updatedNotes.forEach(un => {
+              const idx = newNotes.findIndex(n => n.id === un.id);
+              if (idx >= 0) {
+                if (new Date(un.updatedAt) > new Date(newNotes[idx].updatedAt)) {
+                  newNotes[idx] = un;
+                  changed = true;
+                }
+              } else {
+                newNotes.push(un);
+                changed = true;
+              }
+            });
+            if (changed) {
+              const newData = { ...dataRef.current, notes: newNotes };
+              saveData(newData);
+            }
+          }
+        } catch (e) {
+          console.error("GitHub pull on startup failed", e);
+        }
+      }
+    };
+    // Run after a short delay to let initialization settle
+    const to = setTimeout(runGithubPull, 3000);
+    return () => clearTimeout(to);
+  }, [saveData]);
+
+  // GitHub Sync: Auto push
+  useEffect(() => {
+    const handleGithubPush = async () => {
+      const ghSettings = dataRef.current.settings.githubSync;
+      if (!ghSettings?.enabled || !ghSettings?.syncInterval) return;
+      
+      const lastSync = ghSettings.lastSyncTime ? new Date(ghSettings.lastSyncTime).getTime() : 0;
+      const now = Date.now();
+      const intervalMs = ghSettings.syncInterval * 60 * 1000;
+      
+      if (now - lastSync >= intervalMs) {
+        try {
+          await pushToGithub(dataRef.current, ghSettings);
+          updateSettings({
+            githubSync: {
+              ...ghSettings,
+              lastSyncTime: new Date().toISOString()
+            }
+          });
+        } catch (error) {
+          console.error("GitHub background push failed", error);
+        }
+      }
+    };
+    
+    // Check every minute
+    const interval = setInterval(handleGithubPush, 60 * 1000);
+    return () => clearInterval(interval);
+  }, [updateSettings]);
 
   const [openTabs, setOpenTabs] = useState<string[]>([]);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string>(
@@ -197,6 +284,47 @@ export const MainLayout: React.FC = () => {
     const navSizeMap = { small: "2.5rem", medium: "3.5rem", large: "4rem", xlarge: "5rem" };
     const navIconMap = { small: "1.25rem", medium: "1.5rem", large: "1.75rem", xlarge: "2rem" };
     
+    // Apply fonts if they exist
+    if (data.settings.fonts) {
+      const loadFont = (fontName: string) => {
+        if (!fontName) return;
+        // Don't try to load system fonts from Google
+        if (["system-ui", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Helvetica", "Arial", "sans-serif", "Courier New", "monospace", "Georgia", "serif"].includes(fontName)) return;
+        
+        const linkId = `font-${fontName.replace(/\s+/g, '-')}`;
+        if (!document.getElementById(linkId)) {
+          const link = document.createElement('link');
+          link.id = linkId;
+          link.rel = 'stylesheet';
+          link.href = `https://fonts.googleapis.com/css2?family=${fontName.replace(/\s+/g, '+')}:ital,wght@0,400;0,500;0,600;0,700;1,400;1,700&display=swap`;
+          document.head.appendChild(link);
+        }
+      };
+
+      if (data.settings.fonts.interface) {
+        loadFont(data.settings.fonts.interface);
+        root.style.setProperty("--font-sans", `"${data.settings.fonts.interface}", ui-sans-serif, system-ui, sans-serif`);
+      } else {
+        root.style.removeProperty("--font-sans");
+      }
+      if (data.settings.fonts.note) {
+        loadFont(data.settings.fonts.note);
+        root.style.setProperty("--font-serif", `"${data.settings.fonts.note}", ui-serif, Georgia, serif`);
+      } else {
+        root.style.removeProperty("--font-serif");
+      }
+      if (data.settings.fonts.monospace) {
+        loadFont(data.settings.fonts.monospace);
+        root.style.setProperty("--font-mono", `"${data.settings.fonts.monospace}", ui-monospace, SFMono-Regular, monospace`);
+      } else {
+        root.style.removeProperty("--font-mono");
+      }
+    } else {
+      root.style.removeProperty("--font-sans");
+      root.style.removeProperty("--font-serif");
+      root.style.removeProperty("--font-mono");
+    }
+    
     const toolbarSizeMap = { small: "2rem", medium: "2.5rem", large: "3rem", xlarge: "3.5rem" };
     const toolbarIconMap = { small: "1rem", medium: "1.1rem", large: "1.25rem", xlarge: "1.5rem" };
 
@@ -221,7 +349,7 @@ export const MainLayout: React.FC = () => {
 
     root.style.setProperty("--system-bar-size", systemSizeMap[systemBase as keyof typeof systemSizeMap]);
 
-  }, [data.settings.theme, data.settings.customColors, data.settings.navBarSize, data.settings.toolbarSize, data.settings.floatBtnSize, data.settings.systemBarSize]);
+  }, [data.settings.theme, data.settings.customColors, data.settings.navBarSize, data.settings.toolbarSize, data.settings.floatBtnSize, data.settings.systemBarSize, data.settings.fonts]);
 
   // Set initial collection if none selected but workspace has collections
   useEffect(() => {
@@ -778,6 +906,43 @@ export const MainLayout: React.FC = () => {
 
       <BackgroundAIProcessor />
       <SecondBrainSidebar />
+      
+      <AnimatePresence>
+        {showMissingAlert && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-surface border border-yellow-500/50 shadow-xl rounded-xl p-4 flex items-center gap-4 z-50 overflow-hidden no-print"
+          >
+            <div className="absolute top-0 left-0 w-1 h-full bg-yellow-500"></div>
+            <div className="text-yellow-500">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-text-primary">Some notes may be missing</p>
+              <p className="text-xs text-text-muted">Firebase has more notes than this device.</p>
+            </div>
+            <div className="flex gap-2 ml-2 border-l border-border pl-4">
+              <button
+                onClick={() => {
+                  setShowMissingAlert(false);
+                  setSettingsOpen(true); // User can manually trigger sync or import/export from settings
+                }}
+                className="text-xs font-semibold bg-surface-hover px-3 py-1.5 rounded-lg hover:bg-surface-active text-text-primary transition-colors"
+              >
+                Review Sync
+              </button>
+              <button
+                onClick={() => setShowMissingAlert(false)}
+                className="text-xs text-text-muted hover:text-text-primary px-2"
+              >
+                Dismiss
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

@@ -177,6 +177,16 @@ export interface ApiUsageStats {
   editorCount: number;
 }
 
+export interface GithubSyncSettings {
+  enabled: boolean;
+  repository: string;
+  branch: string;
+  pullOnStartup: boolean;
+  syncInterval: number; // in minutes
+  lastSyncTime?: string;
+  error?: string;
+}
+
 export interface Settings {
   theme: "dark" | "light" | "system";
   fontSize: "small" | "medium" | "large" | "ultralarge";
@@ -195,12 +205,18 @@ export interface Settings {
   plugins?: PluginSettings;
   toolbarItems?: string[];
   driveBackup?: DriveBackupSettings;
+  githubSync?: GithubSyncSettings;
   lastCloudSyncDate?: string;
   navBarSize?: "small" | "medium" | "large" | "xlarge";
   toolbarSize?: "small" | "medium" | "large" | "xlarge";
   floatBtnSize?: "small" | "medium" | "large" | "xlarge";
   systemBarSize?: "small" | "medium" | "large" | "xlarge";
   customColors?: Record<string, string>;
+  fonts?: {
+    note: string;
+    interface: string;
+    monospace: string;
+  };
   highlightColor?: string;
   defaultCallout?: string;
   calloutStyles?: Record<string, CalloutStyle>;
@@ -263,11 +279,23 @@ export const DEFAULT_SETTINGS: Settings = {
   fontSize: "medium",
   defaultWorkspace: "",
   smartPaste: true,
+  githubSync: {
+    enabled: false,
+    repository: "",
+    branch: "main",
+    pullOnStartup: false,
+    syncInterval: 0,
+  },
   navBarSize: "medium",
   toolbarSize: "medium",
   floatBtnSize: "medium",
   systemBarSize: "medium",
   customColors: {},
+  fonts: {
+    note: "Lora",
+    interface: "DM Sans",
+    monospace: "Courier New",
+  },
   highlightColor: "#facc15", // yellow-400
   defaultCallout: "NOTE",
   floatButtons: {
