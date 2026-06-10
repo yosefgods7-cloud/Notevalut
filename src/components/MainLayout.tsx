@@ -10,6 +10,7 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { useStorage } from "../context/StorageContext";
 import { useAuth } from "../context/AuthContext";
+import { DEFAULT_SETTINGS } from "../types";
 import {
   shouldRunBackup,
   uploadToDrive,
@@ -742,36 +743,38 @@ export const MainLayout: React.FC = () => {
       </Suspense>
 
       {/* Quick Capture Floating Action Button */}
-      <button
-        onClick={() => {
-          if (activeWorkspaceId && activeCollectionId) {
-            const newNote = addNote(
-              activeWorkspaceId,
-              activeCollectionId,
-              "Quick Capture",
-              "",
-            );
-            setActiveNoteId(newNote.id);
-          }
-        }}
-        className="fixed bottom-[8.5rem] right-8 bg-accent hover:bg-accent-hover text-white rounded-full shadow-[0_8px_30px_rgba(124,106,247,0.3)] flex items-center justify-center z-40 transition-transform hover:scale-105 active:scale-95 no-print"
-        style={{ width: "var(--float-btn-size, 3.5rem)", height: "var(--float-btn-size, 3.5rem)" }}
-        title="Quick Capture"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          style={{ width: "var(--float-icon-size, 1.5rem)", height: "var(--float-icon-size, 1.5rem)" }}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+      {(data.settings.floatButtons?.quickCapture ?? DEFAULT_SETTINGS.floatButtons?.quickCapture ?? true) && (
+        <button
+          onClick={() => {
+            if (activeWorkspaceId && activeCollectionId) {
+              const newNote = addNote(
+                activeWorkspaceId,
+                activeCollectionId,
+                "Quick Capture",
+                "",
+              );
+              setActiveNoteId(newNote.id);
+            }
+          }}
+          className="fixed bottom-[8.5rem] right-8 bg-accent hover:bg-accent-hover text-white rounded-full shadow-[0_8px_30px_rgba(124,106,247,0.3)] flex items-center justify-center z-40 transition-transform hover:scale-105 active:scale-95 no-print"
+          style={{ width: "var(--float-btn-size, 3.5rem)", height: "var(--float-btn-size, 3.5rem)" }}
+          title="Quick Capture"
         >
-          <line x1="12" y1="5" x2="12" y2="19"></line>
-          <line x1="5" y1="12" x2="19" y2="12"></line>
-        </svg>
-      </button>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            style={{ width: "var(--float-icon-size, 1.5rem)", height: "var(--float-icon-size, 1.5rem)" }}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </button>
+      )}
 
       <BackgroundAIProcessor />
       <SecondBrainSidebar />

@@ -1459,6 +1459,63 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
                   </label>
 
+                  <div className="bg-surface border border-border p-4 rounded-xl mt-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <div className="font-semibold mb-1 text-sm">Float Buttons</div>
+                        <div className="text-xs text-text-muted">Manage visibility for floating action buttons inside the note editor.</div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setLocalSettings(s => ({
+                            ...s,
+                            floatButtons: {
+                              quickCapture: true,
+                              aiAssistant: true,
+                              readEdit: true,
+                              smartSearch: true,
+                            }
+                          }));
+                        }}
+                        className="px-3 py-1 text-xs border border-border rounded-lg hover:bg-surface-active"
+                      >
+                        Reset Layout
+                      </button>
+                    </div>
+
+                    <div className="space-y-3">
+                      {[
+                        { id: 'quickCapture', label: 'Quick Capture' },
+                        { id: 'aiAssistant', label: 'AI Second Brain' },
+                        { id: 'readEdit', label: 'Read/Edit Toggle' },
+                        { id: 'smartSearch', label: 'Smart Search / Brain Map' }
+                      ].map((btn) => (
+                        <label key={btn.id} className="flex items-center justify-between cursor-pointer">
+                          <span className="text-sm">{btn.label}</span>
+                          <div className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={localSettings.floatButtons?.[btn.id as keyof typeof localSettings.floatButtons] ?? DEFAULT_SETTINGS.floatButtons?.[btn.id as keyof typeof DEFAULT_SETTINGS.floatButtons] ?? true}
+                              onChange={(e) =>
+                                setLocalSettings((s) => ({
+                                  ...s,
+                                  floatButtons: {
+                                    ...(s.floatButtons || DEFAULT_SETTINGS.floatButtons || {
+                                      quickCapture: true, aiAssistant: true, readEdit: true, smartSearch: true
+                                    }),
+                                    [btn.id]: e.target.checked,
+                                  },
+                                }))
+                              }
+                              className="sr-only peer"
+                            />
+                            <div className="w-9 h-5 bg-surface-active border border-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2.5px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="border-t border-border pt-4">
                     <div className="text-sm font-medium mb-1">
                       Highlight Colors

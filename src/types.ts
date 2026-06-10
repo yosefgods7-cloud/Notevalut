@@ -206,6 +206,12 @@ export interface Settings {
   calloutStyles?: Record<string, CalloutStyle>;
   apiUsage?: ApiUsageStats; // Legacy
   apiUsageByKey?: Record<string, ApiUsageStats>;
+  floatButtons?: {
+    quickCapture: boolean;
+    aiAssistant: boolean;
+    readEdit: boolean;
+    smartSearch: boolean;
+  };
 }
 
 export interface NoteTemplate {
@@ -264,6 +270,12 @@ export const DEFAULT_SETTINGS: Settings = {
   customColors: {},
   highlightColor: "#facc15", // yellow-400
   defaultCallout: "NOTE",
+  floatButtons: {
+    quickCapture: true,
+    aiAssistant: true,
+    readEdit: true,
+    smartSearch: true,
+  },
   calloutStyles: {
     CONCEPT: { color: "#3b82f6", icon: "BookOpen" },
     IMPORTANT: { color: "#ef4444", icon: "AlertCircle" },

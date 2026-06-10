@@ -2974,16 +2974,18 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
       )}
 
       {/* Smart Search Floating Action Button */}
-      <button
-        onClick={() => setIsSmartSearchOpen(true)}
-        className="fixed bottom-[8.5rem] right-40 w-14 h-14 bg-surface hover:bg-surface-hover text-text-primary border border-border shadow-[0_8px_30px_rgba(0,0,0,0.1)] rounded-full flex items-center justify-center z-40 transition-transform hover:scale-105 active:scale-95 no-print"
-        title="Smart Search / Brain Map"
-      >
-        <Network size={20} className="text-xl" />
-      </button>
+      {(settings.floatButtons?.smartSearch ?? DEFAULT_SETTINGS.floatButtons?.smartSearch ?? true) && (
+        <button
+          onClick={() => setIsSmartSearchOpen(true)}
+          className="fixed bottom-[8.5rem] right-40 w-14 h-14 bg-surface hover:bg-surface-hover text-text-primary border border-border shadow-[0_8px_30px_rgba(0,0,0,0.1)] rounded-full flex items-center justify-center z-40 transition-transform hover:scale-105 active:scale-95 no-print"
+          title="Smart Search / Brain Map"
+        >
+          <Network size={20} className="text-xl" />
+        </button>
+      )}
 
       {/* Read/Edit Floating Action Button */}
-      {!note?.isDeleted && (
+      {!note?.isDeleted && (settings.floatButtons?.readEdit ?? DEFAULT_SETTINGS.floatButtons?.readEdit ?? true) && (
         <button
           onClick={() => setIsEditing(!isEditing)}
           className="fixed bottom-[8.5rem] right-24 w-14 h-14 bg-surface hover:bg-surface-hover text-text-primary border border-border shadow-[0_8px_30px_rgba(0,0,0,0.1)] rounded-full flex items-center justify-center z-40 transition-transform hover:scale-105 active:scale-95 no-print"

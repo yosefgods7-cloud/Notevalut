@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, X, Send, Bot, User, Brain, AlertCircle } from 'lucide-react';
 import { useAI } from '../hooks/useAI';
 import { useStorage } from '../context/StorageContext';
+import { DEFAULT_SETTINGS } from '../types';
 import { cn } from '../lib/utils';
 import { marked } from 'marked';
 
@@ -83,6 +84,10 @@ export const SecondBrainSidebar: React.FC = () => {
   };
 
   if (!isEnabled) return null;
+
+  const showBtn = data.settings.floatButtons?.aiAssistant ?? DEFAULT_SETTINGS.floatButtons?.aiAssistant ?? true;
+
+  if (!showBtn) return null;
 
   return (
     <>
