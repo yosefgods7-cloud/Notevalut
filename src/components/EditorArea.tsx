@@ -241,6 +241,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
   const [isTagInputFocused, setIsTagInputFocused] = useState(false);
   const [searchTerm, setSearchTermState] = useState("");
   const [searchMatches, setSearchMatches] = useState({ total: 0, current: 0 });
+  const [scrollProgress, setScrollProgress] = useState(0);
 
   const tagFrequencies = useMemo(() => {
     const freqs: Record<string, number> = {};
@@ -1490,6 +1491,16 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
     updateNote(noteId, { tags: newTags });
   };
 
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    const scrollHeight = target.scrollHeight - target.clientHeight;
+    if (scrollHeight > 0) {
+      setScrollProgress((target.scrollTop / scrollHeight) * 100);
+    } else {
+      setScrollProgress(0);
+    }
+  };
+
   if (!note || !editor) return null;
 
   return (
@@ -1550,7 +1561,16 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
       )}
 
       <div className="flex-1 flex flex-row overflow-hidden w-full h-full relative">
-        <div className="flex-1 overflow-y-auto no-scrollbar relative flex justify-center pb-32 pt-8 print:pt-0">
+        <div className="absolute top-0 left-0 w-full h-[2px] z-[60] pointer-events-none bg-transparent">
+          <div 
+            className="h-full bg-accent transition-all duration-150 ease-out" 
+            style={{ width: `${scrollProgress}%` }} 
+          />
+        </div>
+        <div 
+          className="flex-1 overflow-y-auto no-scrollbar relative flex justify-center pb-32 pt-8 print:pt-0"
+          onScroll={handleScroll}
+        >
           {smartLinkingSuggestions.length > 0 && (
             <div className="fixed sm:absolute bottom-20 right-4 sm:bottom-auto sm:top-8 sm:right-6 w-64 bg-surface border border-border shadow-[0_4px_30px_rgba(0,0,0,0.5)] shadow-pink-500/10 rounded-xl z-[100] flex flex-col overflow-hidden animate-in fade-in slide-in-from-right-4 ring-1 ring-white/5">
               <div className="bg-surface-active/80 backdrop-blur px-3 py-2 border-b border-border text-xs font-semibold flex items-center justify-between text-text-primary">

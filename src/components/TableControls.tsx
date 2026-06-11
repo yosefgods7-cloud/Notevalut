@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Editor } from '@tiptap/react';
-import { Trash2, Copy, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, GripVertical, GripHorizontal, MoveLeft, MoveRight, MoveUp, MoveDown, PlusSquare } from 'lucide-react';
+import { Trash2, Copy, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, GripVertical, GripHorizontal, MoveLeft, MoveRight, MoveUp, MoveDown, PlusSquare, Settings, Maximize2 } from 'lucide-react';
 
 interface TableControlsProps {
   editor: Editor | null;
@@ -13,7 +13,7 @@ export const TableControls: React.FC<TableControlsProps> = ({ editor }) => {
   const [tableRect, setTableRect] = useState<any>(null);
   const [cols, setCols] = useState<{left: number, width: number, index: number}[]>([]);
   const [rows, setRows] = useState<{top: number, height: number, index: number}[]>([]);
-  const [activeMenu, setActiveMenu] = useState<{type: 'row' | 'col', index: number} | null>(null);
+  const [activeMenu, setActiveMenu] = useState<{type: 'row' | 'col' | 'table', index: number} | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [isDragOn, setIsDragOn] = useState(false);
 
@@ -148,7 +148,7 @@ export const TableControls: React.FC<TableControlsProps> = ({ editor }) => {
     return null;
   };
 
-  const resolveCellPos = (type: 'col'|'row', index: number): number | null => {
+  const resolveCellPos = (type: 'col'|'row'|'table', index: number): number | null => {
     try {
       const data = getTableData();
       if (!data) return null;
@@ -188,7 +188,7 @@ export const TableControls: React.FC<TableControlsProps> = ({ editor }) => {
     }
   };
 
-  const hackSelection = (type: 'col'|'row', index: number, callback: () => void) => {
+  const hackSelection = (type: 'col'|'row'|'table', index: number, callback: () => void) => {
     const pos = resolveCellPos(type, index);
     if (pos !== null) {
       editor.chain().focus().setTextSelection(pos).run();
@@ -214,8 +214,27 @@ export const TableControls: React.FC<TableControlsProps> = ({ editor }) => {
             editor.chain().focus().deleteRow().run();
          } else if (type === 'col') {
             editor.chain().focus().deleteColumn().run();
+         } else if (type === 'table') {
+            editor.chain().focus().deleteTable().run();
          }
          return;
+      }
+
+      if (action === 'fit-content') {
+        const json = data.node.toJSON();
+        const removeColWidths = (n: any) => {
+           if (n.type === 'tableCell' || n.type === 'tableHeader') {
+               if (n.attrs && n.attrs.colwidth) {
+                   n.attrs.colwidth = null;
+               }
+           }
+           if (n.content) {
+               n.content.forEach(removeColWidths);
+           }
+        };
+        removeColWidths(json);
+        manualTableUpdate(json, data.pos, data.node.nodeSize);
+        return;
       }
       
       if (action === 'add-before' || action === 'add-after') {
@@ -337,6 +356,34 @@ export const TableControls: React.FC<TableControlsProps> = ({ editor }) => {
       className="absolute pointer-events-none z-50" 
       style={{ top: tableRect.top, left: tableRect.left, width: tableRect.width, height: tableRect.height }}
     >
+      {/* Table Handle */}
+      {cols.length > 0 && rows.length > 0 && (
+        <div 
+          className="absolute pointer-events-auto flex items-center justify-center group"
+          style={{ top: -20, left: -20, width: 20, height: 20 }}
+        >
+          <div 
+             className="w-4 h-4 bg-surface hover:bg-surface-hover border border-border shadow-sm rounded flex items-center justify-center transition-colors cursor-pointer"
+             onMouseDown={(e) => { 
+                e.stopPropagation(); 
+                if (activeMenu?.type === 'table') setActiveMenu(null);
+                else setActiveMenu({ type: 'table', index: 0 }); 
+             }}
+             title="Table options"
+          >
+             <Settings size={12} className="text-text-muted" />
+          </div>
+
+          {activeMenu?.type === 'table' && (
+            <div ref={menuRef} className="absolute left-6 top-1/2 -translate-y-1/2 bg-surface border border-border rounded-md shadow-xl p-1 flex flex-col gap-1 w-36 z-[60]">
+              <button onMouseDown={(e) => { e.preventDefault(); handleAction('fit-content'); }} className="flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-surface-active rounded-sm w-full font-medium text-text-primary"><Maximize2 size={12}/> Auto Fit Columns</button>
+              <div className="w-full h-px bg-border my-0.5" />
+              <button onMouseDown={(e) => { e.preventDefault(); handleAction('delete'); }} className="flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-surface-active text-red-500 rounded-sm w-full font-medium"><Trash2 size={12}/> Delete Table</button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Col Handles */}
       {cols.map(c => (
         <div 

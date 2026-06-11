@@ -94,7 +94,7 @@ export const SecondBrainSidebar: React.FC = () => {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "fixed bottom-6 right-6 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.15)] flex items-center justify-center z-50 transition-all hover:scale-105 active:scale-95 no-print border",
+          "fixed bottom-24 left-6 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.15)] flex items-center justify-center z-[70] transition-all hover:scale-105 active:scale-95 no-print border",
           isOpen ? "bg-surface text-text-primary border-border" : "bg-gradient-to-r from-blue-600 to-purple-600 text-white border-transparent"
         )}
         style={{ width: "var(--float-btn-size, 3.5rem)", height: "var(--float-btn-size, 3.5rem)" }}
@@ -110,7 +110,7 @@ export const SecondBrainSidebar: React.FC = () => {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
-            className="fixed bottom-24 right-6 w-[380px] h-[550px] max-w-[calc(100vw-3rem)] max-h-[calc(100vh-8rem)] bg-surface border border-border rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden no-print"
+            className="fixed bottom-[10.5rem] left-6 w-[380px] h-[550px] max-w-[calc(100vw-3rem)] max-h-[calc(100vh-8rem)] bg-surface border border-border rounded-2xl shadow-2xl flex flex-col z-[70] overflow-hidden no-print"
           >
             <div className="flex items-center gap-3 p-4 border-b border-border bg-surface-active/50 justify-between">
               <div className="flex items-center gap-3">
