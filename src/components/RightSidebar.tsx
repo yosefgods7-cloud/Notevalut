@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { Link2, X, Search, FolderInput, Folder, ListTree, Merge, ArrowLeft, Check } from "lucide-react";
+import { Link2, X, Search, FolderInput, Folder, ListTree, Merge, ArrowLeft, Check, Presentation } from "lucide-react";
 import { useStorage } from "../context/StorageContext";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
+import { PresentationMode } from "./PresentationMode";
 
 interface RightSidebarProps {
   isOpen: boolean;
@@ -26,6 +27,9 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
   // Merge state
   const [mergeStep, setMergeStep] = useState<"none" | "list" | "preview">("none");
   const [mergeDestinationId, setMergeDestinationId] = useState<string | null>(null);
+
+  // Presentation state
+  const [isPresentationOpen, setIsPresentationOpen] = useState(false);
 
   const currentNote = activeNoteId ? data.notes.find((n) => n.id === activeNoteId) : null;
   const destinationNote = mergeDestinationId ? data.notes.find(n => n.id === mergeDestinationId) : null;
@@ -106,23 +110,24 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
   const backlinks = getBacklinks();
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 z-40 bg-black/20 lg:hidden" // Backdrop for mobile
-          />
-          <motion.div
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed top-0 right-0 z-50 h-[var(--vh,100dvh)] w-80 max-w-[calc(100vw-3rem)] bg-surface border-l border-border shadow-xl flex flex-col"
-          >
+    <>
+      <AnimatePresence>
+        {isOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={onClose}
+              className="fixed inset-0 z-40 bg-black/20 lg:hidden" // Backdrop for mobile
+            />
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="fixed top-0 right-0 z-50 h-[var(--vh,100dvh)] w-80 max-w-[calc(100vw-3rem)] bg-surface border-l border-border shadow-xl flex flex-col"
+            >
             <div className="flex items-center justify-between p-4 border-b border-border bg-background">
               <div className="flex border border-border rounded-lg overflow-hidden flex-1 mr-4">
                  <button
@@ -221,6 +226,12 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                        className="w-full bg-surface-active hover:bg-border text-text-primary border border-border flex items-center justify-center gap-2 p-3 rounded-lg transition-colors font-medium text-sm shadow-sm"
                      >
                        <Search size={16} /> Find in Note
+                     </button>
+                     <button
+                       onClick={() => setIsPresentationOpen(true)}
+                       className="w-full bg-surface-active hover:bg-border text-text-primary border border-border flex items-center justify-center gap-2 p-3 rounded-lg transition-colors font-medium text-sm shadow-sm"
+                     >
+                       <Presentation size={16} /> Presentation Mode
                      </button>
                      <button
                        onClick={() => setActiveTab("outliner")}
@@ -369,5 +380,11 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
         </>
       )}
     </AnimatePresence>
+    <PresentationMode 
+      isOpen={isPresentationOpen} 
+      onClose={() => setIsPresentationOpen(false)} 
+      content={currentNote ? `${currentNote.title ? `<h1>${currentNote.title}</h1>\n` : ''}${currentNote.content || ''}` : ''} 
+    />
+  </>
   );
 };
