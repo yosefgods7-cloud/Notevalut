@@ -32,6 +32,7 @@ import { CalloutBlockquote } from "../lib/CalloutExtension";
 import { FoldableBlock } from "../lib/FoldableExtension";
 import { FontSize } from "../lib/FontSize";
 import { WikiLink } from "../lib/WikiLink";
+import { SearchExtension, SearchPluginKey } from "../lib/SearchExtension";
 import {
   SpellCheckExtension,
   SpellCheckPluginKey,
@@ -195,6 +196,8 @@ interface EditorAreaProps {
     collectionId: string,
     workspaceId: string,
   ) => void;
+  isFindOpen?: boolean;
+  onCloseFind?: () => void;
   onOpenSettings?: () => void;
   onOpenExport?: () => void;
   onDeleteNote?: () => void;
@@ -207,6 +210,8 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
   isFocusMode,
   onToggleFocusMode,
   onNavigateToNote,
+  isFindOpen,
+  onCloseFind,
   onOpenSettings,
   onOpenExport,
   onDeleteNote,
@@ -234,6 +239,8 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
   const [tagInput, setTagInput] = useState("");
   const [selectedTagIndex, setSelectedTagIndex] = useState(0);
   const [isTagInputFocused, setIsTagInputFocused] = useState(false);
+  const [searchTerm, setSearchTermState] = useState("");
+  const [searchMatches, setSearchMatches] = useState({ total: 0, current: 0 });
 
   const tagFrequencies = useMemo(() => {
     const freqs: Record<string, number> = {};
@@ -749,6 +756,33 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
     ],
   );
 
+  useEffect(() => {
+    if (!isFindOpen && editor) {
+       editor.commands.clearSearch();
+       setSearchTermState("");
+    }
+  }, [isFindOpen]);
+
+  const handleSearchTermChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const term = e.target.value;
+    setSearchTermState(term);
+    if (editor) {
+      if (term) {
+        editor.commands.setSearchTerm(term);
+      } else {
+        editor.commands.clearSearch();
+      }
+    }
+  };
+
+  const handleNextMatch = () => {
+    editor?.commands.nextSearchResult();
+  };
+
+  const handlePrevMatch = () => {
+    editor?.commands.previousSearchResult();
+  };
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -777,12 +811,22 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
       CalloutBlockquote,
       FoldableBlock,
       SpellCheckExtension,
+      SearchExtension,
       Placeholder.configure({
         placeholder: "Start writing or paste AI text...",
       }),
     ],
     content: "",
     editable: isEditing && !note?.isDeleted,
+    onTransaction: ({ editor, transaction }) => {
+       const state = SearchPluginKey.getState(editor.state);
+       if (state) {
+         setSearchMatches({
+           total: state.results?.length || 0,
+           current: state.currentIndex >= 0 ? state.currentIndex + 1 : 0
+         });
+       }
+    },
     editorProps: {
       handleDOMEvents: {
         contextmenu: (view, event) => {
@@ -1458,6 +1502,53 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
           border-radius: 0.2EM;
         }
       `}</style>
+
+      {/* Find in Note Panel */}
+      {isFindOpen && (
+        <div className="absolute top-4 right-8 z-50 bg-surface border border-border rounded-lg shadow-2xl flex items-center p-1.5 gap-2 animate-in fade-in slide-in-from-top-4">
+          <div className="relative flex items-center">
+            <input
+              type="text"
+              autoFocus
+              placeholder="Find in note..."
+              value={searchTerm}
+              onChange={handleSearchTermChange}
+              className="w-48 bg-background border border-border rounded text-sm px-3 py-1.5 text-text-primary focus:outline-none focus:border-accent"
+            />
+            <span className="absolute right-2 text-xs text-text-muted select-none">
+               {searchTerm ? `${searchMatches.current} of ${searchMatches.total}` : ''}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1 border-l border-border pl-2">
+            <button
+              onClick={handlePrevMatch}
+              disabled={!searchTerm || searchMatches.total === 0}
+              className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-active rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Previous match"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
+            </button>
+            <button
+              onClick={handleNextMatch}
+              disabled={!searchTerm || searchMatches.total === 0}
+              className="p-1.5 text-text-muted hover:text-text-primary hover:bg-surface-active rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Next match"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
+            <div className="w-px h-4 bg-border mx-1"></div>
+            <button
+              onClick={onCloseFind}
+              className="p-1.5 text-text-muted hover:text-red-400 hover:bg-surface-active rounded transition-colors"
+              title="Close find panel"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 flex flex-row overflow-hidden w-full h-full relative">
         <div className="flex-1 overflow-y-auto no-scrollbar relative flex justify-center pb-32 pt-8 print:pt-0">
           {smartLinkingSuggestions.length > 0 && (

@@ -32,6 +32,7 @@ const TagManagerModal = lazy(() => import("./TagManagerModal").then(module => ({
 const BackgroundAIProcessor = lazy(() => import("./BackgroundAIProcessor").then(module => ({ default: module.BackgroundAIProcessor })));
 const SecondBrainSidebar = lazy(() => import("./SecondBrainSidebar").then(module => ({ default: module.SecondBrainSidebar })));
 const DailyDigestCard = lazy(() => import("./DailyDigestCard").then(module => ({ default: module.DailyDigestCard })));
+const RightSidebar = lazy(() => import("./RightSidebar").then(module => ({ default: module.RightSidebar })));
 
 export const MainLayout: React.FC = () => {
   const { data, totalLocalNotes, addNote, updateSettings, saveData } = useStorage();
@@ -39,6 +40,8 @@ export const MainLayout: React.FC = () => {
   const { cloudNotes, isConnected } = useFirebaseConnection();
   const dataRef = React.useRef(data);
   const [showMissingAlert, setShowMissingAlert] = useState(false);
+  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
+  const [isFindPanelOpen, setIsFindPanelOpen] = useState(false);
 
   useEffect(() => {
     // Perform quiet background verification on first load after deployment
@@ -788,6 +791,8 @@ export const MainLayout: React.FC = () => {
               setActiveNoteId(noteId);
             }}
             onOpenSettings={() => setSettingsOpen(true)}
+            isFindOpen={isFindPanelOpen}
+            onCloseFind={() => setIsFindPanelOpen(false)}
           />
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-text-muted bg-background h-full relative">
@@ -943,6 +948,36 @@ export const MainLayout: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Right Side Navigation Trigger (Bottom Left) */}
+      <button
+        onClick={() => setIsRightSidebarOpen(true)}
+        className="fixed bottom-6 left-6 z-40 bg-surface hover:bg-surface-active border border-border text-text-primary rounded-full p-3 shadow-lg flex items-center justify-center transition-transform hover:scale-105 active:scale-95 no-print"
+        title="Open Note Context"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+      </button>
+
+      <Suspense fallback={null}>
+        <RightSidebar
+           isOpen={isRightSidebarOpen}
+           onClose={() => setIsRightSidebarOpen(false)}
+           activeNoteId={activeNoteId}
+           onOpenFind={() => {
+             setIsFindPanelOpen(true);
+             setIsRightSidebarOpen(false);
+           }}
+           onNavigateToNote={(noteId, collectionId, workspaceId) => {
+             setActiveWorkspaceId(workspaceId);
+             setActiveCollectionId(collectionId);
+             setActiveNoteId(noteId);
+             if (!openTabs.includes(noteId)) {
+               setOpenTabs(prev => [...prev, noteId]);
+             }
+             if (window.innerWidth < 768) setIsRightSidebarOpen(false);
+           }}
+        />
+      </Suspense>
     </div>
   );
 };
