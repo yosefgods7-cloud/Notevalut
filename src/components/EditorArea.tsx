@@ -2334,26 +2334,6 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
       <div className="flex flex-col border-t border-border bg-background shrink-0 no-print safe-area-bottom sticky bottom-0 z-[60] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] w-full max-w-[100%]">
         {/* Top Row: Formatting Tools */}
         <div className="flex items-center gap-2 overflow-x-auto min-w-0 px-4 py-2 border-b border-border/50">
-          <button
-            onClick={onToggleSidebar}
-            className="p-1.5 bg-surface hover:bg-surface-hover rounded-md text-text-secondary transition-colors shrink-0"
-            title="Toggle Sidebar"
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="3" y1="12" x2="21" y2="12"></line>
-              <line x1="3" y1="6" x2="21" y2="6"></line>
-              <line x1="3" y1="18" x2="21" y2="18"></line>
-            </svg>
-          </button>
           {onToggleFocusMode && (
             <button
               onClick={onToggleFocusMode}

@@ -6,7 +6,8 @@ import {
   Plus,
   FilePlus,
   FolderOpen,
-  PanelRight
+  PanelRight,
+  PanelLeft
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useStorage } from "../context/StorageContext";
@@ -519,6 +520,13 @@ export const MainLayout: React.FC = () => {
              style={{ height: "var(--system-bar-size, 3rem)" }}
           >
             <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-1.5 mx-1 hover:bg-surface-active rounded text-text-muted hover:text-text-primary transition-colors"
+              title="Toggle Sidebar"
+            >
+              <PanelLeft size={16} />
+            </button>
+            <button
               onClick={() => {
                 const currentIndex = openTabs.indexOf(activeNoteId || "");
                 if (currentIndex > 0) {
@@ -651,7 +659,14 @@ export const MainLayout: React.FC = () => {
             <div className="flex-1"></div>
             
             <div className="flex items-center px-3 h-full mb-1">
-              <div className="flex items-center gap-1.5 px-2 py-1 bg-surface-active rounded border border-border text-[10px] uppercase font-bold tracking-wider text-text-muted select-none">
+              <button
+                onClick={() => setIsRightSidebarOpen(true)}
+                className="p-1.5 mr-3 mt-1 hover:bg-surface-active rounded text-text-muted hover:text-text-primary transition-colors"
+                title="Open Note Context"
+              >
+                <PanelRight size={16} />
+              </button>
+              <div className="flex items-center gap-1.5 px-2 py-1 mt-1 bg-surface-active rounded border border-border text-[10px] uppercase font-bold tracking-wider text-text-muted select-none">
                  {isOnline ? (
                     <>
                        <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
@@ -949,15 +964,6 @@ export const MainLayout: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Right Side Navigation Trigger (Bottom Left) */}
-      <button
-        onClick={() => setIsRightSidebarOpen(true)}
-        className="fixed bottom-6 left-6 z-40 bg-surface hover:bg-surface-active border border-border text-text-primary rounded-full p-3 shadow-lg flex items-center justify-center transition-transform hover:scale-105 active:scale-95 no-print"
-        title="Open Note Context"
-      >
-        <PanelRight size={20} />
-      </button>
 
       <Suspense fallback={null}>
         <RightSidebar
