@@ -150,6 +150,14 @@ export interface DriveBackupSettings {
   lastBackupDate?: string;
   nextBackupDate?: string;
   fileId?: string;
+  backupFolderId?: string;
+  backupFolderName?: string;
+  vaultBackupEnabled?: boolean;
+  vaultBackupFrequency?: "daily" | "weekly" | "monthly" | "3days" | "90days";
+  vaultLastBackupDate?: string;
+  vaultNextBackupDate?: string;
+  lastJsonNotesCount?: number;
+  lastMdNotesCount?: number;
 }
 
 export interface ExternalApiKey {
@@ -366,6 +374,8 @@ export const DEFAULT_SETTINGS: Settings = {
   driveBackup: {
     enabled: false,
     frequency: "daily",
+    vaultBackupEnabled: false,
+    vaultBackupFrequency: "daily",
   },
   toolbarItems: [
     "undo",

@@ -12,13 +12,13 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { useStorage } from "../context/StorageContext";
 import { useAuth } from "../context/AuthContext";
-import { useFirebaseConnection } from "../context/FirebaseConnectionManager";
 import { DEFAULT_SETTINGS } from "../types";
 import { pullFromGithub, pushToGithub } from "../lib/githubSync";
 import {
   shouldRunBackup,
   uploadToDrive,
   calculateNextBackupDate,
+  ensureBackupHierarchy,
 } from "../lib/drive";
 import { cn } from "../lib/utils";
 import { Sidebar } from "./Sidebar";
@@ -39,26 +39,9 @@ const RightSidebar = lazy(() => import("./RightSidebar").then(module => ({ defau
 export const MainLayout: React.FC = () => {
   const { data, totalLocalNotes, addNote, updateSettings, saveData } = useStorage();
   const { accessToken } = useAuth();
-  const { cloudNotes, isConnected } = useFirebaseConnection();
   const dataRef = React.useRef(data);
-  const [showMissingAlert, setShowMissingAlert] = useState(false);
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
   const [isFindPanelOpen, setIsFindPanelOpen] = useState(false);
-
-  useEffect(() => {
-    // Perform quiet background verification on first load after deployment
-    const verifyKey = "firebase_verification_done_v2";
-    const verified = localStorage.getItem(verifyKey);
-    if (!verified && isConnected && cloudNotes.length > 0) {
-      setTimeout(() => {
-        if (cloudNotes.length > totalLocalNotes) {
-           console.warn(`Local note count (${totalLocalNotes}) is lower than Firebase (${cloudNotes.length}).`);
-           setShowMissingAlert(true);
-        }
-        localStorage.setItem(verifyKey, "true");
-      }, 5000);
-    }
-  }, [isConnected, cloudNotes.length, totalLocalNotes]);
 
   useEffect(() => {
     dataRef.current = data;
@@ -68,13 +51,22 @@ export const MainLayout: React.FC = () => {
   useEffect(() => {
     const handleAutoSync = async () => {
       const backupSettings = dataRef.current.settings.driveBackup;
+      
       if (shouldRunBackup(backupSettings)) {
-        if (!accessToken) return; // Silent return if not authenticated, they can do it manually in settings
+        if (!accessToken) return;
         try {
+          let jsonFolderId = undefined;
+          if (backupSettings?.backupFolderId) {
+             const hierarchy = await ensureBackupHierarchy(accessToken, backupSettings.backupFolderId);
+             jsonFolderId = hierarchy.jsonFolderId;
+          }
+
           const fileId = await uploadToDrive(
             accessToken,
             dataRef.current,
             backupSettings?.fileId,
+            undefined, // fileName
+            jsonFolderId // folderId
           );
           updateSettings({
             driveBackup: {
@@ -91,17 +83,46 @@ export const MainLayout: React.FC = () => {
           console.error("Drive auto sync failed", e);
         }
       }
+
+      const vaultSettings = dataRef.current.settings.driveBackup;
+      if (vaultSettings?.vaultBackupEnabled) {
+         let shouldRunVault = false;
+         if (!vaultSettings.vaultNextBackupDate) {
+            shouldRunVault = true;
+         } else {
+            const vaultNext = new Date(vaultSettings.vaultNextBackupDate);
+            if (vaultNext <= new Date()) shouldRunVault = true;
+         }
+
+         if (shouldRunVault && accessToken) {
+             try {
+                 await import("../lib/drive").then(async (m) => {
+                     await m.uploadVaultToDrive(accessToken, dataRef.current, vaultSettings.backupFolderId);
+                 });
+                 updateSettings({
+                    driveBackup: {
+                      ...dataRef.current.settings.driveBackup!,
+                      vaultLastBackupDate: new Date().toISOString(),
+                      vaultNextBackupDate: calculateNextBackupDate(
+                        new Date(),
+                        vaultSettings.vaultBackupFrequency || "daily",
+                      ).toISOString(),
+                    },
+                 });
+             } catch(e) {
+                 console.error("Vault MD auto sync failed", e);
+             }
+         }
+      }
     };
 
-    // Check on mount/accessToken change
-    if (dataRef.current.settings.driveBackup?.enabled) {
+    if (dataRef.current.settings.driveBackup?.enabled || dataRef.current.settings.driveBackup?.vaultBackupEnabled) {
       handleAutoSync();
     }
 
-    // And check periodically every hour
     const interval = setInterval(
       () => {
-        if (dataRef.current.settings.driveBackup?.enabled) {
+        if (dataRef.current.settings.driveBackup?.enabled || dataRef.current.settings.driveBackup?.vaultBackupEnabled) {
           handleAutoSync();
         }
       },
@@ -928,43 +949,6 @@ export const MainLayout: React.FC = () => {
       <BackgroundAIProcessor />
       <SecondBrainSidebar />
       
-      <AnimatePresence>
-        {showMissingAlert && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-surface border border-yellow-500/50 shadow-xl rounded-xl p-4 flex items-center gap-4 z-50 overflow-hidden no-print"
-          >
-            <div className="absolute top-0 left-0 w-1 h-full bg-yellow-500"></div>
-            <div className="text-yellow-500">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-text-primary">Some notes may be missing</p>
-              <p className="text-xs text-text-muted">Firebase has more notes than this device.</p>
-            </div>
-            <div className="flex gap-2 ml-2 border-l border-border pl-4">
-              <button
-                onClick={() => {
-                  setShowMissingAlert(false);
-                  setSettingsOpen(true); // User can manually trigger sync or import/export from settings
-                }}
-                className="text-xs font-semibold bg-surface-hover px-3 py-1.5 rounded-lg hover:bg-surface-active text-text-primary transition-colors"
-              >
-                Review Sync
-              </button>
-              <button
-                onClick={() => setShowMissingAlert(false)}
-                className="text-xs text-text-muted hover:text-text-primary px-2"
-              >
-                Dismiss
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <Suspense fallback={null}>
         <RightSidebar
            isOpen={isRightSidebarOpen}

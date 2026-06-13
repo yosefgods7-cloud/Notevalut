@@ -3012,8 +3012,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
               <Trash2 className="text-red-400" size={20} /> Delete Note?
             </h3>
             <p className="text-sm text-text-muted mb-6">
-              Are you sure you want to permanently delete this note from local
-              storage, Firebase, and Google Drive? This action cannot be undone.
+              Are you sure you want to permanently delete this note? This action cannot be undone.
             </p>
             <div className="flex items-center justify-end gap-3">
               <button

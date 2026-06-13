@@ -1,7 +1,6 @@
 import React, { Component, ErrorInfo } from 'react';
 import { StorageProvider } from './context/StorageContext';
 import { AuthProvider } from './context/AuthContext';
-import { FirebaseConnectionProvider } from './context/FirebaseConnectionManager';
 import { MainLayout } from './components/MainLayout';
 import { GlobalDialogs } from './components/GlobalDialogs';
 
@@ -38,12 +37,10 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <FirebaseConnectionProvider>
           <StorageProvider>
             <MainLayout />
             <GlobalDialogs />
           </StorageProvider>
-        </FirebaseConnectionProvider>
       </AuthProvider>
     </ErrorBoundary>
   );

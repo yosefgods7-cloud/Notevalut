@@ -20,18 +20,6 @@ import {
 } from "../types";
 import { generateId } from "../lib/utils";
 import { useAuth } from "./AuthContext";
-import { db, handleFirestoreError, OperationType } from "../lib/firebase";
-import {
-  doc,
-  setDoc,
-  deleteDoc,
-  writeBatch,
-  collection,
-  onSnapshot,
-  query,
-  getDocs,
-  deleteField,
-} from "firebase/firestore";
 import { get, set, del } from "idb-keyval";
 
 const STORAGE_KEY = "notevault_data";
@@ -184,9 +172,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
          notes: prev.notes.filter(n => !ids.includes(n.id))
        }));
        
-       const batch = writeBatch(db);
-       ids.forEach(id => batch.delete(doc(db, `users/${user.uid}/notes/${id}`)));
-       batch.commit().catch(e => console.error("Trash cleanup failed", e));
+       
     }
   }, [isInitialized, user, data.notes]);
 
@@ -415,150 +401,9 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
     showToast("Action Undone");
   }, [history, showToast]);
 
-  const syncToCloud = useCallback(async () => {
-    if (!user) return;
-    setIsSyncing(true);
-    try {
-      const timestamp = new Date().toISOString();
-      const updatedSettings = {
-        ...data.settings,
-        lastCloudSyncDate: timestamp,
-      };
+  const syncToCloud = useCallback(async () => {}, [user, data]);
 
-      // We'll write workspaces, collections, settings, review notes in a single initial batch
-      const initialBatch = writeBatch(db);
-
-      initialBatch.set(
-        doc(db, `users/${user.uid}/settings/default`),
-        {
-          userId: user.uid,
-          email: user.email,
-          settings: updatedSettings,
-          tags: data.tags,
-          updatedAt: timestamp,
-        },
-        { merge: true },
-      );
-
-      data.workspaces.forEach((w) => {
-        initialBatch.set(
-          doc(db, `users/${user.uid}/workspaces/${w.id}`),
-          { ...w, userId: user.uid },
-          { merge: true },
-        );
-      });
-      data.collections.forEach((c) => {
-        initialBatch.set(
-          doc(db, `users/${user.uid}/collections/${c.id}`),
-          { ...c, userId: user.uid },
-          { merge: true },
-        );
-      });
-      if (data.reviewNotes) {
-        data.reviewNotes.forEach((rn) => {
-          initialBatch.set(
-            doc(db, `users/${user.uid}/reviewNotes/${rn.id}`),
-            { ...rn, userId: user.uid },
-            { merge: true },
-          );
-        });
-      }
-
-      await initialBatch.commit();
-      
-      // Batched sync for notes (groups of 10)
-      const totalNotes = data.notes.length;
-      let syncedCount = 0;
-      
-      const batchSize = 10;
-      for (let i = 0; i < totalNotes; i += batchSize) {
-        const notesBatch = data.notes.slice(i, i + batchSize);
-        const fbBatch = writeBatch(db);
-        
-        notesBatch.forEach((n) => {
-          fbBatch.set(
-            doc(db, `users/${user.uid}/notes/${n.id}`),
-            { ...n, userId: user.uid },
-            { merge: true },
-          );
-        });
-        
-        await fbBatch.commit();
-        syncedCount += notesBatch.length;
-        
-        // Short delay between batches
-        if (i + batchSize < totalNotes) {
-          showToast(`Syncing notes: ${syncedCount} / ${totalNotes}...`);
-          await new Promise(res => setTimeout(res, 200));
-        }
-      }
-
-      // Update local state to reflect the new sync date without fully pushing to history
-      setData((prev) => {
-        const newData = { ...prev, settings: updatedSettings };
-        try {
-          set(STORAGE_KEY, JSON.stringify(newData));
-        } catch (e) {
-          safeStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
-        }
-        return newData;
-      });
-
-      showToast("Successfully backed up to cloud");
-    } catch (e) {
-      console.error(e);
-      showToast("Failed to sync to cloud");
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [user, data]);
-
-  const getCloudBackupPreview = useCallback(async () => {
-    if (!user) return null;
-    setIsSyncing(true);
-    try {
-      const settingsSnap = await getDocs(collection(db, `users/${user.uid}/settings`));
-      const workspacesSnap = await getDocs(collection(db, `users/${user.uid}/workspaces`));
-      const collectionsSnap = await getDocs(collection(db, `users/${user.uid}/collections`));
-      const notesSnap = await getDocs(collection(db, `users/${user.uid}/notes`));
-      const reviewNotesSnap = await getDocs(collection(db, `users/${user.uid}/reviewNotes`));
-
-      const cloudSettings = settingsSnap.docs[0]?.data();
-      const workspaces = workspacesSnap.docs.map((d) => d.data() as Workspace);
-      const collections = collectionsSnap.docs.map((d) => d.data() as Collection);
-      const notes = notesSnap.docs.map((d) => d.data() as Note);
-      const reviewNotes = reviewNotesSnap.docs.map((d) => d.data() as ReviewNote);
-
-      if (workspaces.length === 0 && notes.length === 0) {
-        showToast("No cloud backup found.");
-        return null;
-      }
-
-      const backupDate = cloudSettings?.updatedAt || undefined;
-
-      const mergedData: NoteVaultData = {
-        ...data,
-        settings: cloudSettings?.settings || data.settings,
-        tags: cloudSettings?.tags || data.tags,
-        workspaces: workspaces.length > 0 ? workspaces : data.workspaces,
-        collections: collections.length > 0 ? collections : data.collections,
-        notes: notes.length > 0 ? notes : data.notes,
-        reviewNotes: reviewNotes.length > 0 ? reviewNotes : data.reviewNotes,
-      };
-
-      return {
-        backupDate,
-        noteCount: notes.length,
-        payload: mergedData
-      };
-    } catch (e) {
-      console.error(e);
-      showToast("Failed to fetch cloud backup preview");
-      return null;
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [user, data, showToast]);
+  const getCloudBackupPreview = useCallback(async () => { return null; }, [user, data, showToast]);
 
   const applyCloudBackup = useCallback((backup: NoteVaultData) => {
     saveData(backup);
@@ -587,13 +432,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
         order: data.workspaces.length,
       };
       saveData({ ...data, workspaces: [...data.workspaces, newWs] });
-      if (user) {
-        setDoc(
-          doc(db, `users/${user.uid}/workspaces/${newWs.id}`),
-          { ...newWs, userId: user.uid },
-          { merge: true },
-        ).catch((e) => console.error(e));
-      }
+      
       return newWs;
     },
     [data, saveData, user],
@@ -607,11 +446,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
           w.id === id ? { ...w, ...updates } : w,
         ),
       });
-      if (user) {
-        setDoc(doc(db, `users/${user.uid}/workspaces/${id}`), updates, {
-          merge: true,
-        }).catch((e) => console.error(e));
-      }
+      
     },
     [data, saveData, user],
   );
@@ -631,21 +466,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
         notes: data.notes.filter((n) => n.workspaceId !== id),
       });
 
-      if (user) {
-        try {
-          const batch = writeBatch(db);
-          batch.delete(doc(db, `users/${user.uid}/workspaces/${id}`));
-          collectionsToDelete.forEach((c) =>
-            batch.delete(doc(db, `users/${user.uid}/collections/${c.id}`)),
-          );
-          notesToDelete.forEach((n) =>
-            batch.delete(doc(db, `users/${user.uid}/notes/${n.id}`)),
-          );
-          await batch.commit();
-        } catch (e) {
-          console.error("Failed to delete workspace from cloud", e);
-        }
-      }
+      
     },
     [data, saveData, user],
   );
@@ -663,13 +484,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
           .length,
       };
       saveData({ ...data, collections: [...data.collections, newCol] });
-      if (user) {
-        setDoc(
-          doc(db, `users/${user.uid}/collections/${newCol.id}`),
-          { ...newCol, userId: user.uid },
-          { merge: true },
-        ).catch((e) => console.error(e));
-      }
+      
       return newCol;
     },
     [data, saveData, user],
@@ -683,11 +498,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
           c.id === id ? { ...c, ...updates } : c,
         ),
       });
-      if (user) {
-        setDoc(doc(db, `users/${user.uid}/collections/${id}`), updates, {
-          merge: true,
-        }).catch((e) => console.error(e));
-      }
+      
     },
     [data, saveData, user],
   );
@@ -701,18 +512,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
         notes: data.notes.filter((n) => n.collectionId !== id),
       });
 
-      if (user) {
-        try {
-          const batch = writeBatch(db);
-          batch.delete(doc(db, `users/${user.uid}/collections/${id}`));
-          notesToDelete.forEach((n) =>
-            batch.delete(doc(db, `users/${user.uid}/notes/${n.id}`)),
-          );
-          await batch.commit();
-        } catch (e) {
-          console.error("Failed to delete collection from cloud", e);
-        }
-      }
+      
     },
     [data, saveData, user],
   );
@@ -785,276 +585,118 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
         },
       };
       saveData({ ...data, notes: [newNote, ...data.notes] });
-      if (user) {
-        setDoc(
-          doc(db, `users/${user.uid}/notes/${newNote.id}`),
-          { ...newNote, userId: user.uid },
-          { merge: true },
-        ).catch((err) => {
-          console.error("Firebase precise add failed", err);
-        });
-      }
+      
       return newNote;
     },
-    [data, saveData, user],
+    [data, saveData, user]
   );
 
   const updateNote = useCallback(
     (id: string, updates: Partial<Note>) => {
-      let finalUpdates: Partial<Note> & { userId?: string } = {
-        ...updates,
-        updatedAt: new Date().toISOString(),
-      };
-
-      setIsSaving(true);
-      setData((prevData) => {
-        let targetCollectionId: string | null = null;
-        let targetWorkspaceId: string | null = null;
-
-        const noteToUpdate = prevData.notes.find((n) => n.id === id);
-
-        // Auto-categorize only if tags are explicitly being updated
-        if (
-          updates.tags !== undefined &&
-          prevData.settings.plugins?.autoCategorize?.enabled &&
-          updates.tags.length > 0
-        ) {
-          for (const rule of prevData.settings.plugins.autoCategorize.rules) {
-            if (updates.tags.includes(rule.tag)) {
-              targetCollectionId = rule.collectionId;
-              targetWorkspaceId = rule.workspaceId;
-              break; // First matching rule wins
-            }
-          }
-        }
-
-        if (targetCollectionId && targetWorkspaceId) {
-          finalUpdates.collectionId = targetCollectionId;
-          finalUpdates.workspaceId = targetWorkspaceId;
-        }
-
-        const newNotes = prevData.notes.map((n) => {
-          if (n.id === id) {
-            return { ...n, ...finalUpdates };
-          }
-          return n;
-        });
-
-        // Recalculate global tags properly
-        const allTags = new Set<string>();
-        newNotes.forEach((n: Note) => {
-          if (n.tags) {
-            n.tags.forEach((t: string) => allTags.add(t));
-          }
-        });
-
-        const newData = {
-          ...prevData,
-          notes: newNotes,
-          tags: Array.from(allTags),
-        };
-
-        // We manually handle saveData's duties here to get the correct prevData
-        const safeDataForLs = {
-          ...newData,
-          notes: newData.notes.map(n => {
-            const { embedding, ...rest } = n;
-            return rest;
-          })
-        };
-        safeStorage.setItem(STORAGE_KEY, JSON.stringify(safeDataForLs));
-        // Also save to indexedDB
-        set(STORAGE_KEY, JSON.stringify(newData))
-          .catch((e) => {
-            console.warn("IndexedDB set failed", e);
-          })
-          .finally(() => setIsSaving(false));
-
-        return newData;
+      saveData({
+        ...data,
+        notes: data.notes.map((n) =>
+          n.id === id ? { ...n, ...updates, updatedAt: new Date().toISOString() } : n
+        ),
       });
-
-      // Auto-update specific fields in firebase with precision
-      if (user) {
-        finalUpdates.userId = user.uid;
-        setDoc(doc(db, `users/${user.uid}/notes/${id}`), finalUpdates, {
-          merge: true,
-        }).catch((err) => {
-          console.error("Firebase precise update failed", err);
-        });
-      }
     },
-    [user],
+    [data, saveData, user]
   );
 
   const deleteNote = useCallback(
-    async (id: string) => {
+    (id: string) => {
       const now = new Date().toISOString();
       saveData({
         ...data,
-        notes: data.notes.map((n) => (n.id === id ? { ...n, isDeleted: true, deletedAt: now } : n)),
+        notes: data.notes.map((n) =>
+          n.id === id ? { ...n, isDeleted: true, deletedAt: now, updatedAt: now } : n
+        ),
       });
-
-      if (user) {
-        setDoc(doc(db, `users/${user.uid}/notes/${id}`), { isDeleted: true, deletedAt: now }, { merge: true }).catch((e) => {
-          handleFirestoreError(
-            e,
-            OperationType.UPDATE,
-            `users/${user.uid}/notes/${id}`
-          );
-        });
-      }
-      showToast("Note moved to trash");
     },
-    [data, saveData, user, showToast],
+    [data, saveData, user]
   );
 
   const deleteNotes = useCallback(
-    async (ids: string[]) => {
+    (ids: string[]) => {
       const now = new Date().toISOString();
       saveData({
         ...data,
-        notes: data.notes.map((n) => (ids.includes(n.id) ? { ...n, isDeleted: true, deletedAt: now } : n)),
+        notes: data.notes.map((n) =>
+          ids.includes(n.id) ? { ...n, isDeleted: true, deletedAt: now, updatedAt: now } : n
+        ),
       });
-
-      if (user) {
-        try {
-          const batch = writeBatch(db);
-          ids.forEach((id) =>
-            batch.update(doc(db, `users/${user.uid}/notes/${id}`), { isDeleted: true, deletedAt: now }),
-          );
-          await batch.commit();
-        } catch (e) {
-          handleFirestoreError(
-            e,
-            OperationType.UPDATE,
-            `users/${user.uid}/notes`,
-          );
-        }
-      }
-      showToast(`${ids.length} notes moved to trash`);
     },
-    [data, saveData, user, showToast],
+    [data, saveData, user]
   );
 
   const permanentlyDeleteNote = useCallback(
-    async (id: string) => {
+    (id: string) => {
       saveData({
         ...data,
         notes: data.notes.filter((n) => n.id !== id),
       });
-
-      if (user) {
-        try {
-          await deleteDoc(doc(db, `users/${user.uid}/notes/${id}`));
-        } catch (e) {
-          handleFirestoreError(
-            e,
-            OperationType.DELETE,
-            `users/${user.uid}/notes/${id}`,
-          );
-        }
-      }
     },
-    [data, saveData, user],
+    [data, saveData, user]
   );
 
   const restoreNote = useCallback(
-    async (id: string) => {
+    (id: string) => {
+      const now = new Date().toISOString();
       saveData({
         ...data,
-        notes: data.notes.map((n) => (n.id === id ? { ...n, isDeleted: false, deletedAt: undefined } : n)),
+        notes: data.notes.map((n) => {
+          if (n.id === id) {
+            const { deletedAt, isDeleted, ...rest } = n;
+            return { ...rest, updatedAt: now } as Note;
+          }
+          return n;
+        }),
       });
-
-      if (user) {
-        try {
-          await setDoc(doc(db, `users/${user.uid}/notes/${id}`), { isDeleted: false, deletedAt: deleteField() }, { merge: true });
-        } catch (e) {
-          handleFirestoreError(
-            e,
-            OperationType.UPDATE,
-            `users/${user.uid}/notes/${id}`,
-          );
-        }
-      }
-      showToast("Note restored");
     },
-    [data, saveData, user, showToast],
+    [data, saveData, user]
   );
 
-  const emptyTrash = useCallback(
-    async () => {
-      const deletedNoteIds = data.notes.filter(n => n.isDeleted).map(n => n.id);
-      saveData({
-        ...data,
-        notes: data.notes.filter((n) => !n.isDeleted),
-      });
-
-      if (user && deletedNoteIds.length > 0) {
-        try {
-          // Firestore batches support up to 500 operations
-          // If a user has > 500 items in trash, this could fail, but assuming reasonable usage here.
-          // For a robust implementation, we would chunk this.
-          const batch = writeBatch(db);
-          deletedNoteIds.forEach((id) =>
-            batch.delete(doc(db, `users/${user.uid}/notes/${id}`)),
-          );
-          await batch.commit();
-        } catch (e) {
-          handleFirestoreError(
-            e,
-            OperationType.DELETE,
-            `users/${user.uid}/notes`,
-          );
-        }
-      }
-      showToast("Trash emptied");
-    },
-    [data, saveData, user, showToast],
-  );
+  const emptyTrash = useCallback(() => {
+    saveData({
+      ...data,
+      notes: data.notes.filter((n) => !n.isDeleted),
+    });
+  }, [data, saveData, user]);
 
   const addTemplate = useCallback(
     (name: string, content: string) => {
-      const newTemplate = { id: generateId(), name, content };
-      saveData({
-        ...data,
-        templates: [...(data.templates || []), newTemplate],
-      });
-      return newTemplate;
+      const template: NoteTemplate = {
+        id: generateId(),
+        name,
+        content,
+        createdAt: new Date().toISOString(),
+      };
+      saveData({ ...data, templates: [...data.templates, template] });
+      return template;
     },
-    [data, saveData],
+    [data, saveData, user]
   );
 
   const deleteTemplate = useCallback(
     (id: string) => {
-      saveData({
-        ...data,
-        templates: (data.templates || []).filter((t) => t.id !== id),
-      });
+      saveData({ ...data, templates: data.templates.filter((t) => t.id !== id) });
     },
-    [data, saveData],
+    [data, saveData, user]
   );
 
-  // --- Review Notes ---
   const addReviewNote = useCallback(
-    (reviewNoteValue: Omit<ReviewNote, "id" | "createdAt" | "updatedAt">) => {
+    (reviewNote: Omit<ReviewNote, "id" | "createdAt" | "updatedAt">) => {
       const now = new Date().toISOString();
       const newReviewNote: ReviewNote = {
-        ...reviewNoteValue,
+        ...reviewNote,
         id: generateId(),
         createdAt: now,
         updatedAt: now,
       };
       saveData({
         ...data,
-        reviewNotes: [newReviewNote, ...(data.reviewNotes || [])],
+        reviewNotes: [...(data.reviewNotes || []), newReviewNote],
       });
-      if (user) {
-        setDoc(
-          doc(db, `users/${user.uid}/reviewNotes/${newReviewNote.id}`),
-          { ...newReviewNote, userId: user.uid },
-          { merge: true }
-        ).catch((e) => console.error(e));
-      }
       return newReviewNote;
     },
     [data, saveData, user]
@@ -1068,11 +710,6 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
           rn.id === id ? { ...rn, ...updates, updatedAt: new Date().toISOString() } : rn
         ),
       });
-      if (user) {
-        const finalUpdates = { ...updates, updatedAt: new Date().toISOString() };
-        setDoc(doc(db, `users/${user.uid}/reviewNotes/${id}`), finalUpdates, { merge: true })
-          .catch((e) => console.error(e));
-      }
     },
     [data, saveData, user]
   );
@@ -1083,13 +720,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
         ...data,
         reviewNotes: (data.reviewNotes || []).filter((n) => n.id !== id),
       });
-      if (user) {
-        try {
-          await deleteDoc(doc(db, `users/${user.uid}/reviewNotes/${id}`));
-        } catch (e) {
-          console.error("Failed to delete review note", e);
-        }
-      }
+      
     },
     [data, saveData, user]
   );
@@ -1120,29 +751,6 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
       };
 
       saveData(newData);
-
-      if (user) {
-        try {
-          const batch = writeBatch(db);
-          let batchCount = 0;
-          newNotes.forEach((note) => {
-            const oldNote = data.notes.find((n) => n.id === note.id);
-            if (oldNote?.tags?.includes(oldTag)) {
-              batch.set(
-                doc(db, `users/${user.uid}/notes/${note.id}`),
-                { tags: note.tags, updatedAt: note.updatedAt },
-                { merge: true }
-              );
-              batchCount++;
-            }
-          });
-          if (batchCount > 0) {
-            batch.commit().catch(console.error);
-          }
-        } catch (e) {
-          console.error("Firebase bulk update failed", e);
-        }
-      }
     },
     [data, saveData, user]
   );
@@ -1172,29 +780,6 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
       };
 
       saveData(newData);
-
-      if (user) {
-        try {
-          const batch = writeBatch(db);
-          let batchCount = 0;
-          newNotes.forEach((note) => {
-            const oldNote = data.notes.find((n) => n.id === note.id);
-            if (oldNote?.tags?.includes(tagToRemove)) {
-              batch.set(
-                doc(db, `users/${user.uid}/notes/${note.id}`),
-                { tags: note.tags, updatedAt: note.updatedAt },
-                { merge: true }
-              );
-              batchCount++;
-            }
-          });
-          if (batchCount > 0) {
-            batch.commit().catch(console.error);
-          }
-        } catch (e) {
-          console.error("Firebase bulk update failed", e);
-        }
-      }
     },
     [data, saveData, user]
   );
@@ -1212,17 +797,6 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
       if (merge) {
         showToast("Checking for existing notes...");
         let currentNotes = data.notes;
-        
-        // Fetch from Firebase to ensure zero duplicates against cloud if logged in
-        if (user) {
-          try {
-            const notesSnap = await getDocs(collection(db, `users/${user.uid}/notes`));
-            const cloudNotes = notesSnap.docs.map((d) => d.data() as Note);
-            currentNotes = [...currentNotes, ...cloudNotes];
-          } catch(e) {
-            console.error("Could not fetch cloud notes during import", e);
-          }
-        }
         
         // Unique identifier sets to avoid duplicates
         const existingNoteIdentifiers = new Set(currentNotes.map(n => `${(n.title || "Untitled").trim().toLowerCase()}-${n.createdAt}`));

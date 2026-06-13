@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { Settings as SettingsType, DEFAULT_SETTINGS } from "../types";
-import { uploadToDrive } from "../lib/drive";
+import { uploadToDrive, listDriveFolders, createFolder, ensureBackupHierarchy, listJsonBackups, downloadJsonBackup } from "../lib/drive";
 import { appPrompt, appConfirm } from "./GlobalDialogs";
 import {
   getPersonalDictionary,
@@ -110,6 +110,36 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [personalDictionary, setPersonalDictionary] = useState<string[]>([]);
   const [newDictWord, setNewDictWord] = useState("");
   const [dictSearchTerm, setDictSearchTerm] = useState("");
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+  const [showDriveFolderPicker, setShowDriveFolderPicker] = useState(false);
+  const [driveFolders, setDriveFolders] = useState<{id: string, name: string}[]>([]);
+  const [loadingDriveFolders, setLoadingDriveFolders] = useState(false);
+  const [newDriveFolderName, setNewDriveFolderName] = useState("NoteVault Backups");
+  
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
+  const [driveBackups, setDriveBackups] = useState<{id: string, name: string, createdTime: string, size?: string, description?: string}[]>([]);
+  const [loadingDriveBackups, setLoadingDriveBackups] = useState(false);
+  const [selectedRestoreBackup, setSelectedRestoreBackup] = useState<any | null>(null);
+  const [restoreMode, setRestoreMode] = useState<'full' | 'selective'>('full');
+  const [downloadedBackup, setDownloadedBackup] = useState<any | null>(null);
+  const [downloadingBackup, setDownloadingBackup] = useState(false);
+  const [selectedNotesToRestore, setSelectedNotesToRestore] = useState<Set<string>>(new Set());
+  const [selectedCollectionsToRestore, setSelectedCollectionsToRestore] = useState<Set<string>>(new Set());
+  const [selectiveRestoreItems, setSelectiveRestoreItems] = useState<{ notes: boolean, folders: boolean }>({ notes: true, folders: true });
+
+  // MD Vault Restore State
+  const [showMdRestoreModal, setShowMdRestoreModal] = useState(false);
+  const [mdVaultBackups, setMdVaultBackups] = useState<{id: string, name: string, createdTime: string}[]>([]);
+  const [loadingMdVaultBackups, setLoadingMdVaultBackups] = useState(false);
+  const [selectedMdVault, setSelectedMdVault] = useState<any | null>(null);
+  
+  // Browsing a specific vault
+  const [mdVaultContents, setMdVaultContents] = useState<{id: string, name: string, mimeType: string}[]>([]);
+  const [loadingMdVaultContents, setLoadingMdVaultContents] = useState(false);
+  // Stack for folder navigation inside the vault
+  const [mdFolderStack, setMdFolderStack] = useState<{id: string, name: string}[]>([]); 
+  
+  const [mdRestoreProgress, setMdRestoreProgress] = useState<{current: number, total: number, status: string} | null>(null);
 
   useEffect(() => {
     if (expandedSection === "Dictionary") {
@@ -241,7 +271,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     total: number;
   } | null>(null);
 
-  const handleManualDriveBackup = async () => {
+  const handleManualDriveBackup = async (type: 'json' | 'md' | 'both') => {
     if (!accessToken) {
       showToast("Please sign in to Google Drive first.");
       return;
@@ -265,14 +295,58 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         }
       }
 
-      await uploadToDrive(
-        accessToken,
-        fullData,
-        undefined,
-        `NoteVault_Manual_Backup_${new Date().toISOString().replace(/:/g, "-")}.json`,
-      );
+      let jsonFolderId = undefined;
+      const backupFolderId = localSettings.driveBackup?.backupFolderId;
+      if (backupFolderId) {
+         try {
+            const hierarchy = await ensureBackupHierarchy(accessToken, backupFolderId);
+            jsonFolderId = hierarchy.jsonFolderId;
+         } catch(e) {
+            console.error("Failed to ensure hierarchy", e);
+         }
+      }
+
+      if (type === 'json' || type === 'both') {
+        showToast("Starting JSON Backup...");
+        await uploadToDrive(
+          accessToken,
+          fullData,
+          undefined,
+          `NoteVault_Manual_Backup_${new Date().toISOString().replace(/:/g, "-")}.json`,
+          jsonFolderId
+        );
+        
+        // Update JSON backup date
+        setLocalSettings(s => ({
+          ...s,
+          driveBackup: {
+            ...s.driveBackup!,
+            lastBackupDate: new Date().toISOString(),
+            lastJsonNotesCount: totalNotes
+          }
+        }));
+      }
+
+      if (type === 'md' || type === 'both') {
+        showToast("Starting MD Vault Backup...");
+        setManualBackupProgress({ current: 0, total: totalNotes }); 
+        await import("../lib/drive").then(async m => {
+            await m.uploadVaultToDrive(accessToken, fullData, backupFolderId);
+        });
+
+        // Update MD backup date
+        setLocalSettings(s => ({
+          ...s,
+          driveBackup: {
+            ...s.driveBackup!,
+            vaultLastBackupDate: new Date().toISOString(),
+            lastMdNotesCount: totalNotes
+          }
+        }));
+      }
+
       setManualBackupProgress({ current: totalNotes, total: totalNotes });
-      alert("Manual Backup completed successfully.");
+      alert(`Manual ${type === 'both' ? 'Full' : type.toUpperCase()} Backup completed successfully.`);
     } catch (err: any) {
       console.error(err);
       alert(`Backup failed: ${err.message}`);
@@ -280,6 +354,387 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setIsManualBackingUp(false);
       setManualBackupProgress(null);
     }
+  };
+
+  const handleFetchDriveFolders = async () => {
+     if (!accessToken) return;
+     setLoadingDriveFolders(true);
+     setShowDriveFolderPicker(true);
+     try {
+       const folders = await listDriveFolders(accessToken);
+       setDriveFolders(folders);
+     } catch (err) {
+       console.error(err);
+       showToast("Failed to fetch folders");
+     } finally {
+       setLoadingDriveFolders(false);
+     }
+  };
+
+  const handleCreateRootFolder = async () => {
+     if (!accessToken || !newDriveFolderName.trim()) return;
+     setLoadingDriveFolders(true);
+     try {
+       const newId = await createFolder(accessToken, newDriveFolderName.trim());
+       setLocalSettings(s => ({
+         ...s,
+         driveBackup: {
+           ...s.driveBackup!,
+           backupFolderId: newId,
+           backupFolderName: newDriveFolderName.trim(),
+           enabled: s.driveBackup?.enabled ?? false,
+           frequency: s.driveBackup?.frequency || "daily"
+         }
+       }));
+       setShowDriveFolderPicker(false);
+       showToast("Created and selected new backup folder");
+     } catch(e) {
+       console.error(e);
+       showToast("Failed to create folder");
+     } finally {
+       setLoadingDriveFolders(false);
+     }
+  };
+
+  const loadMdVaultContents = async (folderId: string) => {
+    if (!accessToken) return;
+    setLoadingMdVaultContents(true);
+    try {
+      const { listDriveContents } = await import("../lib/drive");
+      const contents = await listDriveContents(accessToken, folderId);
+      setMdVaultContents(contents);
+    } catch(err) {
+      console.error(err);
+      showToast("Failed to fetch folder contents");
+    } finally {
+      setLoadingMdVaultContents(false);
+    }
+  };
+
+  const handleFetchMdVaultBackups = async () => {
+     if (!accessToken) {
+        showToast("Please sign in to Google Drive first.");
+        return;
+     }
+     
+     const folderId = localSettings.driveBackup?.backupFolderId;
+     if (!folderId) {
+        showToast("Please select a Drive Backup folder first.");
+        return;
+     }
+
+     setLoadingMdVaultBackups(true);
+     setShowMdRestoreModal(true);
+     setSelectedMdVault(null);
+     setMdFolderStack([]);
+     
+     try {
+       const { listVaultBackups } = await import("../lib/drive");
+       const backups = await listVaultBackups(accessToken, folderId);
+       setMdVaultBackups(backups);
+     } catch(err) {
+       console.error(err);
+       showToast("Failed to fetch MD Vault backups");
+     } finally {
+       setLoadingMdVaultBackups(false);
+     }
+  };
+
+  const handleFetchDriveBackups = async () => {
+     if (!accessToken) {
+        showToast("Please sign in to Google Drive first.");
+        return;
+     }
+     
+     const folderId = localSettings.driveBackup?.backupFolderId;
+     if (!folderId) {
+        showToast("Please select a Drive Backup folder first.");
+        return;
+     }
+
+     setLoadingDriveBackups(true);
+     setShowRestoreModal(true);
+     setSelectedRestoreBackup(null);
+     
+     try {
+       const backups = await listJsonBackups(accessToken, folderId);
+       setDriveBackups(backups);
+     } catch(err) {
+       console.error(err);
+       showToast("Failed to fetch backups");
+     } finally {
+       setLoadingDriveBackups(false);
+     }
+  };
+
+  const handlePerformRestore = async () => {
+    if (!selectedRestoreBackup || !accessToken) return;
+    
+    try {
+      showToast("Downloading backup...");
+      const imported = await downloadJsonBackup(accessToken, selectedRestoreBackup.id);
+      
+      if (!imported.workspaces || !imported.notes) {
+        showToast("Invalid NoteVault Backup File\nMissing basic structure required for NoteVault.");
+        return;
+      }
+
+      // Create local safety snapshot before applying
+      const { set, get } = await import("idb-keyval");
+      const currentVaultData = await get("notevault_data");
+      if (currentVaultData) {
+        await set("notevault_snapshot_" + Date.now(), currentVaultData);
+        showToast("Created local safety snapshot.");
+      }
+
+      const mergedData = { ...data };
+
+      if (restoreMode === 'full') {
+         Object.assign(mergedData, {
+            notes: imported.notes || [],
+            collections: imported.collections || [],
+            workspaces: imported.workspaces || [],
+            tags: imported.tags || [],
+            settings: { ...mergedData.settings, ...(imported.settings || {}) },
+         });
+      } else {
+         // Selective Merge
+         const existingNoteIds = new Set(mergedData.notes.map(n => n.id));
+         const newNotes = imported.notes?.filter((n: any) => selectedNotesToRestore.has(n.id) && !existingNoteIds.has(n.id)) || [];
+         mergedData.notes = [...mergedData.notes, ...newNotes];
+
+         const existingColIds = new Set(mergedData.collections.map(c => c.id));
+         const newCols = imported.collections?.filter((c: any) => selectedCollectionsToRestore.has(c.id) && !existingColIds.has(c.id)) || [];
+         mergedData.collections = [...mergedData.collections, ...newCols];
+
+         // Always merge workspaces if any folder is selected to prevent orphan folders
+         if (newCols.length > 0) {
+            const existingWsIds = new Set(mergedData.workspaces.map(w => w.id));
+            const newWs = imported.workspaces?.filter((w: any) => !existingWsIds.has(w.id)) || [];
+            mergedData.workspaces = [...mergedData.workspaces, ...newWs];
+         }
+         
+         if (imported.tags) {
+            const tagSet = new Set([...mergedData.tags, ...imported.tags]);
+            mergedData.tags = Array.from(tagSet);
+         }
+      }
+
+      saveData(mergedData);
+      showToast(`Restore completed (${restoreMode}).`);
+      setShowRestoreModal(false);
+    } catch (err) {
+      console.error(err);
+      showToast("Restore failed.");
+    }
+  };
+
+  // MD Restore Conflict State
+  const [mdConflict, setMdConflict] = useState<{noteName: string, folderName: string, resolve: (choice: 'keep' | 'replace' | 'both') => void} | null>(null);
+  const mdCancelRef = useRef(false);
+
+  const performMdRestore = async (mode: 'file' | 'folder' | 'vault', item: {id: string, name: string}) => {
+    if (!accessToken) return;
+    mdCancelRef.current = false;
+    
+    // Create safety snapshot
+    const { set: setIDB, get: getIDB } = await import("idb-keyval");
+    const currentVaultData = await getIDB("notevault_data");
+    if (currentVaultData) {
+      await setIDB("notevault_snapshot_" + Date.now(), currentVaultData);
+      showToast("Created local safety snapshot.");
+    }
+    
+    setMdRestoreProgress({ current: 0, total: 1, status: "Scanning folders..." });
+    
+    const { listDriveContents, downloadTextFile, parseMarkdownFile } = await import("../lib/drive");
+    const mergedData = { ...data };
+    
+    // Collect all items to process
+    let totalNotesToProcess = 0;
+    
+    type ImportTarget = { id: string, name: string, path: string[], isFile: boolean };
+    const scanQueue: { id: string, name: string, path: string[] }[] = [];
+    const filesToImport: ImportTarget[] = [];
+    const foldersToImport: ImportTarget[] = [];
+    
+    if (mode === 'file') {
+      filesToImport.push({ id: item.id, name: item.name, path: mdFolderStack.map(f => f.name), isFile: true });
+    } else if (mode === 'folder' || mode === 'vault') {
+      scanQueue.push({ id: item.id, name: item.name, path: mode === 'vault' ? [] : [...mdFolderStack.map(f => f.name), item.name] });
+      foldersToImport.push({ id: item.id, name: item.name, path: mode === 'vault' ? [] : mdFolderStack.map(f => f.name), isFile: false });
+    }
+    
+    // Breadth-first scan
+    let scanCount = 0;
+    while (scanQueue.length > 0 && !mdCancelRef.current) {
+      const current = scanQueue.shift()!;
+      setMdRestoreProgress({ current: scanCount, total: scanCount + scanQueue.length, status: `Scanning ${current.name}...` });
+      try {
+        const contents = await listDriveContents(accessToken, current.id);
+        for (const child of contents) {
+          if (child.mimeType === 'application/vnd.google-apps.folder') {
+             scanQueue.push({ id: child.id, name: child.name, path: [...current.path, child.name] });
+             foldersToImport.push({ id: child.id, name: child.name, path: current.path, isFile: false });
+          } else if (child.name.endsWith('.md')) {
+             filesToImport.push({ id: child.id, name: child.name, path: current.path, isFile: true });
+          } else if (mode === 'vault' && child.name === 'tags.json') {
+             // Will handle tags.json later
+             filesToImport.push({ id: child.id, name: 'tags.json', path: current.path, isFile: true });
+          }
+        }
+      } catch (e) {
+        console.error("Scan error on", current.name, e);
+      }
+      scanCount++;
+    }
+
+    if (mdCancelRef.current) {
+       setMdRestoreProgress(null);
+       showToast("Restore cancelled during scan.");
+       return;
+    }
+
+    setMdRestoreProgress({ current: 0, total: filesToImport.length, status: "Importing notes..." });
+    let importedNotesCount = 0;
+    let tagsMap: Record<string, string[]> | null = null;
+    
+    // Process files
+    for (let i = 0; i < filesToImport.length; i++) {
+       if (mdCancelRef.current) break;
+       const file = filesToImport[i];
+       setMdRestoreProgress({ current: i, total: filesToImport.length, status: `Importing ${file.path.join('/')}/${file.name}` });
+       
+       try {
+         const content = await downloadTextFile(accessToken, file.id);
+         
+         if (file.name === 'tags.json' && file.path.length === 0) {
+            tagsMap = JSON.parse(content);
+            continue;
+         }
+         
+         const { frontmatter, body } = parseMarkdownFile(content);
+         const title = frontmatter.title || file.name.replace('.md', '');
+         const titleCleaned = title.replace(/\//g, '_');
+         
+         // Find target folder (Collection/Workspace)
+         let targetWsId: string | undefined = undefined;
+         let targetColId: string | undefined = undefined;
+         
+         if (file.path.length > 0) {
+            const wsName = file.path[0];
+            let ws = mergedData.workspaces.find(w => w.name === wsName);
+            if (!ws) {
+               ws = { id: crypto.randomUUID(), name: wsName, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+               mergedData.workspaces.push(ws);
+            }
+            targetWsId = ws.id;
+            
+            if (file.path.length > 1) {
+               const fullColName = file.path.slice(1).join('/'); // We flatten nested folders in UI to simple collection paths or nested if structure allows, but NoteVault currently maps folders to Workspaces->Collections
+               // Let's assume path[1] is collection name
+               const colName = file.path[1];
+               let col = mergedData.collections.find(c => c.name === colName && c.workspaceId === ws!.id);
+               if (!col) {
+                  col = { id: crypto.randomUUID(), name: colName, workspaceId: ws!.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+                  mergedData.collections.push(col);
+               }
+               targetColId = col.id;
+            }
+         }
+         
+         // Conflict check
+         const existingNote = mergedData.notes.find(n => n.title === title && n.workspaceId === targetWsId && n.collectionId === targetColId);
+         let finalChoice: 'keep' | 'replace' | 'both' = 'replace';
+         
+         if (existingNote) {
+            finalChoice = await new Promise<'keep' | 'replace' | 'both'>((resolve) => {
+               setMdConflict({ noteName: title, folderName: file.path.join('/') || 'Root', resolve });
+            });
+            setMdConflict(null);
+         }
+         
+         if (finalChoice === 'keep') {
+            continue;
+         }
+         
+         const newNote: any = {
+            id: finalChoice === 'replace' ? existingNote!.id : crypto.randomUUID(),
+            title: title,
+            content: body,
+            createdAt: frontmatter.date || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            workspaceId: targetWsId,
+            collectionId: targetColId,
+            tags: [], // Handled by tagsMap or frontmatter
+            headerMeta: {
+               date: frontmatter.date,
+               source: frontmatter.source,
+               summary: frontmatter.summary
+            }
+         };
+         
+         if (finalChoice === 'both') {
+            newNote.title = `${title} (Imported)`;
+         }
+         
+         if (finalChoice === 'replace') {
+            mergedData.notes = mergedData.notes.map(n => n.id === existingNote!.id ? newNote : n);
+         } else {
+            mergedData.notes.push(newNote);
+         }
+         importedNotesCount++;
+         
+       } catch (e) {
+         console.error("Failed to import file", file.name, e);
+       }
+    }
+    
+    // Apply tags if full vault restore and tags.json exists
+    if (mode === 'vault' && tagsMap && !mdCancelRef.current) {
+       for (const tagName of Object.keys(tagsMap)) {
+          if (!mergedData.tags.includes(tagName)) {
+             mergedData.tags.push(tagName);
+          }
+          const taggedFiles = tagsMap[tagName]; // Array of filenames
+          for (const filename of taggedFiles) {
+             const titleToMatch = filename.replace('.md', '');
+             // Try to find imported note; simplified mapping for now (tags.json just stores filenames in original backup)
+             mergedData.notes.filter(n => n.title === titleToMatch || n.title === `${titleToMatch} (Imported)`).forEach(n => {
+                if (!n.tags.includes(tagName)) {
+                   n.tags.push(tagName);
+                }
+             });
+          }
+       }
+    }
+
+    if (!mdCancelRef.current) {
+       saveData(mergedData);
+       showToast(`Imported ${importedNotesCount} MD notes successfully.`);
+    } else {
+       // if cancelled mid-process, we still save what we got so we don't 'corrupt already imported notes' as requested!
+       saveData(mergedData);
+       showToast(`Restore cancelled. Saved ${importedNotesCount} complete notes.`);
+    }
+
+    setMdRestoreProgress(null);
+    setShowMdRestoreModal(false);
+  };
+  
+  const handleSelectRootFolder = (folder: {id: string, name: string}) => {
+     setLocalSettings(s => ({
+         ...s,
+         driveBackup: {
+           ...s.driveBackup!,
+           backupFolderId: folder.id,
+           backupFolderName: folder.name,
+           enabled: s.driveBackup?.enabled ?? false,
+           frequency: s.driveBackup?.frequency || "daily"
+         }
+     }));
+     setShowDriveFolderPicker(false);
+     showToast("Updated backup folder location");
   };
 
   const handleSave = () => {
@@ -2116,7 +2571,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               </span>
                             </div>
                             <button
-                              onClick={signOut}
+                              onClick={() => setShowSignOutConfirm(true)}
                               className="text-text-muted hover:bg-surface-active p-1.5 rounded transition-colors text-xs font-medium"
                             >
                               Sign out
@@ -2228,74 +2683,255 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           <div className="w-9 h-5 bg-surface-active border border-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2.5px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
                         </div>
                       </label>
+                    </div>
 
-                      {localSettings.driveBackup?.enabled && (
+                    <div className="bg-surface border border-border rounded-lg p-3 mt-2">
+                      <label className="flex items-center justify-between cursor-pointer mb-3">
+                        <div>
+                          <div className="text-sm font-medium">
+                            Enable MD Vault Sync
+                          </div>
+                          <div className="text-[11px] text-text-muted mt-0.5">
+                            Automatically back up notes as regular Markdown files
+                          </div>
+                        </div>
+                        <div className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={
+                              localSettings.driveBackup?.vaultBackupEnabled || false
+                            }
+                            onChange={(e) => {
+                              const enabled = e.target.checked;
+                              setLocalSettings((s) => ({
+                                ...s,
+                                driveBackup: {
+                                  enabled: s.driveBackup?.enabled || false,
+                                  frequency: s.driveBackup?.frequency || "daily",
+                                  ...s.driveBackup,
+                                  vaultBackupEnabled: enabled,
+                                  vaultBackupFrequency: s.driveBackup?.vaultBackupFrequency || "daily",
+                                },
+                              }));
+                            }}
+                            className="sr-only peer"
+                          />
+                          <div className="w-9 h-5 bg-surface-active border border-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2.5px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
+                        </div>
+                      </label>
+
+                      {(localSettings.driveBackup?.enabled || localSettings.driveBackup?.vaultBackupEnabled) && (
                         <div className="pt-3 border-t border-border flex flex-col gap-3">
                           <div className="flex flex-col gap-1.5">
                             <span className="text-xs text-text-secondary">
-                              Sync Frequency
+                              Backup Location
                             </span>
-                            <select
-                              value={
-                                localSettings.driveBackup?.frequency || "daily"
-                              }
-                              onChange={(e) => {
-                                setLocalSettings((s) => ({
-                                  ...s,
-                                  driveBackup: {
-                                    ...s.driveBackup!,
-                                    frequency: e.target.value as any,
-                                  },
-                                }));
+                            <div className="flex items-center justify-between bg-background border border-border rounded-md px-2 py-1.5 text-sm">
+                              <span className="truncate max-w-[150px] text-text-primary">
+                                {localSettings.driveBackup?.backupFolderName || "Root Folder"}
+                              </span>
+                              <button
+                                onClick={handleFetchDriveFolders}
+                                className="text-[11px] font-medium text-accent hover:text-accent-hover transition-colors"
+                              >
+                                Change
+                              </button>
+                            </div>
+                          </div>
+                          
+                          {localSettings.driveBackup?.enabled && (
+                            <div className="flex flex-col gap-1.5">
+                              <span className="text-xs text-text-secondary">
+                                JSON Sync Frequency
+                              </span>
+                              <select
+                                value={
+                                  localSettings.driveBackup?.frequency || "daily"
+                                }
+                                onChange={(e) => {
+                                  setLocalSettings((s) => ({
+                                    ...s,
+                                    driveBackup: {
+                                      ...s.driveBackup!,
+                                      frequency: e.target.value as any,
+                                    },
+                                  }));
+                                }}
+                                className="w-full bg-background border border-border rounded-md px-2 py-1.5 text-sm focus:border-green-500 outline-none"
+                              >
+                                <option value="daily">Daily</option>
+                                <option value="3days">Every 3 Days</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="monthly">Monthly</option>
+                                <option value="90days">Every 90 Days</option>
+                              </select>
+                            </div>
+                          )}
+
+                          {localSettings.driveBackup?.vaultBackupEnabled && (
+                            <div className="flex flex-col gap-1.5 mt-2">
+                              <span className="text-xs text-text-secondary">
+                                MD Vault Sync Frequency
+                              </span>
+                              <select
+                                value={
+                                  localSettings.driveBackup?.vaultBackupFrequency || "daily"
+                                }
+                                onChange={(e) => {
+                                  setLocalSettings((s) => ({
+                                    ...s,
+                                    driveBackup: {
+                                      ...s.driveBackup!,
+                                      vaultBackupFrequency: e.target.value as any,
+                                    },
+                                  }));
+                                }}
+                                className="w-full bg-background border border-border rounded-md px-2 py-1.5 text-sm focus:border-green-500 outline-none"
+                              >
+                                <option value="daily">Daily</option>
+                                <option value="3days">Every 3 Days</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="monthly">Monthly</option>
+                                <option value="90days">Every 90 Days</option>
+                              </select>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* JSON Status */}
+                    <div className="bg-surface border border-border rounded-lg p-3 mt-2 flex flex-col gap-1.5">
+                      <span className="text-sm font-medium text-text-primary">JSON Backup Status</span>
+                      <div className="flex justify-between items-center text-xs text-text-muted mt-1">
+                          <span>Last Backup:</span>
+                          <span className="text-text-primary">{localSettings.driveBackup?.lastBackupDate ? new Date(localSettings.driveBackup.lastBackupDate).toLocaleString() : "Never"}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs text-text-muted">
+                          <span>Notes Backed Up:</span>
+                          <span className="text-text-primary">{localSettings.driveBackup?.lastJsonNotesCount || 0}</span>
+                      </div>
+                    </div>
+
+                    {/* MD Vault Status */}
+                    <div className="bg-surface border border-border rounded-lg p-3 mt-2 flex flex-col gap-1.5">
+                      <span className="text-sm font-medium text-text-primary">MD Vault Backup Status</span>
+                      <div className="flex justify-between items-center text-xs text-text-muted mt-1">
+                          <span>Last Backup:</span>
+                          <span className="text-text-primary">{localSettings.driveBackup?.vaultLastBackupDate ? new Date(localSettings.driveBackup.vaultLastBackupDate).toLocaleString() : "Never"}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs text-text-muted">
+                          <span>Notes Backed Up:</span>
+                          <span className="text-text-primary">{localSettings.driveBackup?.lastMdNotesCount || 0}</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-surface border border-border rounded-lg p-3 mt-4 flex flex-col gap-3">
+                      <span className="text-sm font-medium text-text-primary">Manual Backups</span>
+                      
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-text-secondary">
+                          JSON Backup Only
+                        </span>
+                        <button
+                          onClick={() => handleManualDriveBackup('json')}
+                          disabled={isManualBackingUp}
+                          className="bg-surface-active hover:bg-border text-text-primary border border-border disabled:opacity-50 text-[11px] px-3 py-1.5 rounded-md font-medium transition-colors flex items-center gap-1"
+                        >
+                          <Upload size={12} /> Run JSON
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-text-secondary">
+                          MD Vault Backup Only
+                        </span>
+                        <button
+                          onClick={() => handleManualDriveBackup('md')}
+                          disabled={isManualBackingUp}
+                          className="bg-surface-active hover:bg-border text-text-primary border border-border disabled:opacity-50 text-[11px] px-3 py-1.5 rounded-md font-medium transition-colors flex items-center gap-1"
+                        >
+                          <Upload size={12} /> Run MD Vault
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-3 border-t border-border">
+                        <span className="text-xs font-medium text-text-secondary">
+                          Full Sequential Backup (Both)
+                        </span>
+                        <button
+                          onClick={() => handleManualDriveBackup('both')}
+                          disabled={isManualBackingUp}
+                          className="bg-accent hover:bg-accent-hover text-white disabled:opacity-50 text-[11px] px-3 py-1.5 rounded-md font-medium transition-colors flex items-center gap-1"
+                        >
+                          <Upload size={12} /> Run Both
+                        </button>
+                      </div>
+
+                      {isManualBackingUp && manualBackupProgress && (
+                        <div className="space-y-1 mt-1">
+                          <div className="flex justify-between text-[10px] text-text-muted">
+                            <span>Backing up...</span>
+                            <span>
+                              {manualBackupProgress.current} /{" "}
+                              {manualBackupProgress.total} notes
+                            </span>
+                          </div>
+                          <div className="w-full bg-surface-active rounded-full h-1.5">
+                            <div
+                              className="bg-green-500 h-1.5 rounded-full transition-all duration-300"
+                              style={{
+                                width: `${(manualBackupProgress.current / (manualBackupProgress.total || 1)) * 100}%`,
                               }}
-                              className="w-full bg-background border border-border rounded-md px-2 py-1.5 text-sm focus:border-green-500 outline-none"
-                            >
-                              <option value="daily">Daily</option>
-                              <option value="3days">Every 3 Days</option>
-                              <option value="weekly">Weekly</option>
-                              <option value="monthly">Monthly</option>
-                              <option value="90days">Every 90 Days</option>
-                            </select>
+                            ></div>
                           </div>
                         </div>
                       )}
-
-                      <div className="pt-3 mt-3 border-t border-border flex flex-col gap-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-text-secondary">
-                            Manual Full Backup
-                          </span>
-                          <button
-                            onClick={handleManualDriveBackup}
-                            disabled={isManualBackingUp}
-                            className="bg-accent hover:bg-accent-hover text-white disabled:opacity-50 text-[11px] px-3 py-1.5 rounded-md font-medium transition-colors flex items-center gap-1"
-                          >
-                            <Upload size={12} /> Backup Now
-                          </button>
-                        </div>
-                        {isManualBackingUp && manualBackupProgress && (
-                          <div className="space-y-1 mt-1">
-                            <div className="flex justify-between text-[10px] text-text-muted">
-                              <span>Backing up...</span>
-                              <span>
-                                {manualBackupProgress.current} /{" "}
-                                {manualBackupProgress.total} notes
-                              </span>
-                            </div>
-                            <div className="w-full bg-surface-active rounded-full h-1.5">
-                              <div
-                                className="bg-green-500 h-1.5 rounded-full transition-all duration-300"
-                                style={{
-                                  width: `${(manualBackupProgress.current / (manualBackupProgress.total || 1)) * 100}%`,
-                                }}
-                              ></div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
                     </div>
                   </div>
                   
+                  {/* Drive JSON Restore */}
+                  <div className="pt-4 border-t border-border">
+                    <h4 className="text-xs font-semibold text-text-muted uppercase mb-3 flex items-center gap-2">
+                      <Cloud size={14} /> Drive JSON Restore
+                    </h4>
+                    <div className="bg-surface border border-border rounded-lg p-3 flex flex-col gap-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-sm font-medium text-text-primary block">Restore JSON Backup</span>
+                          <span className="text-xs text-text-secondary">Load a JSON backup from your selected Drive folder</span>
+                        </div>
+                        <button
+                          onClick={handleFetchDriveBackups}
+                          className="bg-accent hover:bg-accent-hover text-white text-[11px] px-3 py-1.5 rounded-md font-medium transition-colors flex items-center gap-1"
+                        >
+                           Search Backups
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* MD Vault Restore */}
+                  <div className="pt-4 border-t border-border">
+                    <h4 className="text-xs font-semibold text-text-muted uppercase mb-3 flex items-center gap-2">
+                      <Cloud size={14} /> MD Vault Folder Restore
+                    </h4>
+                    <div className="bg-surface border border-border rounded-lg p-3 flex flex-col gap-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-sm font-medium text-text-primary block">Restore MD Vault</span>
+                          <span className="text-xs text-text-secondary">Browse your Drive Vault backups and import folders/notes</span>
+                        </div>
+                        <button
+                          onClick={handleFetchMdVaultBackups}
+                          className="bg-accent hover:bg-accent-hover text-white text-[11px] px-3 py-1.5 rounded-md font-medium transition-colors flex items-center gap-1"
+                        >
+                           Browse Vaults
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
                   <GithubSyncSettingsPanel settings={localSettings} updateSettings={(s) => setLocalSettings((prev) => ({ ...prev, ...s }))} />
 
                   {/* Local Backup */}
@@ -2330,6 +2966,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         />
                       </label>
                     </div>
+                    <button
+                      onClick={async () => {
+                        const { get, keys } = await import("idb-keyval");
+                        const allKeys = await keys();
+                        const snapshotKeys = allKeys.filter(k => typeof k === 'string' && k.startsWith("notevault_snapshot_")).sort().reverse();
+                        if (snapshotKeys.length === 0) {
+                           showToast("No safety snapshots found.");
+                           return;
+                        }
+                        const latest = snapshotKeys[0];
+                        const snapshotData = await get(latest as string);
+                        if (snapshotData) {
+                           if (window.confirm("Roll back vault to the latest safety snapshot before the last restore? This will overwrite your current vault.")) {
+                              saveData(snapshotData);
+                              showToast("Rollback completed.");
+                           }
+                        } else {
+                           showToast("Snapshot is empty.");
+                        }
+                      }}
+                      className="w-full mt-2 flex items-center justify-center gap-2 bg-surface hover:bg-surface-active border border-border p-2 rounded-lg transition-colors text-text-primary text-xs font-medium"
+                    >
+                       Rollback to Safety Snapshot
+                    </button>
                   </div>
 
                   {/* Danger Zone */}
@@ -2379,53 +3039,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </button>
         </div>
 
-        {cloudPreview && (
+        {showSignOutConfirm && (
           <div className="absolute inset-0 bg-background/90 backdrop-blur-[2px] rounded-2xl z-50 flex items-center justify-center p-6">
-            <div className="bg-surface border border-border rounded-xl shadow-2xl p-5 w-full max-w-sm border-l-4 border-l-accent">
+            <div className="bg-surface border border-border rounded-xl shadow-2xl p-5 w-full max-w-sm">
               <h3 className="text-lg font-bold text-text-primary mb-3 flex items-center gap-2">
-                <Cloud size={18} className="text-accent" /> Restore Backup
+                 Sign Out?
               </h3>
-              <p className="text-sm text-text-secondary mb-4 leading-relaxed">
-                You are about to completely override your local vault with a
-                backup from Firebase. This action cannot be easily undone.
+              <p className="text-sm text-text-secondary mb-4">
+                Signing out will remove your local cache and offline data. Please ensure any pending changes are synced to Google Drive before proceeding.
               </p>
-
-              <div className="bg-surface-active rounded-lg p-3 mb-5 border border-border grid grid-cols-2 gap-4">
-                <div>
-                  <span className="text-[10px] uppercase text-text-muted font-semibold tracking-wider block">
-                    Backup Date
-                  </span>
-                  <span className="text-xs font-medium text-text-primary break-all">
-                    {cloudPreview.backupDate
-                      ? new Date(cloudPreview.backupDate).toLocaleString()
-                      : "Unknown"}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase text-text-muted font-semibold tracking-wider block">
-                    Total Notes
-                  </span>
-                  <span className="text-xs font-medium text-text-primary">
-                    {cloudPreview.noteCount}
-                  </span>
-                </div>
-              </div>
-
               <div className="flex justify-end gap-3 mt-4">
                 <button
-                  onClick={() => setCloudPreview(null)}
-                  className="px-4 py-2 rounded-md hover:bg-surface-active transition-colors text-sm font-medium"
+                  onClick={() => setShowSignOutConfirm(false)}
+                  className="px-4 py-2 rounded-md hover:bg-surface-active transition-colors text-sm font-medium border border-border"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={() => {
-                    applyCloudBackup(cloudPreview.payload);
-                    setCloudPreview(null);
+                  onClick={async () => {
+                    await signOut();
+                    setShowSignOutConfirm(false);
+                    clearAllData();
                   }}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-md transition-colors text-sm flex items-center gap-1"
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-md transition-colors text-sm"
                 >
-                  <RefreshCw size={14} /> Restore Now
+                   Sign Out
                 </button>
               </div>
             </div>
@@ -2531,6 +3169,348 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
         )}
+
+        {showDriveFolderPicker && (
+          <div className="absolute inset-0 bg-background/90 backdrop-blur-[2px] rounded-2xl z-50 flex items-center justify-center p-6">
+            <div className="bg-surface border border-border rounded-xl shadow-2xl p-5 w-full max-w-sm flex flex-col max-h-[80vh]">
+              <h3 className="text-lg font-bold text-text-primary mb-3 flex items-center gap-2">
+                 Select Backup Folder
+              </h3>
+              
+              <div className="flex gap-2 mb-4">
+                 <input 
+                   type="text"
+                   value={newDriveFolderName}
+                   onChange={e => setNewDriveFolderName(e.target.value)}
+                   className="flex-1 bg-background border border-border rounded-md px-3 py-1.5 text-sm"
+                   placeholder="New folder name"
+                 />
+                 <button
+                   onClick={handleCreateRootFolder}
+                   disabled={loadingDriveFolders || !newDriveFolderName.trim()}
+                   className="bg-accent text-white px-3 py-1.5 rounded-md text-sm font-medium disabled:opacity-50"
+                 >
+                   Create
+                 </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto min-h-[100px] border border-border rounded-md bg-background mb-4 p-2">
+                 {loadingDriveFolders ? (
+                    <div className="text-center text-sm text-text-muted py-4">Loading...</div>
+                 ) : driveFolders.length === 0 ? (
+                    <div className="text-center text-sm text-text-muted py-4">No backup folders found. Create one.</div>
+                 ) : (
+                    driveFolders.map(folder => (
+                       <button
+                         key={folder.id}
+                         onClick={() => handleSelectRootFolder(folder)}
+                         className="w-full text-left px-3 py-2 text-sm hover:bg-surface-active rounded-md transition-colors flex items-center gap-2"
+                       >
+                         <Cloud size={14} className="text-accent" />
+                         <span className="truncate flex-1">{folder.name}</span>
+                       </button>
+                    ))
+                 )}
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setShowDriveFolderPicker(false)}
+                  className="px-4 py-2 rounded-md hover:bg-surface-active transition-colors text-sm font-medium border border-border"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {showRestoreModal && (
+          <div className="absolute inset-0 bg-background/90 backdrop-blur-[2px] rounded-2xl z-50 flex items-center justify-center p-6">
+            <div className="bg-surface border border-border rounded-xl shadow-2xl p-5 w-full max-w-sm flex flex-col max-h-[90vh]">
+              <h3 className="text-lg font-bold text-text-primary mb-3 flex items-center gap-2">
+                 <Cloud size={18} className="text-accent" /> Select Backup to Restore
+              </h3>
+              
+              <div className="flex-1 overflow-y-auto border border-border rounded-md bg-background mb-4 p-2 min-h-[150px]">
+                 {loadingDriveBackups ? (
+                    <div className="text-center text-sm text-text-muted py-4">Loading backups...</div>
+                 ) : driveBackups.length === 0 ? (
+                    <div className="text-center text-sm text-text-muted py-4">No JSON backups found.</div>
+                 ) : (
+                    driveBackups.map(backup => (
+                       <div 
+                         key={backup.id}
+                         onClick={async () => {
+                           setSelectedRestoreBackup(backup);
+                           setRestoreMode('full');
+                           if (!accessToken) return;
+                           setDownloadingBackup(true);
+                           setDownloadedBackup(null);
+                           try {
+                             const imported = await downloadJsonBackup(accessToken, backup.id);
+                             setDownloadedBackup(imported);
+                             setSelectedNotesToRestore(new Set((imported.notes || []).map((n: any) => n.id)));
+                             setSelectedCollectionsToRestore(new Set((imported.collections || []).map((c: any) => c.id)));
+                           } catch(e) {
+                             console.error(e);
+                             showToast("Failed to fetch backup contents for preview");
+                           } finally {
+                             setDownloadingBackup(false);
+                           }
+                         }}
+                         className={`w-full text-left p-3 text-sm hover:bg-surface-active rounded-md transition-colors cursor-pointer border ${selectedRestoreBackup?.id === backup.id ? 'border-accent bg-accent/10' : 'border-transparent'}`}
+                       >
+                         <div className="font-medium truncate">{backup.name}</div>
+                         <div className="flex justify-between items-center text-xs text-text-muted mt-1">
+                           <span>{new Date(backup.createdTime).toLocaleString()}</span>
+                           <span>{backup.description ? backup.description : (backup.size ? (parseInt(backup.size) / 1024).toFixed(1) + ' KB' : '')}</span>
+                         </div>
+                       </div>
+                    ))
+                 )}
+              </div>
+
+              {selectedRestoreBackup && (
+                <div className="mb-4 bg-background border border-border rounded-md p-3">
+                  <span className="text-sm font-medium mb-2 block">Restore Mode</span>
+                  <div className="flex flex-col gap-2">
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input 
+                        type="radio" 
+                        name="restoreMode" 
+                        checked={restoreMode === 'full'} 
+                        onChange={() => setRestoreMode('full')}
+                        className="accent-accent"
+                      />
+                      <div>
+                        Full Restore
+                        <span className="block text-[10px] text-text-muted">Replaces all vault data. A local safety snapshot will be created.</span>
+                      </div>
+                    </label>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input 
+                        type="radio" 
+                        name="restoreMode" 
+                        checked={restoreMode === 'selective'} 
+                        onChange={() => setRestoreMode('selective')}
+                        className="accent-accent"
+                      />
+                      <div>
+                        Selective Merge
+                        <span className="block text-[10px] text-text-muted">Imports items without deleting existing data.</span>
+                      </div>
+                    </label>
+                  </div>
+                  
+                  {restoreMode === 'selective' && (
+                     <div className="ml-5 mt-2 flex flex-col gap-2 text-xs border-t border-border pt-2">
+                       {downloadingBackup ? (
+                          <div className="text-text-muted">Loading backup contents...</div>
+                       ) : downloadedBackup ? (
+                          <div className="flex flex-col gap-2 max-h-32 overflow-y-auto">
+                            <div className="font-semibold text-text-primary underline">Notes ({downloadedBackup.notes?.length || 0})</div>
+                            {downloadedBackup.notes?.map((n: any) => (
+                               <label key={n.id} className="flex items-center gap-2 cursor-pointer ml-1 truncate">
+                                  <input type="checkbox" checked={selectedNotesToRestore.has(n.id)} onChange={e => {
+                                      const next = new Set(selectedNotesToRestore);
+                                      if (e.target.checked) next.add(n.id); else next.delete(n.id);
+                                      setSelectedNotesToRestore(next);
+                                  }} />
+                                  <span className="truncate">{n.title || 'Untitled Note'}</span>
+                               </label>
+                            ))}
+                            
+                            <div className="font-semibold text-text-primary underline mt-2">Folders ({downloadedBackup.collections?.length || 0})</div>
+                            {downloadedBackup.collections?.map((c: any) => (
+                               <label key={c.id} className="flex items-center gap-2 cursor-pointer ml-1 truncate">
+                                  <input type="checkbox" checked={selectedCollectionsToRestore.has(c.id)} onChange={e => {
+                                      const next = new Set(selectedCollectionsToRestore);
+                                      if (e.target.checked) next.add(c.id); else next.delete(c.id);
+                                      setSelectedCollectionsToRestore(next);
+                                  }} />
+                                  <span className="truncate">{c.name || 'Untitled Folder'}</span>
+                               </label>
+                            ))}
+                          </div>
+                       ) : (
+                          <div className="text-red-400">Failed to load payload</div>
+                       )}
+                     </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 mt-auto">
+                <button
+                  onClick={() => setShowRestoreModal(false)}
+                  className="px-4 py-2 rounded-md hover:bg-surface-active transition-colors text-sm font-medium border border-border"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handlePerformRestore}
+                  disabled={!selectedRestoreBackup || loadingDriveBackups}
+                  className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 transition-colors"
+                >
+                  Confirm Restore
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showMdRestoreModal && (
+          <div className="absolute inset-0 bg-background/90 backdrop-blur-[2px] rounded-2xl z-50 flex items-center justify-center p-6">
+            <div className="bg-surface border border-border rounded-xl shadow-2xl p-5 w-full max-w-sm flex flex-col max-h-[90vh]">
+              <h3 className="text-lg font-bold text-text-primary mb-3 flex items-center gap-2">
+                 <Cloud size={18} className="text-accent" /> MD Vault Restore
+              </h3>
+
+              {!selectedMdVault ? (
+                 <div className="flex-1 flex flex-col gap-2 min-h-[150px]">
+                    <div className="text-sm font-medium mb-1">Select a Vault Backup</div>
+                    <div className="flex-1 overflow-y-auto border border-border rounded-md bg-background p-2">
+                       {loadingMdVaultBackups ? (
+                          <div className="text-center text-sm text-text-muted py-4">Loading vaults...</div>
+                       ) : mdVaultBackups.length === 0 ? (
+                          <div className="text-center text-sm text-text-muted py-4">No Vaults found.</div>
+                       ) : (
+                          mdVaultBackups.map(vault => (
+                             <div 
+                               key={vault.id}
+                               onClick={() => {
+                                  setSelectedMdVault(vault);
+                                  loadMdVaultContents(vault.id);
+                               }}
+                               className="w-full text-left p-2.5 text-sm hover:bg-surface-active rounded-md transition-colors cursor-pointer border border-transparent hover:border-border"
+                             >
+                               <div className="font-medium truncate">{vault.name}</div>
+                               <div className="text-xs text-text-muted">{new Date(vault.createdTime).toLocaleString()}</div>
+                             </div>
+                          ))
+                       )}
+                    </div>
+                 </div>
+              ) : (
+                 <div className="flex-1 flex flex-col gap-2 min-h-[150px]">
+                    
+                    <div className="flex items-center gap-2 text-sm bg-surface-active p-1.5 rounded-md mb-2 overflow-x-auto whitespace-nowrap">
+                       <button onClick={() => {
+                          setMdFolderStack([]);
+                          loadMdVaultContents(selectedMdVault.id);
+                       }} className="hover:text-accent font-medium text-text-muted transition-colors">
+                          {selectedMdVault.name}
+                       </button>
+                       {mdFolderStack.map((f, i) => (
+                           <span key={f.id} className="flex items-center gap-1 text-text-muted">
+                              <span>/</span>
+                              <button onClick={() => {
+                                 const nextStack = mdFolderStack.slice(0, i + 1);
+                                 setMdFolderStack(nextStack);
+                                 loadMdVaultContents(f.id);
+                              }} className="hover:text-accent font-medium transition-colors max-w-[80px] truncate">
+                                 {f.name}
+                              </button>
+                           </span>
+                       ))}
+                    </div>
+
+                    <div className="flex justify-between items-center mb-1">
+                       <div className="text-sm font-medium">Contents</div>
+                       <button 
+                         onClick={() => performMdRestore(mdFolderStack.length === 0 ? 'vault' : 'folder', mdFolderStack.length === 0 ? selectedMdVault : mdFolderStack[mdFolderStack.length - 1])}
+                         className="text-[11px] bg-accent text-white px-2 py-1 rounded"
+                       >
+                         {mdFolderStack.length === 0 ? "Restore Full Vault" : "Restore This Folder"}
+                       </button>
+                    </div>
+                    
+                    <div className="flex-1 overflow-y-auto border border-border rounded-md bg-background p-2">
+                       {loadingMdVaultContents ? (
+                          <div className="text-center text-sm text-text-muted py-4">Loading contents...</div>
+                       ) : mdVaultContents.length === 0 ? (
+                          <div className="text-center text-sm text-text-muted py-4">Folder is empty.</div>
+                       ) : (
+                          mdVaultContents.map(child => (
+                             <div key={child.id} className="flex items-center justify-between p-2 hover:bg-surface-active rounded-md group">
+                                <div 
+                                   onClick={() => {
+                                      if (child.mimeType === 'application/vnd.google-apps.folder') {
+                                         setMdFolderStack([...mdFolderStack, {id: child.id, name: child.name}]);
+                                         loadMdVaultContents(child.id);
+                                      }
+                                   }}
+                                   className={`flex items-center gap-2 text-sm truncate flex-1 ${child.mimeType === 'application/vnd.google-apps.folder' ? 'cursor-pointer hover:text-accent' : ''}`}
+                                >
+                                   {child.mimeType === 'application/vnd.google-apps.folder' ? '📁' : '📄'}
+                                   <span className="truncate">{child.name}</span>
+                                </div>
+                                
+                                {child.mimeType !== 'application/vnd.google-apps.folder' && child.name.endsWith('.md') && (
+                                   <button 
+                                      onClick={() => performMdRestore('file', child)}
+                                      className="opacity-0 group-hover:opacity-100 text-[10px] bg-surface border border-border px-2 py-0.5 rounded text-text-primary hover:text-accent hover:border-accent transition-all"
+                                   >
+                                      Import
+                                   </button>
+                                )}
+                             </div>
+                          ))
+                       )}
+                    </div>
+                 </div>
+              )}
+
+              {mdRestoreProgress && (
+                <div className="mt-4 bg-background border border-border rounded-md p-3">
+                   <div className="flex justify-between text-xs mb-2">
+                      <span className="font-medium text-text-primary truncate mr-2">{mdRestoreProgress.status}</span>
+                      <span className="text-text-muted shrink-0">{mdRestoreProgress.current} / {mdRestoreProgress.total}</span>
+                   </div>
+                   <div className="w-full bg-surface-active rounded-full h-1.5 mb-2">
+                      <div className="bg-green-500 h-1.5 rounded-full transition-all duration-300" style={{ width: `${(mdRestoreProgress.current / (mdRestoreProgress.total || 1)) * 100}%` }}></div>
+                   </div>
+                   <button 
+                     onClick={() => { mdCancelRef.current = true; }} 
+                     className="w-full text-xs text-red-500 font-medium py-1 hover:bg-red-500/10 rounded-md transition-colors"
+                   >
+                     Cancel Restore
+                   </button>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 mt-4">
+                <button
+                  onClick={() => setShowMdRestoreModal(false)}
+                  disabled={!!mdRestoreProgress}
+                  className="px-4 py-2 rounded-md hover:bg-surface-active transition-colors text-sm font-medium border border-border disabled:opacity-50"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+            
+            {mdConflict && (
+              <div className="absolute inset-0 bg-background/95 flex items-center justify-center p-6 z-[60]">
+                <div className="bg-surface border border-border rounded-xl shadow-2xl p-5 w-full max-w-sm">
+                   <h3 className="text-lg font-bold text-red-500 mb-2">Note Conflict</h3>
+                   <p className="text-sm text-text-primary mb-1">A note with this title already exists in exactly this location.</p>
+                   <p className="text-xs text-text-muted bg-background p-2 rounded border border-border mb-4">
+                      Title: {mdConflict.noteName}<br />
+                      Location: {mdConflict.folderName}
+                   </p>
+                   <div className="flex flex-col gap-2">
+                      <button onClick={() => mdConflict.resolve('replace')} className="w-full bg-red-500 hover:bg-red-600 text-white py-2 rounded-md font-medium text-sm transition-colors">Replace Existing Note</button>
+                      <button onClick={() => mdConflict.resolve('keep')} className="w-full bg-surface-active border border-border hover:border-text-muted py-2 rounded-md font-medium text-sm transition-colors">Skip (Keep Existing)</button>
+                      <button onClick={() => mdConflict.resolve('both')} className="w-full bg-surface-active border border-border hover:border-text-muted py-2 rounded-md font-medium text-sm transition-colors">Keep Both (Rename newly imported)</button>
+                   </div>
+                </div>
+              </div>
+            )}
+            
+          </div>
+        )}
+
       </div>
     </div>
   );
