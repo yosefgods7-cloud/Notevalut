@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useStorage } from "../context/StorageContext";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -172,14 +172,48 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.name.endsWith(".txt") || file.name.endsWith(".md")) {
+    if (file.name.endsWith(".txt") || file.name.endsWith(".md") || file.name.endsWith(".html")) {
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         const content = event.target?.result as string;
         let htmlContent = content;
 
-        // Basic Markdown to HTML conversion if it's md
-        if (file.name.endsWith(".md")) {
+        if (file.name.endsWith(".html")) {
+           try {
+              const TurndownService = (await import('turndown')).default;
+              const { gfm } = await import('turndown-plugin-gfm');
+              
+              const turndownService = new TurndownService({
+                 headingStyle: 'atx',
+                 hr: '---',
+                 bulletListMarker: '-',
+                 codeBlockStyle: 'fenced',
+                 emDelimiter: '*',
+                 strongDelimiter: '**'
+              });
+              
+              turndownService.use(gfm);
+              
+              turndownService.addRule('strikethrough', {
+                filter: ['del', 's', 'strike'],
+                replacement: function (content) {
+                  return '~~' + content + '~~';
+                }
+              });
+
+              turndownService.addRule('stripStyles', {
+                filter: ['style', 'script', 'title', 'meta'],
+                replacement: function () {
+                  return '';
+                }
+              });
+
+              htmlContent = turndownService.turndown(content);
+           } catch (e) {
+              console.error("HTML conversion failed:", e);
+              showToast("Failed to convert HTML cleanly");
+           }
+        } else if (file.name.endsWith(".md")) {
           htmlContent = content
             .replace(/^### (.*$)/gim, "<h3>$1</h3>")
             .replace(/^## (.*$)/gim, "<h2>$1</h2>")
@@ -2960,7 +2994,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <span className="text-xs font-medium">Import</span>
                         <input
                           type="file"
-                          accept=".json,.txt,.md"
+                          accept=".json,.txt,.md,.html"
                           onChange={handleDataImport}
                           className="hidden"
                         />
