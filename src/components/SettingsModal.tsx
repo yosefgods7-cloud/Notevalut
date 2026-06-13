@@ -55,6 +55,7 @@ import { AskYourVaultSettingsPanel } from "./AskYourVaultSettingsPanel";
 import { ApiKeysSettingsPanel } from "./ApiKeysSettingsPanel";
 import { VaultHealthDashboard } from "./VaultHealthDashboard";
 import { GithubSyncSettingsPanel } from "./GithubSyncSettingsPanel";
+import { useGooglePicker } from "../hooks/useGooglePicker";
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
@@ -78,8 +79,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     addCollection,
     updateCollection,
     deleteCollection,
+    saveData,
   } = useStorage();
   const { user, accessToken, signIn, signOut } = useAuth();
+  const { isReady: isPickerReady, openPicker } = useGooglePicker();
   const [localSettings, setLocalSettings] = useState<SettingsType>(
     data.settings,
   );
@@ -195,7 +198,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               turndownService.use(gfm);
               
               turndownService.addRule('strikethrough', {
-                filter: ['del', 's', 'strike'],
+                filter: ['del', 's'],
                 replacement: function (content) {
                   return '~~' + content + '~~';
                 }
@@ -391,18 +394,33 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleFetchDriveFolders = async () => {
-     if (!accessToken) return;
-     setLoadingDriveFolders(true);
-     setShowDriveFolderPicker(true);
-     try {
-       const folders = await listDriveFolders(accessToken);
-       setDriveFolders(folders);
-     } catch (err) {
-       console.error(err);
-       showToast("Failed to fetch folders");
-     } finally {
-       setLoadingDriveFolders(false);
+     if (!accessToken) {
+       showToast("Please sign in to Google Drive first.");
+       return;
      }
+     if (!isPickerReady) {
+       showToast("Google Picker is not ready. Try again in a moment.");
+       return;
+     }
+
+     openPicker(
+       accessToken,
+       "folders",
+       (docs) => {
+         const folder = docs[0];
+         setLocalSettings(s => ({
+           ...s,
+           driveBackup: {
+             ...s.driveBackup!,
+             backupFolderId: folder.id,
+             backupFolderName: folder.name,
+             enabled: s.driveBackup?.enabled ?? false,
+             frequency: s.driveBackup?.frequency || "daily"
+           }
+         }));
+         showToast(`Selected backup folder: ${folder.name}`);
+       }
+     );
   };
 
   const handleCreateRootFolder = async () => {
@@ -445,60 +463,68 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
+  const handleFetchDriveBackups = async () => {
+     if (!accessToken) {
+        showToast("Please sign in to Google Drive first.");
+        return;
+     }
+
+     if (!isPickerReady) {
+       showToast("Google Picker is not ready. Try again in a moment.");
+       return;
+     }
+
+     openPicker(
+       accessToken,
+       "files",
+       async (docs) => {
+         const file = docs[0];
+         setLoadingDriveBackups(false);
+         setShowRestoreModal(true);
+         setSelectedRestoreBackup(file);
+         setRestoreMode('full');
+
+         // Trigger the automatic download of the selected backup for preview
+         setDownloadingBackup(true);
+         setDownloadedBackup(null);
+         try {
+           const { downloadJsonBackup } = await import("../lib/drive");
+           const imported = await downloadJsonBackup(accessToken, file.id);
+           setDownloadedBackup(imported);
+           setSelectedNotesToRestore(new Set((imported.notes || []).map((n: any) => n.id)));
+           setSelectedCollectionsToRestore(new Set((imported.collections || []).map((c: any) => c.id)));
+         } catch(e) {
+           console.error(e);
+           showToast("Failed to fetch backup contents for preview");
+         } finally {
+           setDownloadingBackup(false);
+         }
+       }
+     );
+  };
+
   const handleFetchMdVaultBackups = async () => {
      if (!accessToken) {
         showToast("Please sign in to Google Drive first.");
         return;
      }
      
-     const folderId = localSettings.driveBackup?.backupFolderId;
-     if (!folderId) {
-        showToast("Please select a Drive Backup folder first.");
-        return;
+     if (!isPickerReady) {
+       showToast("Google Picker is not ready. Try again in a moment.");
+       return;
      }
 
-     setLoadingMdVaultBackups(true);
-     setShowMdRestoreModal(true);
-     setSelectedMdVault(null);
-     setMdFolderStack([]);
-     
-     try {
-       const { listVaultBackups } = await import("../lib/drive");
-       const backups = await listVaultBackups(accessToken, folderId);
-       setMdVaultBackups(backups);
-     } catch(err) {
-       console.error(err);
-       showToast("Failed to fetch MD Vault backups");
-     } finally {
-       setLoadingMdVaultBackups(false);
-     }
-  };
-
-  const handleFetchDriveBackups = async () => {
-     if (!accessToken) {
-        showToast("Please sign in to Google Drive first.");
-        return;
-     }
-     
-     const folderId = localSettings.driveBackup?.backupFolderId;
-     if (!folderId) {
-        showToast("Please select a Drive Backup folder first.");
-        return;
-     }
-
-     setLoadingDriveBackups(true);
-     setShowRestoreModal(true);
-     setSelectedRestoreBackup(null);
-     
-     try {
-       const backups = await listJsonBackups(accessToken, folderId);
-       setDriveBackups(backups);
-     } catch(err) {
-       console.error(err);
-       showToast("Failed to fetch backups");
-     } finally {
-       setLoadingDriveBackups(false);
-     }
+     openPicker(
+       accessToken,
+       "folders",
+       async (docs) => {
+         const folder = docs[0];
+         setShowMdRestoreModal(true);
+         setSelectedMdVault(folder);
+         setMdFolderStack([]);
+         loadMdVaultContents(folder.id);
+       }
+     );
   };
 
   const handlePerformRestore = async () => {
@@ -3203,109 +3229,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
         )}
-
-        {showDriveFolderPicker && (
-          <div className="absolute inset-0 bg-background/90 backdrop-blur-[2px] rounded-2xl z-50 flex items-center justify-center p-6">
-            <div className="bg-surface border border-border rounded-xl shadow-2xl p-5 w-full max-w-sm flex flex-col max-h-[80vh]">
-              <h3 className="text-lg font-bold text-text-primary mb-3 flex items-center gap-2">
-                 Select Backup Folder
-              </h3>
-              
-              <div className="flex gap-2 mb-4">
-                 <input 
-                   type="text"
-                   value={newDriveFolderName}
-                   onChange={e => setNewDriveFolderName(e.target.value)}
-                   className="flex-1 bg-background border border-border rounded-md px-3 py-1.5 text-sm"
-                   placeholder="New folder name"
-                 />
-                 <button
-                   onClick={handleCreateRootFolder}
-                   disabled={loadingDriveFolders || !newDriveFolderName.trim()}
-                   className="bg-accent text-white px-3 py-1.5 rounded-md text-sm font-medium disabled:opacity-50"
-                 >
-                   Create
-                 </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto min-h-[100px] border border-border rounded-md bg-background mb-4 p-2">
-                 {loadingDriveFolders ? (
-                    <div className="text-center text-sm text-text-muted py-4">Loading...</div>
-                 ) : driveFolders.length === 0 ? (
-                    <div className="text-center text-sm text-text-muted py-4">No backup folders found. Create one.</div>
-                 ) : (
-                    driveFolders.map(folder => (
-                       <button
-                         key={folder.id}
-                         onClick={() => handleSelectRootFolder(folder)}
-                         className="w-full text-left px-3 py-2 text-sm hover:bg-surface-active rounded-md transition-colors flex items-center gap-2"
-                       >
-                         <Cloud size={14} className="text-accent" />
-                         <span className="truncate flex-1">{folder.name}</span>
-                       </button>
-                    ))
-                 )}
-              </div>
-
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => setShowDriveFolderPicker(false)}
-                  className="px-4 py-2 rounded-md hover:bg-surface-active transition-colors text-sm font-medium border border-border"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
         {showRestoreModal && (
           <div className="absolute inset-0 bg-background/90 backdrop-blur-[2px] rounded-2xl z-50 flex items-center justify-center p-6">
             <div className="bg-surface border border-border rounded-xl shadow-2xl p-5 w-full max-w-sm flex flex-col max-h-[90vh]">
               <h3 className="text-lg font-bold text-text-primary mb-3 flex items-center gap-2">
-                 <Cloud size={18} className="text-accent" /> Select Backup to Restore
+                 <Cloud size={18} className="text-accent" /> Confirm Restore Options
               </h3>
               
-              <div className="flex-1 overflow-y-auto border border-border rounded-md bg-background mb-4 p-2 min-h-[150px]">
-                 {loadingDriveBackups ? (
-                    <div className="text-center text-sm text-text-muted py-4">Loading backups...</div>
-                 ) : driveBackups.length === 0 ? (
-                    <div className="text-center text-sm text-text-muted py-4">No JSON backups found.</div>
-                 ) : (
-                    driveBackups.map(backup => (
-                       <div 
-                         key={backup.id}
-                         onClick={async () => {
-                           setSelectedRestoreBackup(backup);
-                           setRestoreMode('full');
-                           if (!accessToken) return;
-                           setDownloadingBackup(true);
-                           setDownloadedBackup(null);
-                           try {
-                             const imported = await downloadJsonBackup(accessToken, backup.id);
-                             setDownloadedBackup(imported);
-                             setSelectedNotesToRestore(new Set((imported.notes || []).map((n: any) => n.id)));
-                             setSelectedCollectionsToRestore(new Set((imported.collections || []).map((c: any) => c.id)));
-                           } catch(e) {
-                             console.error(e);
-                             showToast("Failed to fetch backup contents for preview");
-                           } finally {
-                             setDownloadingBackup(false);
-                           }
-                         }}
-                         className={`w-full text-left p-3 text-sm hover:bg-surface-active rounded-md transition-colors cursor-pointer border ${selectedRestoreBackup?.id === backup.id ? 'border-accent bg-accent/10' : 'border-transparent'}`}
-                       >
-                         <div className="font-medium truncate">{backup.name}</div>
-                         <div className="flex justify-between items-center text-xs text-text-muted mt-1">
-                           <span>{new Date(backup.createdTime).toLocaleString()}</span>
-                           <span>{backup.description ? backup.description : (backup.size ? (parseInt(backup.size) / 1024).toFixed(1) + ' KB' : '')}</span>
-                         </div>
-                       </div>
-                    ))
-                 )}
-              </div>
-
               {selectedRestoreBackup && (
                 <div className="mb-4 bg-background border border-border rounded-md p-3">
+                  <div className="font-medium truncate mb-2 text-sm text-accent">{selectedRestoreBackup.name}</div>
                   <span className="text-sm font-medium mb-2 block">Restore Mode</span>
                   <div className="flex flex-col gap-2">
                     <label className="flex items-center gap-2 text-sm cursor-pointer">
@@ -3400,32 +3333,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                  <Cloud size={18} className="text-accent" /> MD Vault Restore
               </h3>
 
-              {!selectedMdVault ? (
-                 <div className="flex-1 flex flex-col gap-2 min-h-[150px]">
-                    <div className="text-sm font-medium mb-1">Select a Vault Backup</div>
-                    <div className="flex-1 overflow-y-auto border border-border rounded-md bg-background p-2">
-                       {loadingMdVaultBackups ? (
-                          <div className="text-center text-sm text-text-muted py-4">Loading vaults...</div>
-                       ) : mdVaultBackups.length === 0 ? (
-                          <div className="text-center text-sm text-text-muted py-4">No Vaults found.</div>
-                       ) : (
-                          mdVaultBackups.map(vault => (
-                             <div 
-                               key={vault.id}
-                               onClick={() => {
-                                  setSelectedMdVault(vault);
-                                  loadMdVaultContents(vault.id);
-                               }}
-                               className="w-full text-left p-2.5 text-sm hover:bg-surface-active rounded-md transition-colors cursor-pointer border border-transparent hover:border-border"
-                             >
-                               <div className="font-medium truncate">{vault.name}</div>
-                               <div className="text-xs text-text-muted">{new Date(vault.createdTime).toLocaleString()}</div>
-                             </div>
-                          ))
-                       )}
-                    </div>
-                 </div>
-              ) : (
+              {selectedMdVault && (
                  <div className="flex-1 flex flex-col gap-2 min-h-[150px]">
                     
                     <div className="flex items-center gap-2 text-sm bg-surface-active p-1.5 rounded-md mb-2 overflow-x-auto whitespace-nowrap">

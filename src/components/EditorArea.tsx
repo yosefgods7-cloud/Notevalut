@@ -161,7 +161,7 @@ const preprocessWikilinks = (html: string) => {
 const turndownService = new TurndownService();
 // Preserve some basic HTML if needed
 turndownService.addRule("strikethrough", {
-  filter: ["del", "s", "strike"],
+  filter: ["del", "s"],
   replacement: (content) => `~~${content}~~`,
 });
 
