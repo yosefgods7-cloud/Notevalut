@@ -25,6 +25,9 @@ async function ghFetch(endpoint: string, token: string, options: RequestInit = {
   
   if (!response.ok) {
     const errText = await response.text();
+    if (response.status === 404) {
+      throw new Error(`GitHub API error (404): ${url} not found. Please check repo name, branch, and token access.`);
+    }
     throw new Error(`GitHub API error (${response.status}): ${errText}`);
   }
   
@@ -38,11 +41,22 @@ async function ghFetch(endpoint: string, token: string, options: RequestInit = {
  * Throws if repository doesn't exist or token lacks permission.
  */
 export async function testGithubConnection(repo: string, branch: string, token: string) {
-  const [owner, name] = repo.split('/');
-  if (!owner || !name) throw new Error("Invalid repository format. Use owner/repo.");
-  const data = await ghFetch(`/repos/${repo}/branches/${branch}`, token);
-  if (!data?.commit?.sha) throw new Error(`Branch ${branch} not found`);
-  return data;
+  const parts = repo.split('/');
+  if (parts.length !== 2) throw new Error("Invalid repository format. Use owner/repo.");
+  const owner = parts[0];
+  const repoName = parts[1];
+  
+  const endpoint = `/repos/${owner}/${repoName}/branches/${branch}`;
+  try {
+     const data = await ghFetch(endpoint, token);
+     if (!data?.commit?.sha) throw new Error(`Branch ${branch} not found`);
+     return data;
+  } catch (error: any) {
+     if (error.message.includes("404")) {
+         throw new Error(`GitHub API error (404): https://api.github.com${endpoint} not found. Please check repo name, branch, and token access.`);
+     }
+     throw error;
+  }
 }
 
 /**
@@ -55,6 +69,11 @@ export async function pushToGithub(data: NoteVaultData, config: any): Promise<nu
   if (!config.repository || !config.branch) throw new Error("Repository or branch not configured");
   
   const { repository, branch } = config;
+  const parts = repository.split('/');
+  if (parts.length !== 2) throw new Error("Invalid repository format. Use owner/repo.");
+  const owner = parts[0];
+  const repoName = parts[1];
+  
   const lastSyncTime = config.lastSyncTime || "1970-01-01T00:00:00.000Z";
   
   // Find notes that need to be pushed
@@ -62,11 +81,11 @@ export async function pushToGithub(data: NoteVaultData, config: any): Promise<nu
   if (notesToPush.length === 0) return 0; // Nothing to push
   
   // Get current commit
-  const refData = await ghFetch(`/repos/${repository}/git/refs/heads/${branch}`, token);
+  const refData = await ghFetch(`/repos/${owner}/${repoName}/git/refs/heads/${branch}`, token);
   const baseCommitSha = refData.object.sha;
   
   // Get the tree of the base commit
-  const commitData = await ghFetch(`/repos/${repository}/git/commits/${baseCommitSha}`, token);
+  const commitData = await ghFetch(`/repos/${owner}/${repoName}/git/commits/${baseCommitSha}`, token);
   const baseTreeSha = commitData.tree.sha;
   
   // Create blobs for each note file and the index
@@ -98,11 +117,8 @@ export async function pushToGithub(data: NoteVaultData, config: any): Promise<nu
     });
   }
   
-  // Delete notes that exist? We only push notes. Deletes are tricky without a full sync.
-  // For now, let's keep it simple: we push new notes or modified notes.
-  
   // Create tree
-  const newTreeData = await ghFetch(`/repos/${repository}/git/trees`, token, {
+  const newTreeData = await ghFetch(`/repos/${owner}/${repoName}/git/trees`, token, {
     method: 'POST',
     body: JSON.stringify({
       base_tree: baseTreeSha,
@@ -114,7 +130,7 @@ export async function pushToGithub(data: NoteVaultData, config: any): Promise<nu
   // Create commit
   const nowStr = new Date().toLocaleString();
   const commitMsg = `Sync: ${notesToPush.length} notes updated on ${nowStr}`;
-  const newCommitData = await ghFetch(`/repos/${repository}/git/commits`, token, {
+  const newCommitData = await ghFetch(`/repos/${owner}/${repoName}/git/commits`, token, {
     method: 'POST',
     body: JSON.stringify({
       message: commitMsg,
@@ -125,7 +141,7 @@ export async function pushToGithub(data: NoteVaultData, config: any): Promise<nu
   const newCommitSha = newCommitData.sha;
   
   // Update ref
-  await ghFetch(`/repos/${repository}/git/refs/heads/${branch}`, token, {
+  await ghFetch(`/repos/${owner}/${repoName}/git/refs/heads/${branch}`, token, {
     method: 'PATCH',
     body: JSON.stringify({
       sha: newCommitSha
@@ -145,11 +161,15 @@ export async function pullFromGithub(data: NoteVaultData, config: any): Promise<
   if (!config.repository || !config.branch) throw new Error("Repository or branch not configured");
   
   const { repository, branch } = config;
+  const parts = repository.split('/');
+  if (parts.length !== 2) throw new Error("Invalid repository format. Use owner/repo.");
+  const owner = parts[0];
+  const repoName = parts[1];
   
   // Try to get notes_index.json
   let indexData;
   try {
-    const rawRes = await ghFetch(`/repos/${repository}/contents/notes_index.json?ref=${branch}`, token);
+    const rawRes = await ghFetch(`/repos/${owner}/${repoName}/contents/notes_index.json?ref=${branch}`, token);
     const content = atob(rawRes.content);
     indexData = JSON.parse(content);
   } catch (e) {
@@ -168,7 +188,7 @@ export async function pullFromGithub(data: NoteVaultData, config: any): Promise<
     if (!localNote || new Date(remoteInfo.updatedAt) > new Date(localNote.updatedAt)) {
       // Pull this note
       try {
-        const rawRes = await ghFetch(`/repos/${repository}/contents/notes/${id}.json?ref=${branch}`, token);
+        const rawRes = await ghFetch(`/repos/${owner}/${repoName}/contents/notes/${id}.json?ref=${branch}`, token);
         const content = decodeURIComponent(escape(atob(rawRes.content)));
         const noteData = JSON.parse(content);
         updatedNotes.push(noteData);
