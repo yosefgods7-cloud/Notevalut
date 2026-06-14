@@ -7,7 +7,10 @@ import {
   FilePlus,
   FolderOpen,
   PanelRight,
-  PanelLeft
+  PanelLeft,
+  MoreVertical,
+  Columns,
+  Rows
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useStorage } from "../context/StorageContext";
@@ -42,6 +45,9 @@ export const MainLayout: React.FC = () => {
   const dataRef = React.useRef(data);
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
   const [isFindPanelOpen, setIsFindPanelOpen] = useState(false);
+  const [splitMode, setSplitMode] = useState<'none' | 'left' | 'down'>('none');
+  const [secondaryNoteId, setSecondaryNoteId] = useState<string | null>(null);
+  const [showSplitPicker, setShowSplitPicker] = useState<'left' | 'down' | null>(null);
 
   useEffect(() => {
     dataRef.current = data;
@@ -224,8 +230,23 @@ export const MainLayout: React.FC = () => {
     const newTabs = openTabs.filter((id) => id !== idToClose);
     setOpenTabs(newTabs);
 
+    if (idToClose === secondaryNoteId) {
+      setSecondaryNoteId(null);
+      setSplitMode('none');
+    }
+
     if (idToClose === activeNoteId) {
-      if (newTabs.length > 0) {
+      if (secondaryNoteId && secondaryNoteId !== idToClose) {
+        // If there's a secondary note, promote it to active note
+        setActiveNoteId(secondaryNoteId);
+        const nextNote = data.notes.find((n) => n.id === secondaryNoteId);
+        if (nextNote) {
+          setActiveCollectionId(nextNote.collectionId);
+          setActiveWorkspaceId(nextNote.workspaceId);
+        }
+        setSecondaryNoteId(null);
+        setSplitMode('none');
+      } else if (newTabs.length > 0) {
         // Find adjacent tab
         const closedIndex = openTabs.indexOf(idToClose);
         const nextId = newTabs[Math.min(closedIndex, newTabs.length - 1)];
@@ -245,6 +266,8 @@ export const MainLayout: React.FC = () => {
   const handleCloseAllTabs = () => {
     setOpenTabs([]);
     setActiveNoteId(null);
+    setSecondaryNoteId(null);
+    setSplitMode('none');
   };
 
   const [isExportOpen, setExportOpen] = useState(false);
@@ -679,14 +702,37 @@ export const MainLayout: React.FC = () => {
             
             <div className="flex-1"></div>
             
-            <div className="flex items-center px-3 h-full mb-1">
+            <div className="flex items-center px-1 h-full mb-1">
               <button
                 onClick={() => setIsRightSidebarOpen(true)}
-                className="p-1.5 mr-3 mt-1 hover:bg-surface-active rounded text-text-muted hover:text-text-primary transition-colors"
+                className="p-1.5 mx-1 mt-1 hover:bg-surface-active rounded text-text-muted hover:text-text-primary transition-colors"
                 title="Open Note Context"
               >
                 <PanelRight size={16} />
               </button>
+
+              <div className="relative group/more-options mt-1 mr-2">
+                <button
+                  className="p-1.5 hover:bg-surface-active rounded text-text-muted hover:text-text-primary transition-colors"
+                  title="More Options"
+                >
+                  <MoreVertical size={16} />
+                </button>
+                <div className="absolute top-full right-0 mt-1 w-48 bg-surface border border-border rounded-md shadow-xl opacity-0 invisible group-hover/more-options:opacity-100 group-hover/more-options:visible transition-all z-50 py-1 flex flex-col origin-top-right">
+                  <button
+                    onClick={() => setShowSplitPicker("down")}
+                    className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-surface-active flex items-center gap-2"
+                  >
+                    <Rows size={14} /> Split Down
+                  </button>
+                  <button
+                    onClick={() => setShowSplitPicker("left")}
+                    className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-surface-active flex items-center gap-2"
+                  >
+                    <Columns size={14} /> Split Left
+                  </button>
+                </div>
+              </div>
             </div>
             
           </div>
@@ -789,35 +835,108 @@ export const MainLayout: React.FC = () => {
             </div>
           </div>
         ) : activeCollectionId && activeNoteId ? (
-          <EditorArea
-            noteId={activeNoteId}
-            isSidebarOpen={isSidebarOpen}
-            onToggleSidebar={() => {
-              const newSidebarOpen = !isSidebarOpen;
-              setIsSidebarOpen(newSidebarOpen);
-              if (newSidebarOpen && isFocusMode) {
-                setIsFocusMode(false);
+          <div className={`flex flex-1 overflow-hidden ${splitMode === 'down' ? 'flex-col' : 'flex-row'}`}>
+            <EditorArea
+              noteId={activeNoteId}
+              isSidebarOpen={isSidebarOpen}
+              onToggleSidebar={() => {
+                const newSidebarOpen = !isSidebarOpen;
+                setIsSidebarOpen(newSidebarOpen);
+                if (newSidebarOpen && isFocusMode) {
+                  setIsFocusMode(false);
+                }
+              }}
+              isFocusMode={isFocusMode}
+              onToggleFocusMode={() => {
+                const newMode = !isFocusMode;
+                setIsFocusMode(newMode);
+                if (newMode) setIsSidebarOpen(false);
+              }}
+              onOpenExport={() => setExportOpen(true)}
+              onDeleteNote={() =>
+                handleCloseTab(activeNoteId, { stopPropagation: () => {} } as any)
               }
-            }}
-            isFocusMode={isFocusMode}
-            onToggleFocusMode={() => {
-              const newMode = !isFocusMode;
-              setIsFocusMode(newMode);
-              if (newMode) setIsSidebarOpen(false);
-            }}
-            onOpenExport={() => setExportOpen(true)}
-            onDeleteNote={() =>
-              handleCloseTab(activeNoteId, { stopPropagation: () => {} } as any)
-            }
-            onNavigateToNote={(noteId, collectionId, workspaceId) => {
-              setActiveWorkspaceId(workspaceId);
-              setActiveCollectionId(collectionId);
-              setActiveNoteId(noteId);
-            }}
-            onOpenSettings={() => setSettingsOpen(true)}
-            isFindOpen={isFindPanelOpen}
-            onCloseFind={() => setIsFindPanelOpen(false)}
-          />
+              onNavigateToNote={(noteId, collectionId, workspaceId) => {
+                setActiveWorkspaceId(workspaceId);
+                setActiveCollectionId(collectionId);
+                setActiveNoteId(noteId);
+              }}
+              onOpenSettings={() => setSettingsOpen(true)}
+              isFindOpen={isFindPanelOpen}
+              onCloseFind={() => setIsFindPanelOpen(false)}
+              isSplitViewMode={splitMode !== 'none'}
+              onCloseSplit={() => {
+                if (secondaryNoteId) {
+                  setActiveNoteId(secondaryNoteId);
+                  const nextNote = data.notes.find(n => n.id === secondaryNoteId);
+                  if (nextNote) {
+                    setActiveCollectionId(nextNote.collectionId);
+                    setActiveWorkspaceId(nextNote.workspaceId);
+                  }
+                  setSecondaryNoteId(null);
+                  setSplitMode('none');
+                }
+              }}
+            />
+
+            {splitMode !== 'none' && secondaryNoteId && (
+              <div className={`flex flex-1 overflow-hidden border-border ${splitMode === 'down' ? 'border-t' : 'border-l'}`}>
+                <EditorArea
+                  noteId={secondaryNoteId}
+                  isSidebarOpen={false}
+                  onToggleSidebar={() => {}}
+                  isFocusMode={isFocusMode}
+                  onToggleFocusMode={() => {}}
+                  onOpenExport={() => setExportOpen(true)}
+                  onDeleteNote={() => {
+                    handleCloseTab(secondaryNoteId, { stopPropagation: () => {} } as any);
+                  }}
+                  onNavigateToNote={(noteId, collectionId, workspaceId) => {
+                    setSecondaryNoteId(noteId);
+                  }}
+                  onOpenSettings={() => setSettingsOpen(true)}
+                  isSplitViewMode={true}
+                  onCloseSplit={() => {
+                    setSecondaryNoteId(null);
+                    setSplitMode('none');
+                  }}
+                />
+              </div>
+            )}
+            
+            {showSplitPicker && (
+               <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                  <div className="bg-surface border border-border shadow-2xl rounded-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh] animate-in fade-in zoom-in duration-200">
+                    <div className="p-4 border-b border-border flex justify-between items-center">
+                       <h3 className="text-lg font-semibold text-text-primary">Select Note for Split View</h3>
+                       <button onClick={() => setShowSplitPicker(null)} className="text-text-muted hover:text-text-primary">
+                          <X size={20} />
+                       </button>
+                    </div>
+                    <div className="overflow-y-auto p-2">
+                       {data.notes.filter(n => !n.isDeleted && n.id !== activeNoteId).length === 0 ? (
+                         <div className="p-8 text-center text-text-muted">No other notes available to split.</div>
+                       ) : (
+                         data.notes.filter(n => !n.isDeleted && n.id !== activeNoteId).map(n => (
+                           <button 
+                             key={n.id}
+                             onClick={() => {
+                               setSecondaryNoteId(n.id);
+                               setSplitMode(showSplitPicker);
+                               setShowSplitPicker(null);
+                             }}
+                             className="w-full text-left p-3 hover:bg-surface-active rounded-lg transition-colors border border-transparent hover:border-border mb-1"
+                           >
+                             <div className="font-medium text-text-primary truncate">{n.title || 'Untitled Note'}</div>
+                             <div className="text-xs text-text-muted mt-1 truncate">{n.preview || 'No content...'}</div>
+                           </button>
+                         ))
+                       )}
+                    </div>
+                  </div>
+               </div>
+            )}
+          </div>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-text-muted bg-background h-full relative">
             <button
