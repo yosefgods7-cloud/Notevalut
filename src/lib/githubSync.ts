@@ -1,14 +1,22 @@
 import { get, set } from 'idb-keyval';
 import { NoteVaultData, Note } from '../types';
-
-const TOKEN_KEY = "github_pat_token";
+import { getAuth } from 'firebase/auth';
 
 export async function getGithubToken(): Promise<string | null> {
-  return await get(TOKEN_KEY) || null;
+  const auth = getAuth();
+  if (auth.currentUser) {
+     try {
+       // As requested, using the authenticated Firebase Auth user token directly
+       return await auth.currentUser.getIdToken();
+     } catch (e) {
+       console.error(e);
+     }
+  }
+  return null;
 }
 
 export async function setGithubToken(token: string) {
-  await set(TOKEN_KEY, token);
+  // No-op, managed by Firebase Auth
 }
 
 // GitHub API Helpers
@@ -65,7 +73,7 @@ export async function testGithubConnection(repo: string, branch: string, token: 
  */
 export async function pushToGithub(data: NoteVaultData, config: any): Promise<number> {
   const token = await getGithubToken();
-  if (!token) throw new Error("No GitHub token stored");
+  if (!token) throw new Error("No authenticated Firebase user token found");
   if (!config.repository || !config.branch) throw new Error("Repository or branch not configured");
   
   const { repository, branch } = config;
@@ -157,7 +165,7 @@ export async function pushToGithub(data: NoteVaultData, config: any): Promise<nu
  */
 export async function pullFromGithub(data: NoteVaultData, config: any): Promise<Note[]> {
   const token = await getGithubToken();
-  if (!token) throw new Error("No GitHub token stored");
+  if (!token) throw new Error("No authenticated Firebase user token found");
   if (!config.repository || !config.branch) throw new Error("Repository or branch not configured");
   
   const { repository, branch } = config;
@@ -205,3 +213,4 @@ export function getPendingPushCount(data: NoteVaultData, lastSyncTime?: string):
   if (!lastSyncTime) return data.notes.filter(n => !n.isDeleted).length;
   return data.notes.filter(n => (!n.isDeleted) && (n.updatedAt > lastSyncTime)).length;
 }
+

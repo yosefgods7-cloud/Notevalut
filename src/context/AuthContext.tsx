@@ -1,5 +1,22 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { get, set, del } from 'idb-keyval';
+import { initializeApp } from 'firebase/app';
+import { 
+  getAuth, 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  signOut as fbSignOut, 
+  onAuthStateChanged 
+} from 'firebase/auth';
+
+// Initialize Firebase (only Auth)
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+};
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
 
 interface AuthContextType {
   user: any | null | undefined;
@@ -22,193 +39,69 @@ export const useAuth = () => {
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // We use user to store basic identity from Google profile.
   const [user, setUser] = useState<any | null | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | undefined>(undefined);
   const [accessToken, setAccessToken] = useState<string | null>(null);
 
   useEffect(() => {
-    const initializeAuth = async () => {
-      try {
-        const storedAccessToken = await get("drive_access_token");
-        const storedExpiresAt = await get("drive_token_expires_at");
-        const storedUser = await get("drive_user_info");
-        
-        if (storedAccessToken && storedExpiresAt && Date.now() < storedExpiresAt - 5 * 60 * 1000) {
-          setAccessToken(storedAccessToken);
-          setUser(storedUser || { id: "google-oauth-user" });
-        } else {
-          // If expired, try refresh logic
-          await refreshAccessToken();
-        }
-      } catch (err) {
-        console.error("Auth init error:", err);
-      } finally {
-        setLoading(false);
-      }
+    // Restore locally saved OAuth access token if available
+    const initAuth = async () => {
+       const token = await get('drive_access_token');
+       if (token) setAccessToken(token);
     };
+    initAuth();
 
-    initializeAuth();
-  }, []);
-
-  const parseIdToken = (idToken: string) => {
-    try {
-      const base64Url = idToken.split('.')[1];
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
-          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-      }).join(''));
-      const parsed = JSON.parse(jsonPayload);
-      if (parsed.sub) {
-         return { id: parsed.sub, email: parsed.email, name: parsed.name, picture: parsed.picture };
-      }
-    } catch(e) {
-      console.error("Failed to parse id_token", e);
-    }
-    return null;
-  };
-
-  const refreshAccessToken = async () => {
-    try {
-      const storedRefreshToken = await get("drive_refresh_token");
-      if (!storedRefreshToken) {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setUser({
+          id: firebaseUser.uid,
+          email: firebaseUser.email,
+          name: firebaseUser.displayName,
+          picture: firebaseUser.photoURL
+        });
+      } else {
         setUser(null);
-        return;
       }
-      
-      const res = await fetch("/api/auth/refresh", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refresh_token: storedRefreshToken })
-      });
-      
-      if (!res.ok) {
-        setUser(null);
-        await del("drive_access_token");
-        await del("drive_token_expires_at");
-        await del("drive_refresh_token");
-        await del("drive_user_info");
-        return;
-      }
-      
-      const data = await res.json();
-      if (data.access_token) {
-        const newExpiresAt = Date.now() + (data.expires_in || 3600) * 1000;
-        setAccessToken(data.access_token);
-        await set("drive_access_token", data.access_token);
-        await set("drive_token_expires_at", newExpiresAt);
-        
-        let userInfo = await get("drive_user_info") || { id: "google-oauth-user" };
-        if (data.id_token) {
-           const parsedUser = parseIdToken(data.id_token);
-           if (parsedUser) {
-             userInfo = parsedUser;
-             await set("drive_user_info", userInfo);
-           }
-        }
-        setUser(userInfo);
-        
-        if (data.refresh_token) {
-           await set("drive_refresh_token", data.refresh_token);
-        }
-      }
-    } catch(e) {
-      console.error("Auto refresh failed", e);
-      setUser(null);
-    }
-  };
-
-  useEffect(() => {
-    const handleSilentRefresh = async () => {
-      try {
-        const storedExpiresAt = await get("drive_token_expires_at");
-        if (!storedExpiresAt) return;
-        
-        // Refresh within 5 minutes of expiration
-        if (Date.now() >= storedExpiresAt - 5 * 60 * 1000) {
-           await refreshAccessToken();
-        }
-      } catch (e) {
-         console.error("Silent refresh interval error", e);
-      }
-    };
+      setLoading(false);
+    });
     
-    // Check every minute
-    const interval = setInterval(handleSilentRefresh, 60 * 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Listen for message from popup
-  useEffect(() => {
-    const handleMessage = async (event: MessageEvent) => {
-      // Validate origin is from same app
-      const origin = event.origin;
-      if (!origin.endsWith('.run.app') && !origin.includes('localhost') && origin !== window.location.origin) {
-        return;
-      }
-      if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
-        const payload = event.data.payload;
-        if (payload.access_token) {
-          const expiresAt = Date.now() + (payload.expires_in || 3600) * 1000;
-          setAccessToken(payload.access_token);
-          await set("drive_access_token", payload.access_token);
-          await set("drive_token_expires_at", expiresAt);
-          if (payload.refresh_token) {
-            await set("drive_refresh_token", payload.refresh_token);
-          }
-          
-          let userInfo = { id: "google-oauth-user" };
-          if (payload.id_token) {
-             const parsedUser = parseIdToken(payload.id_token);
-             if (parsedUser) userInfo = parsedUser;
-          }
-          await set("drive_user_info", userInfo);
-          setUser(userInfo);
-        }
-      }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+    return () => unsubscribe();
   }, []);
 
   const signIn = async () => {
     try {
-      if (accessToken) return;
-
-      const response = await fetch('/api/auth/url');
-      if (!response.ok) {
-        throw new Error('Failed to get auth URL');
+      const provider = new GoogleAuthProvider();
+      // Add scopes for Drive
+      provider.addScope('https://www.googleapis.com/auth/drive.file');
+      
+      const result = await signInWithPopup(auth, provider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (credential?.accessToken) {
+        setAccessToken(credential.accessToken);
+        await set('drive_access_token', credential.accessToken);
       }
-      const { url } = await response.json();
-
-      const authWindow = window.open(
-        url,
-        'oauth_popup',
-        'width=600,height=700'
-      );
-
-      if (!authWindow) {
-        alert('Please allow popups for this site to connect your Google account.');
-      }
-    } catch (err) {
-      console.error("Login popup failed:", err);
-      alert("Failed to initialize Google login.");
+    } catch (err: any) {
+      console.error("Firebase login failed:", err);
+      alert("Failed to sign in with Google.");
     }
   };
   
   const requireDriveScope = async () => {
-     if (accessToken) return;
-     await signIn();
+     if (!accessToken) {
+       await signIn();
+     }
   };
 
   const signOut = async () => {
-    setUser(null);
-    setAccessToken(null);
-    await del('drive_access_token');
-    await del('drive_token_expires_at');
-    await del('drive_refresh_token');
-    await del('drive_user_info');
+    try {
+      await fbSignOut(auth);
+      setUser(null);
+      setAccessToken(null);
+      await del('drive_access_token');
+    } catch(err) {
+      console.error("Sign out error", err);
+    }
   };
 
   return (
