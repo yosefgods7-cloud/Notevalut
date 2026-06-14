@@ -580,9 +580,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
          }
       }
 
-      saveData(mergedData);
-      showToast(`Restore completed (${restoreMode}).`);
-      setShowRestoreModal(false);
+      try {
+         await saveData(mergedData);
+         showToast(`Restore completed (${restoreMode}) and saved to IndexedDB.`);
+         setShowRestoreModal(false);
+      } catch (err) {
+         console.error(err);
+         showToast("Restore failed. Could not save to IndexedDB.");
+      }
     } catch (err) {
       console.error(err);
       showToast("Restore failed.");
@@ -663,7 +668,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     for (let i = 0; i < filesToImport.length; i++) {
        if (mdCancelRef.current) break;
        const file = filesToImport[i];
-       setMdRestoreProgress({ current: i, total: filesToImport.length, status: `Importing ${file.path.join('/')}/${file.name}` });
+       setMdRestoreProgress({ current: i, total: filesToImport.length, status: `Saving to IndexedDB: ${file.path.join('/')}/${file.name}` });
        
        try {
          const content = await downloadTextFile(accessToken, file.id);
@@ -769,13 +774,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
        }
     }
 
-    if (!mdCancelRef.current) {
-       saveData(mergedData);
-       showToast(`Imported ${importedNotesCount} MD notes successfully.`);
-    } else {
-       // if cancelled mid-process, we still save what we got so we don't 'corrupt already imported notes' as requested!
-       saveData(mergedData);
-       showToast(`Restore cancelled. Saved ${importedNotesCount} complete notes.`);
+    try {
+       if (!mdCancelRef.current) {
+          await saveData(mergedData);
+          showToast(`Imported ${importedNotesCount} MD notes successfully to IndexedDB.`);
+       } else {
+          // if cancelled mid-process, we still save what we got so we don't 'corrupt already imported notes' as requested!
+          await saveData(mergedData);
+          showToast(`Restore cancelled. Saved ${importedNotesCount} complete notes to IndexedDB.`);
+       }
+    } catch (err) {
+       console.error("IDB save error:", err);
+       showToast("Failed to save imported notes to IndexedDB.");
     }
 
     setMdRestoreProgress(null);
@@ -3407,7 +3417,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="mt-4 bg-background border border-border rounded-md p-3">
                    <div className="flex justify-between text-xs mb-2">
                       <span className="font-medium text-text-primary truncate mr-2">{mdRestoreProgress.status}</span>
-                      <span className="text-text-muted shrink-0">{mdRestoreProgress.current} / {mdRestoreProgress.total}</span>
+                      <span className="text-text-muted shrink-0 text-right">
+                        <div>{mdRestoreProgress.current} / {mdRestoreProgress.total}</div>
+                        <div className="text-[10px] text-green-500 mt-0.5">Dest: IndexedDB</div>
+                      </span>
                    </div>
                    <div className="w-full bg-surface-active rounded-full h-1.5 mb-2">
                       <div className="bg-green-500 h-1.5 rounded-full transition-all duration-300" style={{ width: `${(mdRestoreProgress.current / (mdRestoreProgress.total || 1)) * 100}%` }}></div>

@@ -79,7 +79,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, activ
           </p>
         </div>
 
-        {isImporting && <p className="text-center mt-4 text-sm text-accent">Importing data...</p>}
+        {isImporting && <p className="text-center mt-4 text-sm text-green-500 font-medium">Importing safely to IndexedDB...</p>}
       </div>
     </div>
   );

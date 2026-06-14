@@ -196,16 +196,8 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
       try {
         await set(STORAGE_KEY, JSON.stringify(fullData));
       } catch (e) {
-        console.warn("Failed to write to IndexedDB, fallback to localStorage");
-        // Strip out large vectors for localStorage to avoid crashing 5MB quota
-        const safeDataForLs = {
-          ...fullData,
-          notes: fullData.notes.map(n => {
-            const { embedding, ...rest } = n;
-            return rest;
-          })
-        };
-        safeStorage.setItem(STORAGE_KEY, JSON.stringify(safeDataForLs));
+        console.error("Failed to write to IndexedDB:", e);
+        throw e; // Verify the IndexedDB write is confirmed successful
       } finally {
         setIsSaving(false);
       }
@@ -380,7 +372,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
       try {
         await set(STORAGE_KEY, JSON.stringify(initialData));
       } catch (e) {
-        safeStorage.setItem(STORAGE_KEY, JSON.stringify(initialData));
+        console.error("Failed to write initial data to IndexedDB:", e);
       }
       setIsInitialized(true);
     };
@@ -396,7 +388,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       await set(STORAGE_KEY, JSON.stringify(previous));
     } catch (e) {
-      safeStorage.setItem(STORAGE_KEY, JSON.stringify(previous));
+      console.error("Failed to write to IndexedDB:", e);
     }
     showToast("Action Undone");
   }, [history, showToast]);
@@ -794,33 +786,38 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const importData = useCallback(
     async (importedData: NoteVaultData, merge: boolean) => {
-      if (merge) {
-        showToast("Checking for existing notes...");
-        let currentNotes = data.notes;
-        
-        // Unique identifier sets to avoid duplicates
-        const existingNoteIdentifiers = new Set(currentNotes.map(n => `${(n.title || "Untitled").trim().toLowerCase()}-${n.createdAt}`));
-        
-        const newNotes = importedData.notes.filter(n => {
-          const idMatch = currentNotes.find(e => e.id === n.id);
-          const metaMatch = existingNoteIdentifiers.has(`${(n.title || "Untitled").trim().toLowerCase()}-${n.createdAt}`);
-          return !idMatch && !metaMatch;
-        });
-        
-        const newWorkspaces = importedData.workspaces.filter(w => !data.workspaces.find(e => e.id === w.id));
-        const newCollections = importedData.collections.filter(c => !data.collections.find(e => e.id === c.id));
-        
-        saveData({
-          ...data,
-          workspaces: [...data.workspaces, ...newWorkspaces],
-          collections: [...data.collections, ...newCollections],
-          notes: [...data.notes, ...newNotes],
-          tags: Array.from(new Set([...data.tags, ...importedData.tags])),
-        });
-        showToast(`Imported ${newNotes.length} new notes (skipped duplicates).`);
-      } else {
-        saveData(importedData);
-        showToast("Restored backup successfully.");
+      try {
+        if (merge) {
+          showToast("Checking for existing notes...");
+          let currentNotes = data.notes;
+          
+          // Unique identifier sets to avoid duplicates
+          const existingNoteIdentifiers = new Set(currentNotes.map(n => `${(n.title || "Untitled").trim().toLowerCase()}-${n.createdAt}`));
+          
+          const newNotes = importedData.notes.filter(n => {
+            const idMatch = currentNotes.find(e => e.id === n.id);
+            const metaMatch = existingNoteIdentifiers.has(`${(n.title || "Untitled").trim().toLowerCase()}-${n.createdAt}`);
+            return !idMatch && !metaMatch;
+          });
+          
+          const newWorkspaces = importedData.workspaces.filter(w => !data.workspaces.find(e => e.id === w.id));
+          const newCollections = importedData.collections.filter(c => !data.collections.find(e => e.id === c.id));
+          
+          await saveData({
+            ...data,
+            workspaces: [...data.workspaces, ...newWorkspaces],
+            collections: [...data.collections, ...newCollections],
+            notes: [...data.notes, ...newNotes],
+            tags: Array.from(new Set([...data.tags, ...importedData.tags])),
+          });
+          showToast(`Imported ${newNotes.length} new notes successfully to IndexedDB (skipped duplicates).`);
+        } else {
+          await saveData(importedData);
+          showToast("Restored backup successfully to IndexedDB.");
+        }
+      } catch (err) {
+         console.error("Save failed:", err);
+         showToast("Import failed. Could not save to IndexedDB.");
       }
     },
     [data, saveData, user],

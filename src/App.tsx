@@ -3,6 +3,7 @@ import { StorageProvider } from './context/StorageContext';
 import { AuthProvider } from './context/AuthContext';
 import { MainLayout } from './components/MainLayout';
 import { GlobalDialogs } from './components/GlobalDialogs';
+import { StorageDiagnosticBanner } from './components/StorageDiagnosticBanner';
 
 class ErrorBoundary extends Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null}> {
   constructor(props: {children: React.ReactNode}) {
@@ -38,6 +39,7 @@ export default function App() {
     <ErrorBoundary>
       <AuthProvider>
           <StorageProvider>
+            <StorageDiagnosticBanner />
             <MainLayout />
             <GlobalDialogs />
           </StorageProvider>

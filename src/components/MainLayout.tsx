@@ -687,19 +687,6 @@ export const MainLayout: React.FC = () => {
               >
                 <PanelRight size={16} />
               </button>
-              <div className="flex items-center gap-1.5 px-2 py-1 mt-1 bg-surface-active rounded border border-border text-[10px] uppercase font-bold tracking-wider text-text-muted select-none">
-                 {isOnline ? (
-                    <>
-                       <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
-                       <span>Synced</span>
-                    </>
-                 ) : (
-                    <>
-                       <div className="w-1.5 h-1.5 rounded-full bg-orange-500"></div>
-                       <span>Offline Mode</span>
-                    </>
-                 )}
-              </div>
             </div>
             
           </div>
