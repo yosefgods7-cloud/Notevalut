@@ -690,7 +690,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             const wsName = file.path[0];
             let ws = mergedData.workspaces.find(w => w.name === wsName);
             if (!ws) {
-               ws = { id: crypto.randomUUID(), name: wsName, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+               ws = { id: crypto.randomUUID(), name: wsName, createdAt: new Date().toISOString(), icon: 'folder', order: 0 };
                mergedData.workspaces.push(ws);
             }
             targetWsId = ws.id;
@@ -701,7 +701,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                const colName = file.path[1];
                let col = mergedData.collections.find(c => c.name === colName && c.workspaceId === ws!.id);
                if (!col) {
-                  col = { id: crypto.randomUUID(), name: colName, workspaceId: ws!.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+                  col = { id: crypto.randomUUID(), name: colName, workspaceId: ws!.id, createdAt: new Date().toISOString(), icon: 'folder', order: 0 };
                   mergedData.collections.push(col);
                }
                targetColId = col.id;

@@ -905,7 +905,7 @@ export const MainLayout: React.FC = () => {
                              className="w-full text-left p-3 hover:bg-surface-active rounded-lg transition-colors border border-transparent hover:border-border mb-1"
                            >
                              <div className="font-medium text-text-primary truncate">{n.title || 'Untitled Note'}</div>
-                             <div className="text-xs text-text-muted mt-1 truncate">{n.preview || 'No content...'}</div>
+                             <div className="text-xs text-text-muted mt-1 truncate">{n.content?.replace(/<[^>]+>/g, "").substring(0, 50) || 'No content...'}</div>
                            </button>
                          ))
                        )}

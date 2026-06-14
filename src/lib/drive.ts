@@ -1,5 +1,5 @@
 import { addDays, addMonths, isAfter, isBefore } from 'date-fns';
-import { DriveBackupSettings, NoteVaultData } from '../types';
+import { DriveBackupSettings, NoteVaultData, Note } from '../types';
 
 export const calculateNextBackupDate = (startDate: Date, frequency: DriveBackupSettings['frequency']): Date => {
   switch (frequency) {

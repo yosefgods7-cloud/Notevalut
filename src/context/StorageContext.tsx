@@ -661,7 +661,6 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({
         id: generateId(),
         name,
         content,
-        createdAt: new Date().toISOString(),
       };
       saveData({ ...data, templates: [...data.templates, template] });
       return template;
