@@ -710,29 +710,6 @@ export const MainLayout: React.FC = () => {
               >
                 <PanelRight size={16} />
               </button>
-
-              <div className="relative group/more-options mt-1 mr-2">
-                <button
-                  className="p-1.5 hover:bg-surface-active rounded text-text-muted hover:text-text-primary transition-colors"
-                  title="More Options"
-                >
-                  <MoreVertical size={16} />
-                </button>
-                <div className="absolute top-full right-0 mt-1 w-48 bg-surface border border-border rounded-md shadow-xl opacity-0 invisible group-hover/more-options:opacity-100 group-hover/more-options:visible transition-all z-50 py-1 flex flex-col origin-top-right">
-                  <button
-                    onClick={() => setShowSplitPicker("down")}
-                    className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-surface-active flex items-center gap-2"
-                  >
-                    <Rows size={14} /> Split Down
-                  </button>
-                  <button
-                    onClick={() => setShowSplitPicker("left")}
-                    className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-surface-active flex items-center gap-2"
-                  >
-                    <Columns size={14} /> Split Left
-                  </button>
-                </div>
-              </div>
             </div>
             
           </div>
@@ -1073,6 +1050,7 @@ export const MainLayout: React.FC = () => {
              }
              if (window.innerWidth < 768) setIsRightSidebarOpen(false);
            }}
+           onSplitView={(mode) => setShowSplitPicker(mode)}
         />
       </Suspense>
     </div>

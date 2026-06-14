@@ -41,10 +41,15 @@ export const GithubSyncSettingsPanel: React.FC<{
     setIsConnecting(true);
     
     try {
-      const realToken = await getGithubToken();
-      if (!realToken) throw new Error("No authenticated Firebase token found");
+      const realToken = token.startsWith("••••") ? await getGithubToken() : token;
+      if (!realToken) throw new Error("Please enter a personal access token");
       
       await testGithubConnection(githubSync.repository, githubSync.branch, realToken);
+      
+      if (!token.startsWith("••••")) {
+        await setGithubToken(token);
+        setToken("••••••••••••••••••••••••••••••••••••••••");
+      }
       
       updateSettings({
         githubSync: {
@@ -102,6 +107,8 @@ export const GithubSyncSettingsPanel: React.FC<{
   };
 
   const disconnect = async () => {
+    await setGithubToken("");
+    setToken("");
     updateSettings({
       githubSync: {
         ...githubSync,
@@ -208,13 +215,24 @@ export const GithubSyncSettingsPanel: React.FC<{
             <div className="text-xs text-text-muted space-y-2 mb-4 bg-background p-3 rounded border border-border">
               <p className="font-semibold text-text-primary">How to connect GitHub Sync:</p>
               <ol className="list-decimal pl-4 space-y-1">
-                 <li>Ensure you are authenticated via Google which connects to your account.</li>
-                 <li>Create an empty repository on GitHub</li>
-                 <li>Fill in the details below to connect</li>
+                <li>Go to GitHub Settings &gt; Developer settings &gt; Personal access tokens &gt; Tokens (classic)</li>
+                <li>Generate new token with `repo` scope</li>
+                <li>Create an empty repository on GitHub</li>
+                <li>Fill in the details below to connect</li>
               </ol>
             </div>
           
             <div className="space-y-3">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium">Personal Access Token</label>
+                <input
+                  type="password"
+                  placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                  className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-accent"
+                />
+              </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium">Repository</label>
                 <input

@@ -49,21 +49,28 @@ export async function clearPersonalDictionary(): Promise<void> {
 export async function loadSpellchecker(): Promise<void> {
   if (spellcheckerInstance) return;
 
-  const [affRes, dicRes] = await Promise.all([
-    fetch(AFF_URL),
-    fetch(DIC_URL)
-  ]);
-  
-  const affText = await affRes.text();
-  const dicText = await dicRes.text();
+  try {
+    const [affRes, dicRes] = await Promise.all([
+      fetch(AFF_URL),
+      fetch(DIC_URL)
+    ]);
+    
+    if (!affRes.ok || !dicRes.ok) throw new Error("Failed to load dictionary files");
 
-  spellcheckerInstance = nspell(affText, dicText);
-  
-  const customWords = await getPersonalDictionary();
-  customWordsSet = new Set(customWords.map((w) => w.toLowerCase()));
-  
-  for (const word of customWords) {
-    spellcheckerInstance.personal(word);
+    const affText = await affRes.text();
+    const dicText = await dicRes.text();
+
+    spellcheckerInstance = nspell(affText, dicText);
+    
+    const customWords = await getPersonalDictionary();
+    customWordsSet = new Set(customWords.map((w) => w.toLowerCase()));
+    
+    for (const word of customWords) {
+      spellcheckerInstance.personal(word);
+    }
+  } catch (error) {
+    console.warn("Could not load spellchecker dictionary:", error);
+    // Fail softly so we don't spam console.error and trigger AI error overlays
   }
 }
 

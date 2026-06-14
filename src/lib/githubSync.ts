@@ -3,20 +3,11 @@ import { NoteVaultData, Note } from '../types';
 import { getAuth } from 'firebase/auth';
 
 export async function getGithubToken(): Promise<string | null> {
-  const auth = getAuth();
-  if (auth.currentUser) {
-     try {
-       // As requested, using the authenticated Firebase Auth user token directly
-       return await auth.currentUser.getIdToken();
-     } catch (e) {
-       console.error(e);
-     }
-  }
-  return null;
+  return await get('github_token');
 }
 
 export async function setGithubToken(token: string) {
-  // No-op, managed by Firebase Auth
+  await set('github_token', token);
 }
 
 // GitHub API Helpers
@@ -29,7 +20,12 @@ async function ghFetch(endpoint: string, token: string, options: RequestInit = {
     ...(options.headers || {})
   };
   
-  const response = await fetch(url, { ...options, headers });
+  let response;
+  try {
+    response = await fetch(url, { ...options, headers });
+  } catch (error: any) {
+    throw new Error(`Network error connecting to GitHub: ${error.message}`);
+  }
   
   if (!response.ok) {
     const errText = await response.text();

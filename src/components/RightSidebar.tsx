@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link2, X, Search, FolderInput, Folder, ListTree, Merge, ArrowLeft, Check, Presentation } from "lucide-react";
+import { Link2, X, Search, FolderInput, Folder, ListTree, Merge, ArrowLeft, Check, Presentation, Columns, Rows } from "lucide-react";
 import { useStorage } from "../context/StorageContext";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
@@ -11,6 +11,7 @@ interface RightSidebarProps {
   activeNoteId: string | null;
   onOpenFind?: () => void;
   onNavigateToNote?: (noteId: string, collectionId: string, workspaceId: string) => void;
+  onSplitView?: (mode: 'down' | 'left') => void;
 }
 
 export const RightSidebar: React.FC<RightSidebarProps> = ({
@@ -19,6 +20,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
   activeNoteId,
   onOpenFind,
   onNavigateToNote,
+  onSplitView,
 }) => {
   const { data, updateNote, deleteNote } = useStorage();
   const [activeTab, setActiveTab] = useState<"context" | "outliner">("context");
@@ -220,6 +222,24 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                        className="w-full bg-surface-active hover:bg-border text-text-primary border border-border flex items-center justify-center gap-2 p-3 rounded-lg transition-colors font-medium text-sm shadow-sm"
                      >
                        <Merge size={16} /> Merge Note
+                     </button>
+                     <button
+                       onClick={() => {
+                         onSplitView?.("down");
+                         onClose();
+                       }}
+                       className="w-full bg-surface-active hover:bg-border text-text-primary border border-border flex items-center justify-center gap-2 p-3 rounded-lg transition-colors font-medium text-sm shadow-sm"
+                     >
+                       <Rows size={16} /> Split Down
+                     </button>
+                     <button
+                       onClick={() => {
+                         onSplitView?.("left");
+                         onClose();
+                       }}
+                       className="w-full bg-surface-active hover:bg-border text-text-primary border border-border flex items-center justify-center gap-2 p-3 rounded-lg transition-colors font-medium text-sm shadow-sm"
+                     >
+                       <Columns size={16} /> Split Left
                      </button>
                      <button
                        onClick={() => onOpenFind && onOpenFind()}

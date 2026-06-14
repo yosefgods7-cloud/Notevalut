@@ -978,7 +978,7 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
             );
           }
         })
-        .catch(console.error);
+        .catch(() => {}); // Already handled softly inside loadSpellchecker
     } else {
       setSpellCheckEnabled(false);
       if (editor) {
